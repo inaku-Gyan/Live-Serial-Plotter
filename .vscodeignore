@@ -13,6 +13,8 @@ coverage/**
 .vscode/**
 .agents/**
 .codex/**
+AGENTS.md
+CLAUDE.md
 
 # Development tooling
 *.config.ts

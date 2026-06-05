@@ -58,7 +58,6 @@ pnpm package
 This includes the `pnpm: build` step,
 and outputs `live-serial-plotter-<version>.vsix` in the project root.
 
-
 ### VS Code Debugging
 
 Open the project in VS Code and run the `Run Extension` launch configuration. It runs the `pnpm: build` task first, then opens an Extension Development Host.
