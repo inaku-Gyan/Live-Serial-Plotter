@@ -3,17 +3,17 @@ export async function* generate(context) {
   const phase = numberOption(context.options.phase, 0);
   const temperatureBase = numberOption(context.options.temperatureBase, 24);
   const rpmBase = numberOption(context.options.rpmBase, 1200);
-
-  let t = phase;
+  const startedAt = Date.now();
 
   while (!context.signal.aborted) {
-    t += 0.1;
+    const elapsedSeconds = (Date.now() - startedAt) / 1000;
+    const t = elapsedSeconds + phase;
 
-    const temp = temperatureBase + Math.sin(t) * 2;
-    const humidity = 50 + Math.cos(t * 0.7) * 10;
-    const rpm = Math.round(rpmBase + Math.sin(t * 0.4) * 300);
+    const temp = temperatureBase + Math.sin(t * 1.2) * 2;
+    const humidity = 50 + Math.cos(t * 1.6) * 10;
+    const rpm = rpmBase + Math.sin(t * 2.4) * 300;
 
-    yield `temp=${temp.toFixed(2)} humidity=${humidity.toFixed(2)} rpm=${rpm}\n`;
+    yield `temp=${temp.toFixed(2)} humidity=${humidity.toFixed(2)} rpm=${rpm.toFixed(2)}\n`;
     await context.sleep(intervalMs);
   }
 }
