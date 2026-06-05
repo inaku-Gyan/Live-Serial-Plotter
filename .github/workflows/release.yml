@@ -190,9 +190,9 @@ jobs:
     name: publish to VS Code Marketplace
     needs: [check-tag, github-release]
     runs-on: ubuntu-24.04
-    environment: marketplace-production
+    environment:
+      name: marketplace-production
     env:
-      VSCE_PAT: ${{ secrets.VSCE_PAT }}
       CHANNEL: ${{ needs.check-tag.outputs.channel }}
     steps:
       - uses: actions/download-artifact@v8
@@ -214,6 +214,8 @@ jobs:
       - name: Check Marketplace token
         id: token
         shell: bash
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: |
           if [[ -n "${VSCE_PAT:-}" ]]; then
             echo "has_token=true" >> "$GITHUB_OUTPUT"
@@ -224,8 +226,12 @@ jobs:
 
       - name: Publish prerelease packages
         if: steps.token.outputs.has_token == 'true' && env.CHANNEL == 'prerelease'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: pnpm dlx @vscode/vsce@3.9.1 publish --pre-release --packagePath dist-vsix/*.vsix
 
       - name: Publish stable packages
         if: steps.token.outputs.has_token == 'true' && env.CHANNEL == 'stable'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
         run: pnpm dlx @vscode/vsce@3.9.1 publish --packagePath dist-vsix/*.vsix
