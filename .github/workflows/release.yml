@@ -165,7 +165,7 @@ jobs:
             }
           }
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: vsix-${{ matrix.target }}
           path: dist-vsix/*.vsix
@@ -182,7 +182,7 @@ jobs:
           path: dist-vsix
           merge-multiple: true
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: dist-vsix/*.vsix
           generate_release_notes: true
