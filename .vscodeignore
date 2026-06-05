@@ -18,6 +18,9 @@ CLAUDE.md
 .github/**
 docs/**
 
+# Design sources
+assets/icon-design.svg
+
 # Development tooling
 *.config.ts
 tsconfig.json

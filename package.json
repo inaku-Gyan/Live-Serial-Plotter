@@ -30,6 +30,7 @@
     "fmt:check": "oxfmt --check",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "dev:serial:e2e": "node scripts/dev-serial/e2e-virtual-ports.mjs",
     "build": "pnpm build:extension && pnpm build:webview",
     "build:extension": "tsdown && node scripts/copy-serial-binding.mjs",
     "build:webview": "vite build",
@@ -70,6 +71,11 @@
         "category": "Live Serial Plotter"
       }
     ]
+  },
+  "icon": "assets/icon.png",
+  "galleryBanner": {
+    "color": "#0B1020",
+    "theme": "dark"
   },
   "engines": {
     "node": ">=22.0.0",

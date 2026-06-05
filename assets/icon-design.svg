@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title>Live Serial Plotter icon concept</title>
+  <desc>A serial connector feeding live telemetry lines into a compact plot.</desc>
+
+  <defs>
+    <linearGradient id="background" x1="34" y1="22" x2="224" y2="238" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#182334" />
+      <stop offset="1" stop-color="#07111f" />
+    </linearGradient>
+    <linearGradient id="panel" x1="50" y1="54" x2="204" y2="183" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#142033" />
+      <stop offset="1" stop-color="#0b1524" />
+    </linearGradient>
+  </defs>
+
+  <rect width="256" height="256" rx="48" fill="url(#background)" />
+  <path d="M36 194c38 31 92 42 145 17 27-13 42-34 53-57v66c0 8-6 14-14 14H50c-8 0-14-6-14-14v-26Z" fill="#0e1b2d" opacity="0.72" />
+
+  <g>
+    <rect x="50" y="64" width="158" height="132" rx="18" fill="#020817" opacity="0.38" />
+    <rect x="50" y="52" width="158" height="132" rx="18" fill="url(#panel)" stroke="#263a56" stroke-width="4" />
+
+    <g opacity="0.28" stroke="#7aa2c8" stroke-width="2">
+      <path d="M82 62v112" />
+      <path d="M114 62v112" />
+      <path d="M146 62v112" />
+      <path d="M178 62v112" />
+      <path d="M60 84h138" />
+      <path d="M60 116h138" />
+      <path d="M60 148h138" />
+    </g>
+
+    <path d="M62 144c16-30 28-30 42 0 12 26 22 23 35-8 13-30 23-32 38 0 8 17 15 24 25 12" fill="none" stroke="#26d9ff" stroke-width="10" stroke-linecap="round" stroke-linejoin="round" />
+    <path d="M62 144c16-30 28-30 42 0 12 26 22 23 35-8 13-30 23-32 38 0 8 17 15 24 25 12" fill="none" stroke="#b9ff4a" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+
+    <path d="M66 103h15l12-18 14 37 13-19h19" fill="none" stroke="#ffb84d" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
+  </g>
+
+  <g>
+    <rect x="30" y="102" width="48" height="76" rx="12" fill="#020817" opacity="0.38" />
+    <rect x="30" y="92" width="48" height="76" rx="12" fill="#223149" stroke="#38506f" stroke-width="4" />
+    <rect x="38" y="104" width="32" height="52" rx="7" fill="#111c2d" />
+    <g fill="#8aa4bd">
+      <rect x="18" y="106" width="22" height="8" rx="4" />
+      <rect x="18" y="124" width="22" height="8" rx="4" />
+      <rect x="18" y="142" width="22" height="8" rx="4" />
+    </g>
+    <circle cx="56" cy="130" r="9" fill="#ffb84d" />
+    <circle cx="56" cy="130" r="4" fill="#fff3bf" />
+  </g>
+
+  <path d="M78 130h20" fill="none" stroke="#ffb84d" stroke-width="8" stroke-linecap="round" />
+  <circle cx="100" cy="130" r="5" fill="#ffb84d" />
+
+  <g fill="#26d9ff">
+    <circle cx="181" cy="202" r="7" />
+    <circle cx="202" cy="202" r="7" opacity="0.75" />
+  </g>
+  <rect x="74" y="198" width="92" height="12" rx="6" fill="#38506f" opacity="0.85" />
+  <rect x="74" y="198" width="56" height="12" rx="6" fill="#b9ff4a" />
+</svg>

@@ -44,6 +44,12 @@ export const ViewColumn = {
   One: 1,
 };
 
+export const ExtensionMode = {
+  Production: 1,
+  Development: 2,
+  Test: 3,
+};
+
 export const Uri = {
   joinPath: vi.fn((base: MockUri, ...parts: string[]): MockUri => {
     const path = [formatUri(base), ...parts].join("/");

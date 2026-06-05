@@ -42,6 +42,8 @@ pnpm test
 pnpm test:extension
 ```
 
+更多测试和串口调试方式见 [测试与调试方式](docs/testing.md)。
+
 Build:
 
 ```sh
