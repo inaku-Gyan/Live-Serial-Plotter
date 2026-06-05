@@ -19,19 +19,6 @@ pnpm install
 
 ### Common Commands
 
-Build both the Extension Host bundle and the Webview assets:
-
-```sh
-pnpm build
-```
-
-Build only one side:
-
-```sh
-pnpm build:extension
-pnpm build:webview
-```
-
 Format, lint, and type-check:
 
 ```sh
@@ -40,6 +27,8 @@ pnpm fmt:check
 pnpm lint
 pnpm lint:fix
 pnpm typecheck
+
+# Run all checks above:
 pnpm check
 ```
 
@@ -50,25 +39,25 @@ pnpm test
 pnpm test:extension
 ```
 
+Build:
+
+```sh
+pnpm build:extension
+pnpm build:webview
+
+# Build both the Extension Host bundle and the Webview assets:
+pnpm build
+```
+
 Package a local VSIX:
 
 ```sh
 pnpm package
 ```
 
-The generated package is written to `live-serial-plotter-0.0.1.vsix`.
+This includes the `pnpm: build` step,
+and outputs `live-serial-plotter-<version>.vsix` in the project root.
 
-Install the local VSIX into VS Code:
-
-```sh
-code --install-extension live-serial-plotter-0.0.1.vsix --force
-```
-
-Uninstall the local extension when needed:
-
-```sh
-code --uninstall-extension inaku.live-serial-plotter
-```
 
 ### VS Code Debugging
 
