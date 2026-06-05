@@ -1,21 +1,33 @@
-.agents/**
-.codex/**
-.vscode/**
+# Source files
+src/**
+webview/**
+scripts/**
+
+# Tests and coverage
+tests/**
 .vscode-test/**
 .vscode-test.mjs
 coverage/**
-dist/**/*.map
-src/**
-tests/**
-webview/**
-scripts/**
+
+# Editor and local agent state
+.vscode/**
+.agents/**
+.codex/**
+
+# Development tooling
 *.config.ts
-.gitignore
-.npmrc
-.oxfmtrc.json
 tsconfig.json
 vitest.config.ts
 tsdown.config.ts
 tsdown.extension-tests.config.ts
 vite.config.ts
+.npmrc
+.oxfmtrc.jsonc
+
+# Package manager and repository metadata
 pnpm-lock.yaml
+.gitignore
+
+# Build artifacts not needed at runtime
+dist/**/*.map
+*.vsix
