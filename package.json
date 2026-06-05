@@ -67,9 +67,6 @@
       }
     ]
   },
-  "activationEvents": [
-    "onCommand:liveSerialPlotter.open"
-  ],
   "engines": {
     "node": ">=22.0.0",
     "vscode": "^1.101.0"
