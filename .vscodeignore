@@ -15,6 +15,8 @@ coverage/**
 .codex/**
 AGENTS.md
 CLAUDE.md
+.github/**
+docs/**
 
 # Design sources
 assets/icon-design.svg

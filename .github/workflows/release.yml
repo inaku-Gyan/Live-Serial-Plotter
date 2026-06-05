@@ -1,0 +1,236 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check-tag:
+    name: validate tag
+    runs-on: ubuntu-24.04
+    outputs:
+      channel: ${{ steps.validate.outputs.channel }}
+      package_version: ${{ steps.validate.outputs.package_version }}
+      prerelease: ${{ steps.validate.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Validate VS Code extension tag
+        id: validate
+        shell: bash
+        env:
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+
+          tag_re='^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+          version_re='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$'
+
+          if [[ ! "$REF_NAME" =~ $tag_re ]]; then
+            echo "::error::tag '$REF_NAME' is invalid. VS Code Marketplace releases must use vMAJOR.MINOR.PATCH without prerelease or build suffixes."
+            exit 1
+          fi
+
+          tag_version="${REF_NAME#v}"
+          package_version="$(node -p "require('./package.json').version")"
+
+          if [[ ! "$package_version" =~ $version_re ]]; then
+            echo "::error::package.json version '$package_version' is invalid. VS Code Marketplace requires MAJOR.MINOR.PATCH without prerelease or build suffixes."
+            exit 1
+          fi
+
+          if [[ "$tag_version" != "$package_version" ]]; then
+            echo "::error::tag version '$tag_version' does not match package.json version '$package_version'."
+            exit 1
+          fi
+
+          minor="$(node -p "require('./package.json').version.split('.')[1]")"
+          if (( minor % 2 == 1 )); then
+            channel="prerelease"
+            prerelease="true"
+          else
+            channel="stable"
+            prerelease="false"
+          fi
+
+          echo "tag '$REF_NAME' matches package.json version '$package_version'"
+          echo "release channel: $channel"
+          echo "channel=$channel" >> "$GITHUB_OUTPUT"
+          echo "package_version=$package_version" >> "$GITHUB_OUTPUT"
+          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+
+  verify:
+    name: verify
+    needs: check-tag
+    uses: ./.github/workflows/ci.yml
+
+  package:
+    name: package ${{ matrix.target }}
+    needs: [check-tag, verify]
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            os: ubuntu-24.04
+          - target: darwin-x64
+            os: macos-15-intel
+          - target: darwin-arm64
+            os: macos-15
+          - target: win32-x64
+            os: windows-2025
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.1
+          run_install: false
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Package VSIX
+        shell: bash
+        env:
+          CHANNEL: ${{ needs.check-tag.outputs.channel }}
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ needs.check-tag.outputs.package_version }}
+        run: |
+          set -euo pipefail
+
+          mkdir -p dist-vsix
+          vsix_path="dist-vsix/live-serial-plotter-${VERSION}-${TARGET}.vsix"
+          prerelease_args=()
+
+          if [[ "$CHANNEL" == "prerelease" ]]; then
+            prerelease_args+=(--pre-release)
+          fi
+
+          pnpm exec vsce package \
+            --no-dependencies \
+            --allow-missing-repository \
+            --target "$TARGET" \
+            --out "$vsix_path" \
+            "${prerelease_args[@]}"
+
+      - name: Verify VSIX channel marker
+        shell: bash
+        env:
+          CHANNEL: ${{ needs.check-tag.outputs.channel }}
+          TARGET: ${{ matrix.target }}
+          VERSION: ${{ needs.check-tag.outputs.package_version }}
+        run: |
+          set -euo pipefail
+
+          vsix_path="dist-vsix/live-serial-plotter-${VERSION}-${TARGET}.vsix"
+          manifest_path="dist-vsix/live-serial-plotter-${VERSION}-${TARGET}.manifest"
+          marker='Microsoft.VisualStudio.Code.PreRelease" Value="true"'
+
+          pnpm exec vsce generate-manifest \
+            --packagePath "$vsix_path" \
+            --out "$manifest_path"
+
+          if [[ "$CHANNEL" == "prerelease" ]]; then
+            if ! grep -Fq "$marker" "$manifest_path"; then
+              echo "::error::expected prerelease VSIX marker in $manifest_path"
+              exit 1
+            fi
+          else
+            if grep -Fq "$marker" "$manifest_path"; then
+              echo "::error::stable VSIX unexpectedly contains prerelease marker in $manifest_path"
+              exit 1
+            fi
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: vsix-${{ matrix.target }}
+          path: dist-vsix/*.vsix
+          if-no-files-found: error
+
+  github-release:
+    name: create GitHub Release
+    needs: [check-tag, package]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: vsix-*
+          path: dist-vsix
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist-vsix/*.vsix
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          prerelease: ${{ needs.check-tag.outputs.prerelease == 'true' }}
+
+  marketplace:
+    name: publish to VS Code Marketplace
+    needs: [check-tag, github-release]
+    runs-on: ubuntu-24.04
+    environment:
+      name: marketplace-production
+    env:
+      CHANNEL: ${{ needs.check-tag.outputs.channel }}
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: vsix-*
+          path: dist-vsix
+          merge-multiple: true
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - name: Enable pnpm
+        shell: bash
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.33.1 --activate
+
+      - name: Check Marketplace token
+        id: token
+        shell: bash
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: |
+          if [[ -n "${VSCE_PAT:-}" ]]; then
+            echo "has_token=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::VSCE_PAT is not configured; skipping Marketplace publish."
+            echo "has_token=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish prerelease packages
+        if: steps.token.outputs.has_token == 'true' && env.CHANNEL == 'prerelease'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: pnpm dlx @vscode/vsce@3.9.1 publish --pre-release --packagePath dist-vsix/*.vsix
+
+      - name: Publish stable packages
+        if: steps.token.outputs.has_token == 'true' && env.CHANNEL == 'stable'
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        run: pnpm dlx @vscode/vsce@3.9.1 publish --packagePath dist-vsix/*.vsix
