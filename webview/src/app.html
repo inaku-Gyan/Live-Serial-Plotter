@@ -1,0 +1,43 @@
+<main class="shell">
+  <header class="toolbar">
+    <label class="field field-wide">
+      <span>Port</span>
+      <select id="portSelect"></select>
+    </label>
+    <button id="refreshPortsButton" class="button button-secondary" type="button">Refresh</button>
+    <label class="field">
+      <span>Baud</span>
+      <select id="baudRateSelect"></select>
+    </label>
+    <label class="field">
+      <span>Parser</span>
+      <select id="parserModeSelect"></select>
+    </label>
+    <button id="connectButton" class="button button-primary" type="button">Connect</button>
+    <span id="connectionStatus" class="status" aria-live="polite">Disconnected</span>
+  </header>
+  <section class="workspace">
+    <section class="plot-area" aria-label="Live plot">
+      <div id="chart" class="chart"></div>
+      <div id="legend" class="legend"></div>
+    </section>
+    <section class="terminal-area" aria-label="Serial monitor">
+      <div class="terminal-header">
+        <span>Raw Monitor</span>
+        <button id="clearLogButton" class="button button-secondary" type="button">Clear</button>
+      </div>
+      <pre id="rawLog" class="raw-log"></pre>
+      <form id="sendForm" class="send-row">
+        <input
+          id="sendInput"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="Send text"
+        />
+        <button id="sendButton" class="button button-primary" type="submit">Send</button>
+      </form>
+    </section>
+  </section>
+  <div id="errorToast" class="error-toast" role="status" aria-live="polite"></div>
+</main>
