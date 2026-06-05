@@ -1,0 +1,83 @@
+{
+  "name": "live-serial-plotter",
+  "displayName": "Live Serial Plotter",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Monitor serial ports, parse telemetry, and plot live data inside VS Code.",
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "monitor",
+    "plot",
+    "serial",
+    "telemetry",
+    "uart"
+  ],
+  "license": "MIT",
+  "publisher": "inaku",
+  "type": "module",
+  "main": "./dist/extension.cjs",
+  "scripts": {
+    "lint": "oxlint",
+    "lint:fix": "oxlint --fix",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "pnpm build:extension && pnpm build:webview",
+    "build:extension": "tsdown && node scripts/copy-serial-binding.mjs",
+    "build:webview": "vite build",
+    "build:extension-tests": "tsdown --config tsdown.extension-tests.config.ts",
+    "test:extension": "pnpm build && pnpm build:extension-tests && vscode-test",
+    "check": "pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm test",
+    "vscode:prepublish": "pnpm build",
+    "package": "vsce package --no-dependencies --allow-missing-repository"
+  },
+  "dependencies": {
+    "serialport": "^13.0.0",
+    "uplot": "^1.6.32"
+  },
+  "devDependencies": {
+    "@oxfmt/binding-linux-x64-gnu": "0.53.0",
+    "@oxlint/binding-linux-x64-gnu": "1.68.0",
+    "@rolldown/binding-linux-x64-gnu": "1.1.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^25.9.1",
+    "@types/vscode": "^1.101.0",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2",
+    "@vscode/vsce": "^3.9.1",
+    "lightningcss-linux-x64-gnu": "1.32.0",
+    "oxfmt": "^0.53.0",
+    "oxlint": "^1.68.0",
+    "tsdown": "^0.22.2",
+    "typescript": "^6.0.3",
+    "unrun": "^0.3.0",
+    "vite": "^8.0.16",
+    "vitest": "^4.1.8"
+  },
+  "contributes": {
+    "commands": [
+      {
+        "command": "liveSerialPlotter.open",
+        "title": "Live Serial Plotter: Open",
+        "category": "Live Serial Plotter"
+      }
+    ]
+  },
+  "activationEvents": [
+    "onCommand:liveSerialPlotter.open"
+  ],
+  "engines": {
+    "node": ">=22.0.0",
+    "vscode": "^1.101.0"
+  },
+  "packageManager": "pnpm@10.33.1",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@serialport/bindings-cpp"
+    ]
+  }
+}
