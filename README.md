@@ -11,10 +11,67 @@ Live Serial Plotter is a VS Code desktop extension for monitoring serial ports, 
 
 ## Development
 
+Install dependencies:
+
 ```sh
 pnpm install
-pnpm build
-pnpm test
 ```
 
-Open the project in VS Code and run the extension launch configuration, or run the command `Live Serial Plotter: Open` from an Extension Development Host.
+### Common Commands
+
+Build both the Extension Host bundle and the Webview assets:
+
+```sh
+pnpm build
+```
+
+Build only one side:
+
+```sh
+pnpm build:extension
+pnpm build:webview
+```
+
+Format, lint, and type-check:
+
+```sh
+pnpm fmt
+pnpm fmt:check
+pnpm lint
+pnpm lint:fix
+pnpm typecheck
+pnpm check
+```
+
+Run tests:
+
+```sh
+pnpm test
+pnpm test:extension
+```
+
+Package a local VSIX:
+
+```sh
+pnpm package
+```
+
+The generated package is written to `live-serial-plotter-0.0.1.vsix`.
+
+Install the local VSIX into VS Code:
+
+```sh
+code --install-extension live-serial-plotter-0.0.1.vsix --force
+```
+
+Uninstall the local extension when needed:
+
+```sh
+code --uninstall-extension inaku.live-serial-plotter
+```
+
+### VS Code Debugging
+
+Open the project in VS Code and run the `Run Extension` launch configuration. It runs the `pnpm: build` task first, then opens an Extension Development Host.
+
+In the Extension Development Host, run the command `Live Serial Plotter: Open`.
