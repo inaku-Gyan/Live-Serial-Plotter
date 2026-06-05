@@ -133,33 +133,37 @@ jobs:
             "${prerelease_args[@]}"
 
       - name: Verify VSIX channel marker
-        shell: bash
+        shell: pwsh
         env:
           CHANNEL: ${{ needs.check-tag.outputs.channel }}
           TARGET: ${{ matrix.target }}
           VERSION: ${{ needs.check-tag.outputs.package_version }}
         run: |
-          set -euo pipefail
+          $ErrorActionPreference = "Stop"
 
-          vsix_path="dist-vsix/live-serial-plotter-${VERSION}-${TARGET}.vsix"
-          manifest_path="dist-vsix/live-serial-plotter-${VERSION}-${TARGET}.manifest"
-          marker='Microsoft.VisualStudio.Code.PreRelease" Value="true"'
+          $vsixPath = "dist-vsix/live-serial-plotter-$env:VERSION-$env:TARGET.vsix"
+          $zipPath = "$vsixPath.zip"
+          $extractPath = "dist-vsix/manifest-$env:TARGET"
+          $manifestPath = Join-Path $extractPath "extension.vsixmanifest"
+          $marker = 'Microsoft.VisualStudio.Code.PreRelease" Value="true"'
 
-          pnpm exec vsce generate-manifest \
-            --packagePath "$vsix_path" \
-            --out "$manifest_path"
+          Remove-Item -Recurse -Force $extractPath -ErrorAction SilentlyContinue
+          Remove-Item -Force $zipPath -ErrorAction SilentlyContinue
+          Copy-Item -Path $vsixPath -Destination $zipPath -Force
+          Expand-Archive -Path $zipPath -DestinationPath $extractPath -Force
+          $manifest = Get-Content -Raw $manifestPath
 
-          if [[ "$CHANNEL" == "prerelease" ]]; then
-            if ! grep -Fq "$marker" "$manifest_path"; then
-              echo "::error::expected prerelease VSIX marker in $manifest_path"
+          if ($env:CHANNEL -eq "prerelease") {
+            if (-not $manifest.Contains($marker)) {
+              Write-Error "expected prerelease VSIX marker in $manifestPath"
               exit 1
-            fi
-          else
-            if grep -Fq "$marker" "$manifest_path"; then
-              echo "::error::stable VSIX unexpectedly contains prerelease marker in $manifest_path"
+            }
+          } else {
+            if ($manifest.Contains($marker)) {
+              Write-Error "stable VSIX unexpectedly contains prerelease marker in $manifestPath"
               exit 1
-            fi
-          fi
+            }
+          }
 
       - uses: actions/upload-artifact@v4
         with:
