@@ -17,6 +17,10 @@
   ],
   "license": "MIT",
   "publisher": "inaku",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/inaku-Gyan/Live-Serial-Plotter"
+  },
   "type": "module",
   "main": "./dist/extension.cjs",
   "scripts": {
