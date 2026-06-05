@@ -2,12 +2,18 @@ import * as vscode from 'vscode';
 import { PointBatcher } from '../session/PointBatcher';
 import { RingBuffer } from '../session/RingBuffer';
 import { SerialService } from '../serial/SerialService';
-import { isParserMode, type PlotSample, type ToExtensionMessage } from '../shared/protocol';
+import {
+  isParserMode,
+  type ConnectionState,
+  type PlotSample,
+  type ToExtensionMessage,
+} from '../shared/protocol';
 
 const panelViewType = 'liveSerialPlotter.panel';
 
 export class LiveSerialPlotterPanel {
-  private static currentPanel: LiveSerialPlotterPanel | undefined;
+  private static readonly activePanels = new Set<LiveSerialPlotterPanel>();
+  private static nextPanelId = 1;
 
   private readonly disposables: vscode.Disposable[] = [];
   private readonly rawLines = new RingBuffer<string>(500);
@@ -17,7 +23,10 @@ export class LiveSerialPlotterPanel {
   });
 
   private readonly serialService = new SerialService({
-    onConnectionState: (state) => this.postMessage({ type: 'connectionState', state }),
+    onConnectionState: (state) => {
+      this.updatePanelTitle(state);
+      this.postMessage({ type: 'connectionState', state });
+    },
     onRawLine: (line, t) => {
       this.rawLines.push(line);
       this.postMessage({ type: 'rawLine', line, t });
@@ -30,28 +39,23 @@ export class LiveSerialPlotterPanel {
   });
 
   static open(extensionUri: vscode.Uri): void {
-    if (LiveSerialPlotterPanel.currentPanel !== undefined) {
-      LiveSerialPlotterPanel.currentPanel.panel.reveal(vscode.ViewColumn.One);
-      return;
-    }
+    const title = `Live Serial Plotter #${LiveSerialPlotterPanel.nextPanelId}`;
+    LiveSerialPlotterPanel.nextPanelId += 1;
 
-    const panel = vscode.window.createWebviewPanel(
-      panelViewType,
-      'Live Serial Plotter',
-      vscode.ViewColumn.One,
-      {
-        enableScripts: true,
-        retainContextWhenHidden: true,
-        localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview')],
-      },
-    );
+    const panel = vscode.window.createWebviewPanel(panelViewType, title, vscode.ViewColumn.One, {
+      enableScripts: true,
+      retainContextWhenHidden: true,
+      localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview')],
+    });
 
-    LiveSerialPlotterPanel.currentPanel = new LiveSerialPlotterPanel(panel, extensionUri);
+    const plotterPanel = new LiveSerialPlotterPanel(panel, extensionUri, title);
+    LiveSerialPlotterPanel.activePanels.add(plotterPanel);
   }
 
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
+    private readonly defaultTitle: string,
   ) {
     this.panel.webview.html = this.getHtml();
 
@@ -113,6 +117,13 @@ export class LiveSerialPlotterPanel {
     void this.panel.webview.postMessage(message);
   }
 
+  private updatePanelTitle(state: ConnectionState): void {
+    this.panel.title =
+      state.connected && state.path !== undefined
+        ? `Live Serial Plotter: ${state.path}`
+        : this.defaultTitle;
+  }
+
   private getHtml(): string {
     const webview = this.panel.webview;
     const nonce = getNonce();
@@ -140,7 +151,7 @@ export class LiveSerialPlotterPanel {
   }
 
   private dispose(): void {
-    LiveSerialPlotterPanel.currentPanel = undefined;
+    LiveSerialPlotterPanel.activePanels.delete(this);
     this.pointBatcher.dispose();
     this.serialService.dispose();
 

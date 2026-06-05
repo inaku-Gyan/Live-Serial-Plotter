@@ -82,16 +82,24 @@ export class SerialService {
     port.on('error', this.handlePortError);
     port.on('close', this.handleClose);
 
-    await new Promise<void>((resolve, reject) => {
-      port.open((error) => {
-        if (error) {
-          reject(error);
-          return;
-        }
+    try {
+      await new Promise<void>((resolve, reject) => {
+        port.open((error) => {
+          if (error) {
+            reject(error);
+            return;
+          }
 
-        resolve();
+          resolve();
+        });
       });
-    });
+    } catch (error) {
+      this.detachPortListeners(port);
+      this.port = undefined;
+      this.currentSettings = undefined;
+      this.disconnecting = false;
+      throw error;
+    }
 
     this.events.onConnectionState?.({
       connected: true,
