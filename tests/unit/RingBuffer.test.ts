@@ -1,8 +1,8 @@
-import { describe, expect, test } from 'vitest';
-import { RingBuffer } from '../../src/session/RingBuffer';
+import { describe, expect, test } from "vitest";
+import { RingBuffer } from "../../src/session/RingBuffer";
 
-describe('RingBuffer', () => {
-  test('keeps only the most recent items within capacity', () => {
+describe("RingBuffer", () => {
+  test("keeps only the most recent items within capacity", () => {
     const buffer = new RingBuffer<number>(3);
 
     buffer.push(1);
@@ -14,15 +14,15 @@ describe('RingBuffer', () => {
     expect(buffer.length).toBe(3);
   });
 
-  test('pushMany applies the same capacity limit', () => {
+  test("pushMany applies the same capacity limit", () => {
     const buffer = new RingBuffer<string>(2);
 
-    buffer.pushMany(['a', 'b', 'c']);
+    buffer.pushMany(["a", "b", "c"]);
 
-    expect(buffer.toArray()).toEqual(['b', 'c']);
+    expect(buffer.toArray()).toEqual(["b", "c"]);
   });
 
-  test('clear removes all buffered items', () => {
+  test("clear removes all buffered items", () => {
     const buffer = new RingBuffer<number>(2);
 
     buffer.pushMany([1, 2]);
@@ -32,7 +32,7 @@ describe('RingBuffer', () => {
     expect(buffer.length).toBe(0);
   });
 
-  test('rejects invalid capacity', () => {
-    expect(() => new RingBuffer(0)).toThrow('capacity');
+  test("rejects invalid capacity", () => {
+    expect(() => new RingBuffer(0)).toThrow("capacity");
   });
 });

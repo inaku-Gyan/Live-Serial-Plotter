@@ -1,4 +1,4 @@
-import { vi } from 'vitest';
+import { vi } from "vitest";
 
 interface DisposableLike {
   dispose(): void;
@@ -46,7 +46,7 @@ export const ViewColumn = {
 
 export const Uri = {
   joinPath: vi.fn((base: MockUri, ...parts: string[]): MockUri => {
-    const path = [formatUri(base), ...parts].join('/');
+    const path = [formatUri(base), ...parts].join("/");
 
     return {
       fsPath: path,
@@ -72,8 +72,8 @@ function createMockWebviewPanel(title: string): MockWebviewPanel {
   return {
     title,
     webview: {
-      cspSource: 'vscode-webview:',
-      html: '',
+      cspSource: "vscode-webview:",
+      html: "",
       asWebviewUri: vi.fn((uri: MockUri) => uri),
       onDidReceiveMessage: vi.fn(
         (

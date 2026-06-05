@@ -1,4 +1,4 @@
-import type { PlotSample } from '../shared/protocol';
+import type { PlotSample } from "../shared/protocol";
 
 export class PointBatcher {
   private readonly pending: PlotSample[] = [];

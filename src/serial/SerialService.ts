@@ -1,14 +1,14 @@
-import { EventEmitter } from 'node:events';
-import { SerialPort } from 'serialport';
-import { toPlotSample } from '../parsers/parseLine';
-import { LineDecoder } from './LineDecoder';
+import { EventEmitter } from "node:events";
+import { SerialPort } from "serialport";
+import { toPlotSample } from "../parsers/parseLine";
+import { LineDecoder } from "./LineDecoder";
 import type {
   ConnectionSettings,
   ConnectionState,
   ParserMode,
   PlotSample,
   SerialPortSummary,
-} from '../shared/protocol';
+} from "../shared/protocol";
 
 export interface SerialPortLike extends EventEmitter {
   readonly isOpen: boolean;
@@ -54,7 +54,7 @@ export class NodeSerialPortFactory implements SerialPortFactory {
 export class SerialService {
   private readonly decoder = new LineDecoder();
   private port: SerialPortLike | undefined;
-  private parserMode: ParserMode = 'auto';
+  private parserMode: ParserMode = "auto";
   private currentSettings: ConnectionSettings | undefined;
   private disconnecting = false;
 
@@ -78,9 +78,9 @@ export class SerialService {
     const port = this.factory.create(settings);
     this.port = port;
 
-    port.on('data', this.handleData);
-    port.on('error', this.handlePortError);
-    port.on('close', this.handleClose);
+    port.on("data", this.handleData);
+    port.on("error", this.handlePortError);
+    port.on("close", this.handleClose);
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -142,7 +142,7 @@ export class SerialService {
     const port = this.port;
 
     if (port === undefined || !port.isOpen) {
-      throw new Error('No serial port is connected.');
+      throw new Error("No serial port is connected.");
     }
 
     await new Promise<void>((resolve, reject) => {
@@ -204,9 +204,9 @@ export class SerialService {
   };
 
   private detachPortListeners(port: SerialPortLike): void {
-    port.off('data', this.handleData);
-    port.off('error', this.handlePortError);
-    port.off('close', this.handleClose);
+    port.off("data", this.handleData);
+    port.off("error", this.handlePortError);
+    port.off("close", this.handleClose);
   }
 }
 

@@ -1,20 +1,20 @@
-import type * as vscode from 'vscode';
-import { beforeEach, describe, expect, test } from 'vitest';
-import { LiveSerialPlotterPanel } from '../../src/panel/LiveSerialPlotterPanel';
-import { __resetVscodeMock, __vscodeMock } from '../mocks/vscode';
+import type * as vscode from "vscode";
+import { beforeEach, describe, expect, test } from "vitest";
+import { LiveSerialPlotterPanel } from "../../src/panel/LiveSerialPlotterPanel";
+import { __resetVscodeMock, __vscodeMock } from "../mocks/vscode";
 
 const extensionUri = {
-  fsPath: '/extension',
-  path: '/extension',
-  toString: () => '/extension',
+  fsPath: "/extension",
+  path: "/extension",
+  toString: () => "/extension",
 };
 
-describe('LiveSerialPlotterPanel', () => {
+describe("LiveSerialPlotterPanel", () => {
   beforeEach(() => {
     __resetVscodeMock();
   });
 
-  test('opens a new webview panel for each command invocation', () => {
+  test("opens a new webview panel for each command invocation", () => {
     LiveSerialPlotterPanel.open(extensionUri as unknown as vscode.Uri);
     LiveSerialPlotterPanel.open(extensionUri as unknown as vscode.Uri);
 

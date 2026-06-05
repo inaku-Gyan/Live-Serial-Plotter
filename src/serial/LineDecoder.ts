@@ -1,8 +1,8 @@
-import { StringDecoder } from 'node:string_decoder';
+import { StringDecoder } from "node:string_decoder";
 
 export class LineDecoder {
-  private readonly decoder = new StringDecoder('utf8');
-  private bufferedText = '';
+  private readonly decoder = new StringDecoder("utf8");
+  private bufferedText = "";
 
   push(chunk: Buffer | Uint8Array): string[] {
     this.bufferedText += this.decoder.write(Buffer.from(chunk));
@@ -17,21 +17,21 @@ export class LineDecoder {
     }
 
     const line = stripTrailingCarriageReturn(this.bufferedText);
-    this.bufferedText = '';
+    this.bufferedText = "";
     return [line];
   }
 
   reset(): void {
-    this.bufferedText = '';
+    this.bufferedText = "";
   }
 
   private takeCompleteLines(): string[] {
-    const parts = this.bufferedText.split('\n');
-    this.bufferedText = parts.pop() ?? '';
+    const parts = this.bufferedText.split("\n");
+    this.bufferedText = parts.pop() ?? "";
     return parts.map(stripTrailingCarriageReturn);
   }
 }
 
 function stripTrailingCarriageReturn(line: string): string {
-  return line.endsWith('\r') ? line.slice(0, -1) : line;
+  return line.endsWith("\r") ? line.slice(0, -1) : line;
 }

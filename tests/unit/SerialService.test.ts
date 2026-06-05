@@ -1,12 +1,12 @@
-import { EventEmitter } from 'node:events';
-import { describe, expect, test, beforeEach } from 'vitest';
-import { SerialPortMock } from 'serialport';
+import { EventEmitter } from "node:events";
+import { describe, expect, test, beforeEach } from "vitest";
+import { SerialPortMock } from "serialport";
 import {
   SerialService,
   type SerialPortFactory,
   type SerialPortLike,
-} from '../../src/serial/SerialService';
-import type { ConnectionSettings, SerialPortSummary } from '../../src/shared/protocol';
+} from "../../src/serial/SerialService";
+import type { ConnectionSettings, SerialPortSummary } from "../../src/shared/protocol";
 
 interface MockPortBinding {
   emitData(data: string | Buffer): void;
@@ -88,28 +88,28 @@ class SequenceSerialPortFactory implements SerialPortFactory {
     const port = this.ports.shift();
 
     if (port === undefined) {
-      throw new Error('No fake serial ports remain.');
+      throw new Error("No fake serial ports remain.");
     }
 
     return port;
   }
 }
 
-describe('SerialService', () => {
+describe("SerialService", () => {
   beforeEach(() => {
     mockSerialPort.binding.reset();
-    mockSerialPort.binding.createPort('/dev/ROBOT', { echo: false, record: true });
+    mockSerialPort.binding.createPort("/dev/ROBOT", { echo: false, record: true });
   });
 
-  test('lists mock ports', async () => {
+  test("lists mock ports", async () => {
     const service = new SerialService({}, new MockSerialPortFactory());
 
     await expect(service.listPorts()).resolves.toEqual([
-      expect.objectContaining({ path: '/dev/ROBOT' }),
+      expect.objectContaining({ path: "/dev/ROBOT" }),
     ]);
   });
 
-  test('receives raw lines and parsed samples from mock serial data', async () => {
+  test("receives raw lines and parsed samples from mock serial data", async () => {
     const rawLines: string[] = [];
     const samples: Array<Record<string, number>> = [];
     const factory = new MockSerialPortFactory();
@@ -121,30 +121,30 @@ describe('SerialService', () => {
       factory,
     );
 
-    await service.connect({ path: '/dev/ROBOT', baudRate: 115200, parserMode: 'auto' });
-    factory.lastPort?.port?.emitData('temp=21.5\nbad line\n1,2\n');
+    await service.connect({ path: "/dev/ROBOT", baudRate: 115200, parserMode: "auto" });
+    factory.lastPort?.port?.emitData("temp=21.5\nbad line\n1,2\n");
     await waitForMicrotask();
     await service.disconnect();
 
-    expect(rawLines).toEqual(['temp=21.5', 'bad line', '1,2']);
+    expect(rawLines).toEqual(["temp=21.5", "bad line", "1,2"]);
     expect(samples).toEqual([{ temp: 21.5 }, { channel1: 1, channel2: 2 }]);
   });
 
-  test('writes to the connected mock serial port', async () => {
+  test("writes to the connected mock serial port", async () => {
     const factory = new MockSerialPortFactory();
     const service = new SerialService({}, factory);
 
-    await service.connect({ path: '/dev/ROBOT', baudRate: 115200, parserMode: 'raw' });
-    await service.send('ping');
+    await service.connect({ path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" });
+    await service.send("ping");
     await waitForMicrotask();
 
-    expect(factory.lastPort?.port?.lastWrite?.toString()).toBe('ping');
+    expect(factory.lastPort?.port?.lastWrite?.toString()).toBe("ping");
 
     await service.disconnect();
   });
 
-  test('keeps separate serial service instances isolated', async () => {
-    mockSerialPort.binding.createPort('/dev/SENSOR', { echo: false, record: true });
+  test("keeps separate serial service instances isolated", async () => {
+    mockSerialPort.binding.createPort("/dev/SENSOR", { echo: false, record: true });
 
     const robotFactory = new MockSerialPortFactory();
     const sensorFactory = new MockSerialPortFactory();
@@ -163,41 +163,41 @@ describe('SerialService', () => {
       sensorFactory,
     );
 
-    await robotService.connect({ path: '/dev/ROBOT', baudRate: 115200, parserMode: 'raw' });
-    await sensorService.connect({ path: '/dev/SENSOR', baudRate: 9600, parserMode: 'raw' });
+    await robotService.connect({ path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" });
+    await sensorService.connect({ path: "/dev/SENSOR", baudRate: 9600, parserMode: "raw" });
 
-    robotFactory.lastPort?.port?.emitData('robot-line\n');
-    sensorFactory.lastPort?.port?.emitData('sensor-line\n');
-    await robotService.send('robot-ping');
-    await sensorService.send('sensor-ping');
+    robotFactory.lastPort?.port?.emitData("robot-line\n");
+    sensorFactory.lastPort?.port?.emitData("sensor-line\n");
+    await robotService.send("robot-ping");
+    await sensorService.send("sensor-ping");
     await waitForMicrotask();
 
-    expect(robotLines).toEqual(['robot-line']);
-    expect(sensorLines).toEqual(['sensor-line']);
-    expect(robotFactory.lastPort?.port?.lastWrite?.toString()).toBe('robot-ping');
-    expect(sensorFactory.lastPort?.port?.lastWrite?.toString()).toBe('sensor-ping');
+    expect(robotLines).toEqual(["robot-line"]);
+    expect(sensorLines).toEqual(["sensor-line"]);
+    expect(robotFactory.lastPort?.port?.lastWrite?.toString()).toBe("robot-ping");
+    expect(sensorFactory.lastPort?.port?.lastWrite?.toString()).toBe("sensor-ping");
 
     await robotService.disconnect();
     await sensorService.disconnect();
   });
 
-  test('cleans up failed open attempts so the service can retry', async () => {
-    const failedPort = new FakeSerialPort(new Error('open failed'));
+  test("cleans up failed open attempts so the service can retry", async () => {
+    const failedPort = new FakeSerialPort(new Error("open failed"));
     const retryPort = new FakeSerialPort();
     const service = new SerialService({}, new SequenceSerialPortFactory([failedPort, retryPort]));
 
     await expect(
-      service.connect({ path: '/dev/FAIL', baudRate: 115200, parserMode: 'raw' }),
-    ).rejects.toThrow('open failed');
+      service.connect({ path: "/dev/FAIL", baudRate: 115200, parserMode: "raw" }),
+    ).rejects.toThrow("open failed");
 
-    expect(failedPort.listenerCount('data')).toBe(0);
-    expect(failedPort.listenerCount('error')).toBe(0);
-    expect(failedPort.listenerCount('close')).toBe(0);
+    expect(failedPort.listenerCount("data")).toBe(0);
+    expect(failedPort.listenerCount("error")).toBe(0);
+    expect(failedPort.listenerCount("close")).toBe(0);
 
-    await service.connect({ path: '/dev/RETRY', baudRate: 115200, parserMode: 'raw' });
-    await service.send('retry-ping');
+    await service.connect({ path: "/dev/RETRY", baudRate: 115200, parserMode: "raw" });
+    await service.send("retry-ping");
 
-    expect(retryPort.writes).toEqual(['retry-ping']);
+    expect(retryPort.writes).toEqual(["retry-ping"]);
 
     await service.disconnect();
   });

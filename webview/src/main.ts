@@ -1,13 +1,13 @@
-import uPlot from 'uplot';
-import 'uplot/dist/uPlot.min.css';
-import './styles.css';
+import uPlot from "uplot";
+import "uplot/dist/uPlot.min.css";
+import "./styles.css";
 import {
   parserModes,
   type ParserMode,
   type SerialPortSummary,
   type ToExtensionMessage,
   type ToWebviewMessage,
-} from '../../src/shared/protocol';
+} from "../../src/shared/protocol";
 
 interface VsCodeApi<State> {
   getState(): State | undefined;
@@ -26,8 +26,8 @@ declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
 const vscode = acquireVsCodeApi<PersistedState>();
 const initialState = vscode.getState() ?? {
   baudRate: 115200,
-  parserMode: 'auto' satisfies ParserMode,
-  selectedPath: '',
+  parserMode: "auto" satisfies ParserMode,
+  selectedPath: "",
 };
 
 const state: PersistedState & { connected: boolean } = {
@@ -35,7 +35,7 @@ const state: PersistedState & { connected: boolean } = {
   connected: false,
 };
 
-const app = requireElement(document, '#app');
+const app = requireElement(document, "#app");
 app.innerHTML = `
   <main class="shell">
     <header class="toolbar">
@@ -76,20 +76,20 @@ app.innerHTML = `
   </main>
 `;
 
-const portSelect = requireElement<HTMLSelectElement>(document, '#portSelect');
-const refreshPortsButton = requireElement<HTMLButtonElement>(document, '#refreshPortsButton');
-const baudRateSelect = requireElement<HTMLSelectElement>(document, '#baudRateSelect');
-const parserModeSelect = requireElement<HTMLSelectElement>(document, '#parserModeSelect');
-const connectButton = requireElement<HTMLButtonElement>(document, '#connectButton');
-const connectionStatus = requireElement(document, '#connectionStatus');
-const chartElement = requireElement(document, '#chart');
-const legendElement = requireElement(document, '#legend');
-const clearLogButton = requireElement<HTMLButtonElement>(document, '#clearLogButton');
-const rawLog = requireElement<HTMLPreElement>(document, '#rawLog');
-const sendForm = requireElement<HTMLFormElement>(document, '#sendForm');
-const sendInput = requireElement<HTMLInputElement>(document, '#sendInput');
-const sendButton = requireElement<HTMLButtonElement>(document, '#sendButton');
-const errorToast = requireElement(document, '#errorToast');
+const portSelect = requireElement<HTMLSelectElement>(document, "#portSelect");
+const refreshPortsButton = requireElement<HTMLButtonElement>(document, "#refreshPortsButton");
+const baudRateSelect = requireElement<HTMLSelectElement>(document, "#baudRateSelect");
+const parserModeSelect = requireElement<HTMLSelectElement>(document, "#parserModeSelect");
+const connectButton = requireElement<HTMLButtonElement>(document, "#connectButton");
+const connectionStatus = requireElement(document, "#connectionStatus");
+const chartElement = requireElement(document, "#chart");
+const legendElement = requireElement(document, "#legend");
+const clearLogButton = requireElement<HTMLButtonElement>(document, "#clearLogButton");
+const rawLog = requireElement<HTMLPreElement>(document, "#rawLog");
+const sendForm = requireElement<HTMLFormElement>(document, "#sendForm");
+const sendInput = requireElement<HTMLInputElement>(document, "#sendInput");
+const sendButton = requireElement<HTMLButtonElement>(document, "#sendButton");
+const errorToast = requireElement(document, "#errorToast");
 
 const baudRates = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 const rawLines: string[] = [];
@@ -98,7 +98,7 @@ const channelData = new Map<string, Array<number | null>>();
 const channelVisibility = new Map<string, boolean>();
 const maxRawLines = 500;
 const maxPlotPoints = 3000;
-const colors = ['#4cc9f0', '#f72585', '#ffd166', '#06d6a0', '#c77dff', '#f77f00', '#90be6d'];
+const colors = ["#4cc9f0", "#f72585", "#ffd166", "#06d6a0", "#c77dff", "#f77f00", "#90be6d"];
 
 let firstTimestamp: number | undefined;
 let plot: uPlot | undefined;
@@ -108,27 +108,27 @@ setupControls();
 rebuildPlot();
 requestPorts();
 
-window.addEventListener('message', (event: MessageEvent<ToWebviewMessage>) => {
+window.addEventListener("message", (event: MessageEvent<ToWebviewMessage>) => {
   const message = event.data;
 
-  if (message.type === 'ports') {
+  if (message.type === "ports") {
     ports = message.ports;
     renderPorts();
     return;
   }
 
-  if (message.type === 'connectionState') {
+  if (message.type === "connectionState") {
     state.connected = message.state.connected;
     updateConnectionControls();
     return;
   }
 
-  if (message.type === 'rawLine') {
+  if (message.type === "rawLine") {
     appendRawLine(message.line, message.t);
     return;
   }
 
-  if (message.type === 'seriesAppend') {
+  if (message.type === "seriesAppend") {
     appendSamples(message.samples);
     return;
   }
@@ -146,7 +146,7 @@ new ResizeObserver(() => {
 
 function setupControls(): void {
   for (const baudRate of baudRates) {
-    const option = document.createElement('option');
+    const option = document.createElement("option");
     option.value = String(baudRate);
     option.textContent = String(baudRate);
     baudRateSelect.append(option);
@@ -155,7 +155,7 @@ function setupControls(): void {
   baudRateSelect.value = String(state.baudRate);
 
   for (const parserMode of parserModes) {
-    const option = document.createElement('option');
+    const option = document.createElement("option");
     option.value = parserMode;
     option.textContent = formatParserMode(parserMode);
     parserModeSelect.append(option);
@@ -163,27 +163,27 @@ function setupControls(): void {
 
   parserModeSelect.value = state.parserMode;
 
-  refreshPortsButton.addEventListener('click', () => requestPorts());
-  connectButton.addEventListener('click', () => toggleConnection());
-  clearLogButton.addEventListener('click', () => clearLog());
+  refreshPortsButton.addEventListener("click", () => requestPorts());
+  connectButton.addEventListener("click", () => toggleConnection());
+  clearLogButton.addEventListener("click", () => clearLog());
 
-  baudRateSelect.addEventListener('change', () => {
+  baudRateSelect.addEventListener("change", () => {
     state.baudRate = Number(baudRateSelect.value);
     saveState();
   });
 
-  parserModeSelect.addEventListener('change', () => {
+  parserModeSelect.addEventListener("change", () => {
     state.parserMode = parserModeSelect.value as ParserMode;
     saveState();
-    postMessage({ type: 'setParserMode', parserMode: state.parserMode });
+    postMessage({ type: "setParserMode", parserMode: state.parserMode });
   });
 
-  portSelect.addEventListener('change', () => {
+  portSelect.addEventListener("change", () => {
     state.selectedPath = portSelect.value;
     saveState();
   });
 
-  sendForm.addEventListener('submit', (event) => {
+  sendForm.addEventListener("submit", (event) => {
     event.preventDefault();
 
     const text = sendInput.value;
@@ -192,31 +192,31 @@ function setupControls(): void {
       return;
     }
 
-    postMessage({ type: 'send', text });
-    sendInput.value = '';
+    postMessage({ type: "send", text });
+    sendInput.value = "";
   });
 
   updateConnectionControls();
 }
 
 function requestPorts(): void {
-  postMessage({ type: 'requestPorts' });
+  postMessage({ type: "requestPorts" });
 }
 
 function renderPorts(): void {
   portSelect.replaceChildren();
 
   if (ports.length === 0) {
-    const option = document.createElement('option');
-    option.value = '';
-    option.textContent = 'No ports found';
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No ports found";
     portSelect.append(option);
     updateConnectionControls();
     return;
   }
 
   for (const port of ports) {
-    const option = document.createElement('option');
+    const option = document.createElement("option");
     option.value = port.path;
     option.textContent =
       port.manufacturer === undefined ? port.path : `${port.path} (${port.manufacturer})`;
@@ -224,7 +224,7 @@ function renderPorts(): void {
   }
 
   const selectedPortStillExists = ports.some((port) => port.path === state.selectedPath);
-  state.selectedPath = selectedPortStillExists ? state.selectedPath : (ports[0]?.path ?? '');
+  state.selectedPath = selectedPortStillExists ? state.selectedPath : (ports[0]?.path ?? "");
   portSelect.value = state.selectedPath;
   saveState();
   updateConnectionControls();
@@ -232,17 +232,17 @@ function renderPorts(): void {
 
 function toggleConnection(): void {
   if (state.connected) {
-    postMessage({ type: 'disconnect' });
+    postMessage({ type: "disconnect" });
     return;
   }
 
   if (state.selectedPath.length === 0) {
-    showError('Select a serial port before connecting.');
+    showError("Select a serial port before connecting.");
     return;
   }
 
   postMessage({
-    type: 'connect',
+    type: "connect",
     settings: {
       path: state.selectedPath,
       baudRate: Number(baudRateSelect.value),
@@ -252,12 +252,12 @@ function toggleConnection(): void {
 }
 
 function updateConnectionControls(): void {
-  connectButton.textContent = state.connected ? 'Disconnect' : 'Connect';
-  connectButton.classList.toggle('button-danger', state.connected);
+  connectButton.textContent = state.connected ? "Disconnect" : "Connect";
+  connectButton.classList.toggle("button-danger", state.connected);
   connectionStatus.textContent = state.connected
     ? `Connected to ${state.selectedPath}`
-    : 'Disconnected';
-  connectionStatus.classList.toggle('status-connected', state.connected);
+    : "Disconnected";
+  connectionStatus.classList.toggle("status-connected", state.connected);
   portSelect.disabled = state.connected || ports.length === 0;
   baudRateSelect.disabled = state.connected;
   connectButton.disabled = !state.connected && state.selectedPath.length === 0;
@@ -273,14 +273,14 @@ function appendRawLine(line: string, timestamp: number): void {
     rawLines.splice(0, rawLines.length - maxRawLines);
   }
 
-  rawLog.textContent = rawLines.join('\n');
+  rawLog.textContent = rawLines.join("\n");
   rawLog.scrollTop = rawLog.scrollHeight;
 }
 
 function clearLog(): void {
   rawLines.length = 0;
-  rawLog.textContent = '';
-  postMessage({ type: 'clearLog' });
+  rawLog.textContent = "";
+  postMessage({ type: "clearLog" });
 }
 
 function appendSamples(samples: readonly { t: number; values: Record<string, number> }[]): void {
@@ -306,7 +306,7 @@ function appendSamples(samples: readonly { t: number; values: Record<string, num
 
     for (const [channelName, values] of channelData.entries()) {
       const value = sample.values[channelName];
-      values.push(typeof value === 'number' && Number.isFinite(value) ? value : null);
+      values.push(typeof value === "number" && Number.isFinite(value) ? value : null);
     }
   }
 
@@ -357,17 +357,17 @@ function rebuildPlot(): void {
       },
       axes: [
         {
-          label: 'Seconds',
-          stroke: 'var(--vscode-foreground)',
+          label: "Seconds",
+          stroke: "var(--vscode-foreground)",
           grid: {
-            stroke: 'var(--vscode-panel-border)',
+            stroke: "var(--vscode-panel-border)",
           },
         },
         {
-          label: 'Value',
-          stroke: 'var(--vscode-foreground)',
+          label: "Value",
+          stroke: "var(--vscode-foreground)",
           grid: {
-            stroke: 'var(--vscode-panel-border)',
+            stroke: "var(--vscode-panel-border)",
           },
         },
       ],
@@ -405,30 +405,30 @@ function renderLegend(channelNames: string[]): void {
   legendElement.replaceChildren();
 
   if (channelNames.length === 0) {
-    const empty = document.createElement('span');
-    empty.className = 'legend-empty';
-    empty.textContent = 'Waiting for numeric data';
+    const empty = document.createElement("span");
+    empty.className = "legend-empty";
+    empty.textContent = "Waiting for numeric data";
     legendElement.append(empty);
     return;
   }
 
   for (const [index, channelName] of channelNames.entries()) {
-    const label = document.createElement('label');
-    label.className = 'legend-item';
+    const label = document.createElement("label");
+    label.className = "legend-item";
 
-    const checkbox = document.createElement('input');
-    checkbox.type = 'checkbox';
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
     checkbox.checked = channelVisibility.get(channelName) ?? true;
-    checkbox.addEventListener('change', () => {
+    checkbox.addEventListener("change", () => {
       channelVisibility.set(channelName, checkbox.checked);
       plot?.setSeries(index + 1, { show: checkbox.checked });
     });
 
-    const swatch = document.createElement('span');
-    swatch.className = 'legend-swatch';
+    const swatch = document.createElement("span");
+    swatch.className = "legend-swatch";
     swatch.style.backgroundColor = colors[index % colors.length] ?? colors[0];
 
-    const text = document.createElement('span');
+    const text = document.createElement("span");
     text.textContent = channelName;
 
     label.append(checkbox, swatch, text);
@@ -446,9 +446,9 @@ function getChartSize(): { width: number; height: number } {
 
 function showError(message: string): void {
   errorToast.textContent = message;
-  errorToast.classList.add('error-toast-visible');
+  errorToast.classList.add("error-toast-visible");
   window.setTimeout(() => {
-    errorToast.classList.remove('error-toast-visible');
+    errorToast.classList.remove("error-toast-visible");
   }, 3500);
 }
 
@@ -465,12 +465,12 @@ function postMessage(message: ToExtensionMessage): void {
 }
 
 function formatParserMode(parserMode: ParserMode): string {
-  if (parserMode === 'jsonl') {
-    return 'JSON Lines';
+  if (parserMode === "jsonl") {
+    return "JSON Lines";
   }
 
-  if (parserMode === 'keyValue') {
-    return 'Key=Value';
+  if (parserMode === "keyValue") {
+    return "Key=Value";
   }
 
   return parserMode.toUpperCase();

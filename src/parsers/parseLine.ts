@@ -1,4 +1,4 @@
-import type { ParserMode, PlotSample } from '../shared/protocol';
+import type { ParserMode, PlotSample } from "../shared/protocol";
 
 export interface ParsedLine {
   values: Record<string, number>;
@@ -7,19 +7,19 @@ export interface ParsedLine {
 export function parseLine(line: string, parserMode: ParserMode): ParsedLine {
   const trimmed = line.trim();
 
-  if (trimmed.length === 0 || parserMode === 'raw') {
+  if (trimmed.length === 0 || parserMode === "raw") {
     return { values: {} };
   }
 
-  if (parserMode === 'auto') {
+  if (parserMode === "auto") {
     return parseAuto(trimmed);
   }
 
-  if (parserMode === 'csv') {
+  if (parserMode === "csv") {
     return parseCsv(trimmed);
   }
 
-  if (parserMode === 'jsonl') {
+  if (parserMode === "jsonl") {
     return parseJsonLine(trimmed);
   }
 
@@ -60,7 +60,7 @@ function parseAuto(line: string): ParsedLine {
 }
 
 function parseCsv(line: string): ParsedLine {
-  const parts = line.split(',').map((part) => part.trim());
+  const parts = line.split(",").map((part) => part.trim());
   const values: Record<string, number> = {};
 
   for (const [index, part] of parts.entries()) {
@@ -87,7 +87,7 @@ function parseJsonLine(line: string): ParsedLine {
     const values: Record<string, number> = {};
 
     for (const [key, value] of Object.entries(parsed)) {
-      if (typeof value === 'number' && Number.isFinite(value)) {
+      if (typeof value === "number" && Number.isFinite(value)) {
         values[key] = value;
       }
     }
@@ -127,5 +127,5 @@ function hasValues(parsedLine: ParsedLine): boolean {
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

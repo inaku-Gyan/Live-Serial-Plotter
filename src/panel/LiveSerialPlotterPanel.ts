@@ -1,15 +1,15 @@
-import * as vscode from 'vscode';
-import { PointBatcher } from '../session/PointBatcher';
-import { RingBuffer } from '../session/RingBuffer';
-import { SerialService } from '../serial/SerialService';
+import * as vscode from "vscode";
+import { PointBatcher } from "../session/PointBatcher";
+import { RingBuffer } from "../session/RingBuffer";
+import { SerialService } from "../serial/SerialService";
 import {
   isParserMode,
   type ConnectionState,
   type PlotSample,
   type ToExtensionMessage,
-} from '../shared/protocol';
+} from "../shared/protocol";
 
-const panelViewType = 'liveSerialPlotter.panel';
+const panelViewType = "liveSerialPlotter.panel";
 
 export class LiveSerialPlotterPanel {
   private static readonly activePanels = new Set<LiveSerialPlotterPanel>();
@@ -19,17 +19,17 @@ export class LiveSerialPlotterPanel {
   private readonly rawLines = new RingBuffer<string>(500);
   private readonly samples = new RingBuffer<PlotSample>(5_000);
   private readonly pointBatcher = new PointBatcher(50, (samples) => {
-    this.postMessage({ type: 'seriesAppend', samples });
+    this.postMessage({ type: "seriesAppend", samples });
   });
 
   private readonly serialService = new SerialService({
     onConnectionState: (state) => {
       this.updatePanelTitle(state);
-      this.postMessage({ type: 'connectionState', state });
+      this.postMessage({ type: "connectionState", state });
     },
     onRawLine: (line, t) => {
       this.rawLines.push(line);
-      this.postMessage({ type: 'rawLine', line, t });
+      this.postMessage({ type: "rawLine", line, t });
     },
     onSample: (sample) => {
       this.samples.push(sample);
@@ -45,7 +45,7 @@ export class LiveSerialPlotterPanel {
     const panel = vscode.window.createWebviewPanel(panelViewType, title, vscode.ViewColumn.One, {
       enableScripts: true,
       retainContextWhenHidden: true,
-      localResourceRoots: [vscode.Uri.joinPath(extensionUri, 'dist', 'webview')],
+      localResourceRoots: [vscode.Uri.joinPath(extensionUri, "dist", "webview")],
     });
 
     const plotterPanel = new LiveSerialPlotterPanel(panel, extensionUri, title);
@@ -71,32 +71,32 @@ export class LiveSerialPlotterPanel {
 
   private async handleMessage(message: ToExtensionMessage): Promise<void> {
     try {
-      if (message.type === 'requestPorts') {
+      if (message.type === "requestPorts") {
         await this.postPorts();
         return;
       }
 
-      if (message.type === 'connect') {
+      if (message.type === "connect") {
         await this.serialService.connect(message.settings);
         return;
       }
 
-      if (message.type === 'disconnect') {
+      if (message.type === "disconnect") {
         await this.serialService.disconnect();
         return;
       }
 
-      if (message.type === 'send') {
+      if (message.type === "send") {
         await this.serialService.send(message.text);
         return;
       }
 
-      if (message.type === 'setParserMode' && isParserMode(message.parserMode)) {
+      if (message.type === "setParserMode" && isParserMode(message.parserMode)) {
         this.serialService.setParserMode(message.parserMode);
         return;
       }
 
-      if (message.type === 'clearLog') {
+      if (message.type === "clearLog") {
         this.rawLines.clear();
       }
     } catch (error) {
@@ -106,14 +106,14 @@ export class LiveSerialPlotterPanel {
 
   private async postPorts(): Promise<void> {
     const ports = await this.serialService.listPorts();
-    this.postMessage({ type: 'ports', ports });
+    this.postMessage({ type: "ports", ports });
   }
 
   private postError(message: string): void {
-    this.postMessage({ type: 'error', message });
+    this.postMessage({ type: "error", message });
   }
 
-  private postMessage(message: Parameters<vscode.Webview['postMessage']>[0]): void {
+  private postMessage(message: Parameters<vscode.Webview["postMessage"]>[0]): void {
     void this.panel.webview.postMessage(message);
   }
 
@@ -128,10 +128,10 @@ export class LiveSerialPlotterPanel {
     const webview = this.panel.webview;
     const nonce = getNonce();
     const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'assets', 'index.js'),
+      vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.js"),
     );
     const styleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, 'dist', 'webview', 'assets', 'index.css'),
+      vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.css"),
     );
 
     return `<!DOCTYPE html>
@@ -162,8 +162,8 @@ export class LiveSerialPlotterPanel {
 }
 
 function getNonce(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let nonce = '';
+  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+  let nonce = "";
 
   for (let index = 0; index < 32; index += 1) {
     nonce += chars.charAt(Math.floor(Math.random() * chars.length));

@@ -1,13 +1,13 @@
-import { cp, mkdir, readFile, rm } from 'node:fs/promises';
-import { createRequire } from 'node:module';
-import { dirname, join, resolve } from 'node:path';
+import { cp, mkdir, readFile, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
+import { dirname, join, resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
-const targetNodeModules = resolve('dist/node_modules');
+const targetNodeModules = resolve("dist/node_modules");
 const copiedPackages = new Set();
 
-await rm(join(targetNodeModules, '@serialport'), { recursive: true, force: true });
-await copyPackageWithRuntimeDependencies('@serialport/bindings-cpp');
+await rm(join(targetNodeModules, "@serialport"), { recursive: true, force: true });
+await copyPackageWithRuntimeDependencies("@serialport/bindings-cpp");
 
 async function copyPackageWithRuntimeDependencies(packageName) {
   if (copiedPackages.has(packageName)) {
@@ -22,7 +22,7 @@ async function copyPackageWithRuntimeDependencies(packageName) {
     await copyPackageWithRuntimeDependencies(dependencyName);
   }
 
-  const targetDir = join(targetNodeModules, ...packageName.split('/'));
+  const targetDir = join(targetNodeModules, ...packageName.split("/"));
   await mkdir(dirname(targetDir), { recursive: true });
   await cp(sourceDir, targetDir, {
     recursive: true,
@@ -36,7 +36,7 @@ async function findPackageRoot(packageName) {
 
   while (currentDir !== dirname(currentDir)) {
     try {
-      const packageJson = JSON.parse(await readFile(join(currentDir, 'package.json'), 'utf8'));
+      const packageJson = JSON.parse(await readFile(join(currentDir, "package.json"), "utf8"));
 
       if (packageJson.name === packageName) {
         return {
