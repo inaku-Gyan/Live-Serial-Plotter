@@ -1,0 +1,28 @@
+{
+  "ports": [
+    {
+      "path": "sim://telemetry-a",
+      "label": "Telemetry Simulator A",
+      "baudRate": 115200,
+      "generator": "./generators/sample-telemetry.mjs",
+      "options": {
+        "intervalMs": 100,
+        "phase": 0,
+        "temperatureBase": 24,
+        "rpmBase": 1200
+      }
+    },
+    {
+      "path": "sim://telemetry-b",
+      "label": "Telemetry Simulator B",
+      "baudRate": 115200,
+      "generator": "./generators/sample-telemetry.mjs",
+      "options": {
+        "intervalMs": 150,
+        "phase": 1.2,
+        "temperatureBase": 28,
+        "rpmBase": 900
+      }
+    }
+  ]
+}
