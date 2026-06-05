@@ -16,6 +16,9 @@ coverage/**
 AGENTS.md
 CLAUDE.md
 
+# Design sources
+assets/icon-design.svg
+
 # Development tooling
 *.config.ts
 tsconfig.json
