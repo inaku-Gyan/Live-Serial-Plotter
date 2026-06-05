@@ -17,6 +17,9 @@ Install dependencies:
 pnpm install
 ```
 
+Release process documentation is available in
+[docs/release.zh-CN.md](docs/release.zh-CN.md).
+
 ### Common Commands
 
 Format, lint, and type-check:
