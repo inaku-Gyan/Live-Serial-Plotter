@@ -21,9 +21,9 @@ jobs:
       package_version: ${{ steps.validate.outputs.package_version }}
       prerelease: ${{ steps.validate.outputs.prerelease }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
@@ -93,9 +93,9 @@ jobs:
           - target: win32-x64
             os: windows-2025
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
           cache: pnpm
@@ -173,7 +173,7 @@ jobs:
     needs: [check-tag, package]
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: vsix-*
           path: dist-vsix
@@ -195,13 +195,13 @@ jobs:
       VSCE_PAT: ${{ secrets.VSCE_PAT }}
       CHANNEL: ${{ needs.check-tag.outputs.channel }}
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: vsix-*
           path: dist-vsix
           merge-multiple: true
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: 22
 
