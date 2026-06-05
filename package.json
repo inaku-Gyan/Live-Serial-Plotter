@@ -1,12 +1,13 @@
 {
   "name": "live-serial-plotter",
   "displayName": "Live Serial Plotter",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "private": true,
   "description": "Monitor serial ports, parse telemetry, and plot live data inside VS Code.",
   "categories": [
     "Other",
-    "Visualization"
+    "Visualization",
+    "Testing"
   ],
   "keywords": [
     "monitor",
