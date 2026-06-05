@@ -21,11 +21,6 @@
     "url": "https://github.com/inaku-Gyan/Live-Serial-Plotter"
   },
   "publisher": "inaku",
-  "icon": "assets/icon.png",
-  "galleryBanner": {
-    "color": "#0B1020",
-    "theme": "dark"
-  },
   "type": "module",
   "main": "./dist/extension.cjs",
   "scripts": {
@@ -76,6 +71,11 @@
         "category": "Live Serial Plotter"
       }
     ]
+  },
+  "icon": "assets/icon.png",
+  "galleryBanner": {
+    "color": "#0B1020",
+    "theme": "dark"
   },
   "engines": {
     "node": ">=22.0.0",
