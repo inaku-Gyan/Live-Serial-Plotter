@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { defaultProfile } from "./defaultProfile";
+import { builtinProfiles, defaultProfile } from "./defaultProfile";
 import { parseJsonc } from "./jsonc";
 import {
   isParserMode,
@@ -103,7 +103,9 @@ export class ProfileStore {
       errors,
     );
 
-    profiles.push(createLoadedProfile(defaultProfile, { scope: "builtin" }));
+    for (const profile of builtinProfiles) {
+      profiles.push(createLoadedProfile(profile, { scope: "builtin" }));
+    }
 
     const fallbackProfile =
       profiles.find((profile) => profile.summary.key === getBuiltinProfileKey(defaultProfile.id)) ??

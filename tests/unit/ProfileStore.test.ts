@@ -2,7 +2,7 @@ import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
-import { defaultProfile } from "../../src/profiles/defaultProfile";
+import { builtinProfiles, defaultProfile } from "../../src/profiles/defaultProfile";
 import {
   createProfileKey,
   getWorkspaceProfilesDirectory,
@@ -56,27 +56,21 @@ describe("ProfileStore", () => {
     const loaded = await store.loadProfiles(sensorKey);
 
     expect(loaded.errors).toEqual([]);
-    expect(loaded.profiles.map((profile) => profile.summary)).toEqual([
-      {
-        key: sensorKey,
-        ref: {
-          scope: "workspace",
-          id: "sensor",
-          workspaceFolderUri: workspaceDirectory.folderUri,
-        },
-        id: "sensor",
-        name: "Sensor",
+    expect(loaded.profiles[0]?.summary).toEqual({
+      key: sensorKey,
+      ref: {
         scope: "workspace",
-        workspaceName: "Firmware",
+        id: "sensor",
+        workspaceFolderUri: workspaceDirectory.folderUri,
       },
-      {
-        key: "builtin:default",
-        ref: { scope: "builtin", id: "default" },
-        id: "default",
-        name: "Default Auto Plot",
-        scope: "builtin",
-      },
-    ]);
+      id: "sensor",
+      name: "Sensor",
+      scope: "workspace",
+      workspaceName: "Firmware",
+    });
+    expect(loaded.profiles.slice(1).map((profile) => profile.summary.key)).toEqual(
+      builtinProfiles.map((profile) => `builtin:${profile.id}`),
+    );
     expect(loaded.activeProfile.id).toBe("sensor");
     expect(loaded.activeProfileKey).toBe(sensorKey);
     expect(loaded.activeProfileSource).toEqual({
@@ -113,7 +107,7 @@ describe("ProfileStore", () => {
     const loaded = await store.loadProfiles("missing");
 
     expect(loaded.activeProfile.id).toBe("default");
-    expect(loaded.profiles).toHaveLength(1);
+    expect(loaded.profiles).toHaveLength(builtinProfiles.length);
     expect(loaded.errors).toHaveLength(1);
     expect(loaded.errors[0]).toContain("broken.jsonc");
   });
@@ -141,7 +135,7 @@ describe("ProfileStore", () => {
         workspaceFolderUri: workspaceDirectory.folderUri,
       }),
       "user:default",
-      "builtin:default",
+      ...builtinProfiles.map((profile) => `builtin:${profile.id}`),
     ]);
   });
 
@@ -179,7 +173,9 @@ describe("ProfileStore", () => {
         id: "sensor",
         workspaceName: "Dashboard",
       }),
-      expect.objectContaining({ key: "builtin:default" }),
+      ...builtinProfiles.map((profile) =>
+        expect.objectContaining({ key: `builtin:${profile.id}` }),
+      ),
     ]);
   });
 
@@ -212,7 +208,7 @@ describe("ProfileStore", () => {
     const loaded = await store.loadProfiles("old");
 
     expect(loaded.activeProfile.id).toBe("default");
-    expect(loaded.profiles).toHaveLength(1);
+    expect(loaded.profiles).toHaveLength(builtinProfiles.length);
     expect(loaded.errors[0]).toContain("must use schemaVersion 2");
   });
 
