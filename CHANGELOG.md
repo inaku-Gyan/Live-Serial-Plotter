@@ -5,6 +5,7 @@
 - Add JSONC profiles, configurable pipeline stages, output packets, and batched Webview updates.
 - Add the Profiles & Pipeline sidebar editor for basic profile configuration and JSONC access.
 - Split runtime serial connection settings from profiles, and introduce schema v2 text codec configuration.
+- Namespace profile ids by builtin, user, and each workspace folder; sidebar edits now auto-save user/workspace profiles and use Copy for new profiles.
 - Add builtin parser options, stateful parsing support, and guarded workspace `.mjs` script parsers.
 
 ## 0.1.0

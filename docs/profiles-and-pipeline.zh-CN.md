@@ -19,6 +19,15 @@ serial bytes -> codec -> framing -> parser -> output mappers -> output sinks -> 
 用户全局 profile 会从 VS Code `globalStorageUri/profiles` 读取。内置 `default`
 profile 等价于当前默认行为：UTF-8 文本 codec、行分割、`auto` parser、raw terminal 和实时折线图。
 
+Profile id 只需要在自己的命名空间内唯一。命名空间包括：
+
+- 每个 VS Code workspace folder。
+- 用户全局 profile。
+- 内置 profile。
+
+因此 `workspace/default`、`user/default` 和 `builtin/default` 可以同时存在。下拉列表按 workspace、user、builtin
+排序；多 workspace 时按 VS Code workspace folder 顺序排序，并显示具体 workspace 名称。
+
 Profile 只描述协议、解析和输出。具体串口端口和当前波特率属于监控页面的运行时连接设置，不写入 profile。Profile 中的
 `serialDefaults.baudRate` 只作为默认值提示。
 
@@ -29,7 +38,7 @@ Profile 只描述协议、解析和输出。具体串口端口和当前波特率
 
 首版支持编辑：
 
-- profile `id` 和 `name`
+- profile `name`；`id` 只读
 - serial defaults：默认波特率
 - codec：UTF-8 文本编码、发送文本时追加的行尾
 - framing：文本行 delimiter、trim、最大 frame 字节数
@@ -38,9 +47,11 @@ Profile 只描述协议、解析和输出。具体串口端口和当前波特率
 - `timeSeriesLine` output、时间轴和 series 样式
 
 `script` parser、`terminalFrame`、`framePlot2d` 和其他未覆盖的高级配置会显示为只读。需要编辑这些字段时，用侧边栏中的
-`Open JSONC` 打开原始配置文件。内置 profile 不能直接打开 JSONC，需要先另存为用户或工作区 profile。
+`Open JSONC` 打开原始配置文件。内置 profile 没有 JSONC 文件，需要先 Copy 到用户或某个 workspace。
 
-点击 `Save Profile` 时会选择保存到用户目录或工作区目录。保存后不会自动应用到已打开的监控页面；在监控页刷新/重新选择 profile 后生效。
+侧边栏不提供 Save / Save As。用户或 workspace profile 在字段变化后会自动保存回原 JSONC 文件。内置 profile 是只读的；
+点击 `Copy Profile` 可以复制到用户命名空间或指定 workspace 命名空间。自动保存不会自动应用到已打开的监控页面；在监控页刷新/重新选择
+profile 后生效。
 
 ## Profile 示例
 
