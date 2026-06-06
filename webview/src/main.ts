@@ -96,7 +96,9 @@ window.addEventListener("message", (event: MessageEvent<ToWebviewMessage>) => {
     return;
   }
 
-  showError(message.message);
+  if (message.type === "error") {
+    showError(message.message);
+  }
 });
 
 new ResizeObserver(() => {

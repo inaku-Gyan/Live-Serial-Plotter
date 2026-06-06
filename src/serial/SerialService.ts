@@ -70,7 +70,7 @@ export class SerialService {
   async connect(settings: ConnectionSettings): Promise<void> {
     await this.disconnect();
 
-    this.parserMode = settings.parserMode;
+    this.parserMode = settings.parserMode ?? "auto";
     this.currentSettings = settings;
     this.decoder.reset();
     this.disconnecting = false;
