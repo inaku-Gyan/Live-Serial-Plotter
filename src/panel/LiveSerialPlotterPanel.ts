@@ -172,18 +172,11 @@ export class LiveSerialPlotterPanel {
   private getHtml(): string {
     const webview = this.panel.webview;
     const nonce = getNonce();
-    const cacheBust = Date.now().toString(36);
-    const scriptUri = withCacheBust(
-      webview.asWebviewUri(
-        vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.js"),
-      ),
-      cacheBust,
+    const scriptUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.js"),
     );
-    const styleUri = withCacheBust(
-      webview.asWebviewUri(
-        vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.css"),
-      ),
-      cacheBust,
+    const styleUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.css"),
     );
 
     return `<!DOCTYPE html>
@@ -222,10 +215,6 @@ function getNonce(): string {
   }
 
   return nonce;
-}
-
-function withCacheBust(uri: vscode.Uri, cacheBust: string): vscode.Uri {
-  return uri.with({ query: `v=${cacheBust}` });
 }
 
 function formatError(error: unknown): string {

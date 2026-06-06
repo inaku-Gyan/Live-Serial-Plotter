@@ -6,12 +6,7 @@
       "type": "extensionHost",
       "request": "launch",
       "runtimeExecutable": "${execPath}",
-      "args": [
-        "--disable-extensions",
-        "--user-data-dir=${workspaceFolder}/.vscode-test/debug-user-data",
-        "--extensions-dir=${workspaceFolder}/.vscode-test/debug-extensions",
-        "--extensionDevelopmentPath=${workspaceFolder}"
-      ],
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
       "preLaunchTask": "pnpm: build",
       "outFiles": ["${workspaceFolder}/dist/**/*.js", "${workspaceFolder}/dist/**/*.cjs"]
     }
