@@ -268,7 +268,7 @@ export interface Plot2dPoint {
 
 export type ToExtensionMessage =
   | { type: "requestPorts" }
-  | { type: "requestProfiles" }
+  | { type: "requestProfiles"; profileId?: string }
   | { type: "selectProfile"; profileId: string }
   | { type: "connect"; settings: ConnectionSettings }
   | { type: "disconnect" }

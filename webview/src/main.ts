@@ -203,7 +203,7 @@ function requestPorts(): void {
 }
 
 function requestProfiles(): void {
-  postMessage({ type: "requestProfiles" });
+  postMessage({ type: "requestProfiles", profileId: state.profileId });
 }
 
 function renderProfiles(): void {

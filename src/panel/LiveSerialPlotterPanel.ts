@@ -81,7 +81,7 @@ export class LiveSerialPlotterPanel {
       }
 
       if (message.type === "requestProfiles") {
-        await this.postProfiles(this.activeProfileId);
+        await this.postProfiles(message.profileId ?? this.activeProfileId);
         return;
       }
 
