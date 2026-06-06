@@ -7,6 +7,19 @@
       "command": "pnpm build",
       "group": "build",
       "problemMatcher": []
+    },
+    {
+      "label": "debug: create workspace",
+      "type": "process",
+      "command": "node",
+      "args": ["-e", "require('node:fs').mkdirSync('.vscode-dev/workspace', { recursive: true })"],
+      "problemMatcher": []
+    },
+    {
+      "label": "debug: prepare extension host",
+      "dependsOrder": "sequence",
+      "dependsOn": ["debug: create workspace", "pnpm: build"],
+      "problemMatcher": []
     }
   ]
 }
