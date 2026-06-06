@@ -61,7 +61,9 @@ describe("parseLine", () => {
       options: { header: "firstLine" },
     });
 
-    expect(parser.parseFrame({ seq: 1, receivedAt: 100, raw: "temp,humidity" })).toEqual([]);
+    expect(parser.parseFrame({ seq: 1, receivedAt: 100, raw: "temp,humidity" })).toEqual([
+      { fields: {} },
+    ]);
     expect(parser.parseFrame({ seq: 2, receivedAt: 110, raw: "23.5,45" })).toEqual([
       {
         fields: {

@@ -104,7 +104,7 @@ export class BuiltinLineParser implements LineParser {
     if (headerOption === true || headerOption === "firstLine") {
       if (this.csvHeaders === undefined) {
         this.csvHeaders = parts;
-        return null;
+        return {};
       }
 
       return parseCsvValues(parts, this.csvHeaders);

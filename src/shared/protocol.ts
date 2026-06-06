@@ -144,6 +144,7 @@ export interface TimeSeriesConfig {
   field: string;
   label?: string;
   unit?: string;
+  scale?: number;
   color?: string;
   visible?: boolean;
   line?: {
@@ -156,7 +157,7 @@ export interface TimeSeriesConfig {
 }
 
 export type TimeAxisConfig =
-  | { source: "hostReceived"; zero?: "none" | "first" }
+  | { source: "hostReceived"; unit?: "s" | "ms"; zero?: "none" | "first" }
   | { source: "field"; field: string; unit: "s" | "ms" | "us"; zero?: "none" | "first" }
   | { source: "fixedInterval"; intervalMs: number }
   | { source: "sequence" };
