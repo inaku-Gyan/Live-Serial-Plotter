@@ -178,11 +178,18 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
-    const profileStyleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.css"),
+    const cacheBust = Date.now().toString(36);
+    const profileStyleUri = withCacheBust(
+      webview.asWebviewUri(
+        vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.css"),
+      ),
+      cacheBust,
     );
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.js"),
+    const scriptUri = withCacheBust(
+      webview.asWebviewUri(
+        vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.js"),
+      ),
+      cacheBust,
     );
 
     return `<!DOCTYPE html>
@@ -211,6 +218,10 @@ function getNonce(): string {
   }
 
   return nonce;
+}
+
+function withCacheBust(uri: vscode.Uri, cacheBust: string): vscode.Uri {
+  return uri.with({ query: `v=${cacheBust}` });
 }
 
 function formatError(error: unknown): string {

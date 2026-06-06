@@ -7,6 +7,8 @@ interface DisposableLike {
 interface MockUri {
   fsPath?: string;
   path?: string;
+  query?: string;
+  with(change: { query?: string }): MockUri;
   toString(): string;
 }
 
@@ -82,20 +84,12 @@ export const ExtensionMode = {
 
 export const Uri = {
   file: vi.fn((filePath: string): MockUri => {
-    return {
-      fsPath: filePath,
-      path: filePath,
-      toString: () => filePath,
-    };
+    return createMockUri(filePath);
   }),
   joinPath: vi.fn((base: MockUri, ...parts: string[]): MockUri => {
     const path = [formatUri(base), ...parts].join("/");
 
-    return {
-      fsPath: path,
-      path,
-      toString: () => path,
-    };
+    return createMockUri(path);
   }),
 };
 
@@ -167,6 +161,16 @@ function createMockWebviewPanel(title: string): MockWebviewPanel {
 function createDisposable(): DisposableLike {
   return {
     dispose: vi.fn(),
+  };
+}
+
+function createMockUri(path: string, query = ""): MockUri {
+  return {
+    fsPath: path,
+    path,
+    query,
+    with: (change) => createMockUri(path, change.query ?? query),
+    toString: () => (query.length > 0 ? `${path}?${query}` : path),
   };
 }
 
