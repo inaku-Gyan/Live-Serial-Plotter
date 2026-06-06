@@ -19,6 +19,25 @@ serial bytes -> framing -> parser -> output mappers -> output sinks -> Webview r
 用户全局 profile 会从 VS Code `globalStorageUri/profiles` 读取。内置 `default`
 profile 等价于当前默认行为：UTF-8 行分割、`auto` parser、raw terminal 和实时折线图。
 
+## 侧边栏可视化配置
+
+扩展在 Activity Bar 中提供 `Live Serial Plotter` 视图，侧边栏里的 `Profiles & Pipeline`
+用于基础 profile 可视化配置。
+
+首版支持编辑：
+
+- profile `id` 和 `name`
+- connection：端口、波特率、发送行尾
+- framing：文本行 delimiter、trim、最大 frame 字节数
+- builtin parser：mode 和 options JSON
+- `terminalAppend` output
+- `timeSeriesLine` output、时间轴和 series 样式
+
+`script` parser、`terminalFrame`、`framePlot2d` 和其他未覆盖的高级配置会显示为只读。需要编辑这些字段时，用侧边栏中的
+`Open JSONC` 打开原始配置文件。内置 profile 不能直接打开 JSONC，需要先另存为用户或工作区 profile。
+
+点击 `Save Profile` 时会选择保存到用户目录或工作区目录。保存后不会自动应用到已打开的监控页面；在监控页刷新/重新选择 profile 后生效。
+
 ## Profile 示例
 
 ```jsonc
