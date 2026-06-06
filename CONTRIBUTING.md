@@ -35,6 +35,9 @@ pnpm test:extension
 
 更多测试和串口调试方式见 [测试与调试方式](docs/testing.zh-CN.md)。
 
+Profile、parser pipeline 和 output 配置见
+[Profile 与 Pipeline 配置](docs/profiles-and-pipeline.zh-CN.md)。
+
 Build:
 
 ```sh

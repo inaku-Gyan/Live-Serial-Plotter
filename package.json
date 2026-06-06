@@ -6,8 +6,8 @@
   "description": "Monitor serial ports, parse telemetry, and plot live data inside VS Code.",
   "categories": [
     "Other",
-    "Visualization",
-    "Testing"
+    "Testing",
+    "Visualization"
   ],
   "keywords": [
     "monitor",
