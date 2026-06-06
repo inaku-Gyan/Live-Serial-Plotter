@@ -16,7 +16,6 @@ describe("LineFramer", () => {
   test("supports explicit carriage-return delimiter", () => {
     const framer = new LineFramer({
       kind: "line",
-      encoding: "utf8",
       delimiter: "cr",
     });
 
@@ -29,7 +28,6 @@ describe("LineFramer", () => {
   test("waits for complete CRLF delimiters", () => {
     const framer = new LineFramer({
       kind: "line",
-      encoding: "utf8",
       delimiter: "crlf",
     });
 
@@ -43,7 +41,6 @@ describe("LineFramer", () => {
   test("trims frames when configured", () => {
     const framer = new LineFramer({
       kind: "line",
-      encoding: "utf8",
       delimiter: "lf",
       trim: true,
     });
@@ -56,7 +53,6 @@ describe("LineFramer", () => {
   test("drops frames that exceed maxFrameBytes", () => {
     const framer = new LineFramer({
       kind: "line",
-      encoding: "utf8",
       delimiter: "lf",
       maxFrameBytes: 4,
     });

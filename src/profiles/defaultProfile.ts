@@ -1,16 +1,19 @@
 import type { ProfileConfig } from "../shared/protocol";
 
 export const defaultProfile: ProfileConfig = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   id: "default",
   name: "Default Auto Plot",
-  connection: {
+  serialDefaults: {
     baudRate: 115200,
-    lineEnding: "none",
+  },
+  codec: {
+    kind: "text",
+    encoding: "utf8",
+    sendLineEnding: "none",
   },
   framing: {
     kind: "line",
-    encoding: "utf8",
     delimiter: "auto",
   },
   parser: {

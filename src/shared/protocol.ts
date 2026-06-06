@@ -53,25 +53,33 @@ export interface ProfileEditorState {
 }
 
 export interface ProfileConfig {
-  schemaVersion: 1;
+  schemaVersion: 2;
   id: string;
   name: string;
-  connection: ConnectionConfig;
+  serialDefaults?: SerialDefaultsConfig;
+  codec: CodecConfig;
   framing: FramingConfig;
   parser: ParserConfig;
   outputs: OutputConfig[];
   export?: ExportConfig;
 }
 
-export interface ConnectionConfig {
-  baudRate: number;
-  path?: string;
-  lineEnding?: "none" | "lf" | "crlf" | "cr";
+export interface SerialDefaultsConfig {
+  baudRate?: number;
+}
+
+export type LineEnding = "none" | "lf" | "crlf" | "cr";
+
+export type CodecConfig = TextCodecConfig;
+
+export interface TextCodecConfig {
+  kind: "text";
+  encoding: "utf8";
+  sendLineEnding?: LineEnding;
 }
 
 export interface LineFramingConfig {
   kind: "line";
-  encoding: "utf8";
   delimiter: "auto" | "lf" | "crlf" | "cr";
   trim?: boolean;
   maxFrameBytes?: number;

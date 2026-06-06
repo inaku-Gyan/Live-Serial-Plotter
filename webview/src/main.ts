@@ -31,8 +31,9 @@ interface PersistedState {
 declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
 
 const vscode = acquireVsCodeApi<PersistedState>();
-const initialState = vscode.getState() ?? {
-  baudRate: 115200,
+const persistedState = vscode.getState();
+const initialState = persistedState ?? {
+  baudRate: defaultProfile.serialDefaults?.baudRate ?? 115200,
   parserMode: "auto" satisfies ParserMode,
   profileId: defaultProfile.id,
   selectedPath: "",
@@ -76,6 +77,7 @@ let plot: uPlot | undefined;
 let ports: SerialPortSummary[] = [];
 let profiles: ProfileSummary[] = [];
 let activeProfile: ProfileConfig = defaultProfile;
+let userChangedBaudRate = persistedState?.baudRate !== undefined;
 
 setupControls();
 rebuildPlot();
@@ -168,6 +170,7 @@ function setupControls(): void {
 
   baudRateSelect.addEventListener("change", () => {
     state.baudRate = Number(baudRateSelect.value);
+    userChangedBaudRate = true;
     saveState();
   });
 
@@ -222,10 +225,10 @@ function renderProfiles(): void {
 function applyProfile(profile: ProfileConfig): void {
   activeProfile = profile;
   state.profileId = profile.id;
-  state.baudRate = profile.connection.baudRate;
 
-  if (profile.connection.path !== undefined) {
-    state.selectedPath = profile.connection.path;
+  if (!userChangedBaudRate && profile.serialDefaults?.baudRate !== undefined) {
+    state.baudRate = profile.serialDefaults.baudRate;
+    baudRateSelect.value = String(state.baudRate);
   }
 
   if (profile.parser.kind === "builtin") {
@@ -236,7 +239,6 @@ function applyProfile(profile: ProfileConfig): void {
     parserModeSelect.disabled = true;
   }
 
-  baudRateSelect.value = String(state.baudRate);
   profileSelect.value = state.profileId;
   saveState();
   clearPlot();

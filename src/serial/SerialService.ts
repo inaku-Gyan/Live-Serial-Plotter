@@ -5,6 +5,7 @@ import { defaultProfile } from "../profiles/defaultProfile";
 import type {
   ConnectionSettings,
   ConnectionState,
+  LineEnding,
   OutputPacket,
   ParserMode,
   PlotSample,
@@ -158,7 +159,7 @@ export class SerialService {
     }
 
     await new Promise<void>((resolve, reject) => {
-      port.write(text, (error) => {
+      port.write(this.encodeTextForSend(text), (error) => {
         if (error) {
           reject(error);
           return;
@@ -238,6 +239,7 @@ export class SerialService {
     const profile = this.createRuntimeProfile(settings);
 
     return PipelineRunner.create({
+      codec: profile.codec,
       framing: profile.framing,
       parser: profile.parser,
       outputs: profile.outputs,
@@ -264,19 +266,20 @@ export class SerialService {
   private createRuntimeProfile(settings: ConnectionSettings): ProfileConfig {
     return {
       ...this.activeProfile,
-      connection: {
-        ...this.activeProfile.connection,
-        path: settings.path,
-        baudRate: settings.baudRate,
-      },
       parser:
         settings.parserMode === undefined
           ? this.activeProfile.parser
           : {
               kind: "builtin",
               mode: settings.parserMode,
-            },
+          },
     };
+  }
+
+  private encodeTextForSend(text: string): Buffer {
+    const lineEnding = getLineEndingText(this.activeProfile.codec.sendLineEnding ?? "none");
+
+    return Buffer.from(`${text}${lineEnding}`, this.activeProfile.codec.encoding);
   }
 
   private handleOutputPacket(packet: OutputPacket): void {
@@ -297,6 +300,22 @@ export class SerialService {
       }
     }
   }
+}
+
+function getLineEndingText(lineEnding: LineEnding): string {
+  if (lineEnding === "lf") {
+    return "\n";
+  }
+
+  if (lineEnding === "crlf") {
+    return "\r\n";
+  }
+
+  if (lineEnding === "cr") {
+    return "\r";
+  }
+
+  return "";
 }
 
 function formatError(error: unknown): string {

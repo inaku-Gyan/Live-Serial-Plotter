@@ -1,6 +1,7 @@
 import "./profileEditor.css";
 import {
   parserModes,
+  type LineEnding,
   type ParserMode,
   type ProfileConfig,
   type ProfileEditorState,
@@ -93,7 +94,7 @@ function renderEditor(): void {
   container.append(
     renderToolbar(),
     renderIdentity(),
-    renderConnection(),
+    renderSerialDefaultsAndCodec(),
     renderFraming(),
     renderParser(),
   );
@@ -155,16 +156,20 @@ function renderIdentity(): HTMLElement {
   return section;
 }
 
-function renderConnection(): HTMLElement {
-  const section = createSection("Connection");
+function renderSerialDefaultsAndCodec(): HTMLElement {
+  const section = createSection("Serial Defaults / Codec");
   const profile = requireSelectedProfile();
   section.append(
-    createInputField("Port path", "connection.path", profile.connection.path ?? ""),
-    createInputField("Baud rate", "connection.baudRate", String(profile.connection.baudRate)),
+    createInputField(
+      "Baud rate",
+      "serialDefaults.baudRate",
+      profile.serialDefaults?.baudRate === undefined ? "" : String(profile.serialDefaults.baudRate),
+    ),
+    createReadonlyLine("Encoding", profile.codec.encoding),
     createSelectField(
-      "Line ending",
-      "connection.lineEnding",
-      profile.connection.lineEnding ?? "none",
+      "Send line ending",
+      "codec.sendLineEnding",
+      profile.codec.sendLineEnding ?? "none",
       ["none", "lf", "crlf", "cr"],
     ),
   );
@@ -390,10 +395,11 @@ function collectPatch(): ProfileEditorPatch {
   return {
     id: getInputValue("profile.id"),
     name: getInputValue("profile.name"),
-    connection: {
-      path: getInputValue("connection.path"),
-      baudRate: getInputValue("connection.baudRate"),
-      lineEnding: getSelectValue("connection.lineEnding") as "none" | "lf" | "crlf" | "cr",
+    serialDefaults: {
+      baudRate: getInputValue("serialDefaults.baudRate"),
+    },
+    codec: {
+      sendLineEnding: getSelectValue("codec.sendLineEnding") as LineEnding,
     },
     framing: {
       delimiter: getSelectValue("framing.delimiter") as "auto" | "lf" | "crlf" | "cr",

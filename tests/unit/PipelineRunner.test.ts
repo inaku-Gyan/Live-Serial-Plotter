@@ -7,7 +7,8 @@ describe("PipelineRunner", () => {
   test("maps serial frames to terminal and time-series packets", () => {
     const packets: OutputPacket[] = [];
     const runner = new PipelineRunner({
-      framing: { kind: "line", encoding: "utf8", delimiter: "auto" },
+      codec: { kind: "text", encoding: "utf8" },
+      framing: { kind: "line", delimiter: "auto" },
       parser: { kind: "builtin", mode: "keyValue" },
       outputs: [
         { id: "raw", kind: "terminalAppend", source: "raw" },
@@ -62,7 +63,8 @@ describe("PipelineRunner", () => {
   test("supports template terminal output", () => {
     const packets: OutputPacket[] = [];
     const runner = new PipelineRunner({
-      framing: { kind: "line", encoding: "utf8", delimiter: "lf" },
+      codec: { kind: "text", encoding: "utf8" },
+      framing: { kind: "line", delimiter: "lf" },
       parser: { kind: "builtin", mode: "jsonl" },
       outputs: [
         {

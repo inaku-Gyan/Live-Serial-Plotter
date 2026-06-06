@@ -12,14 +12,16 @@ describe("profileEditorModel", () => {
 
     expect(patched.id).toBe("edited");
     expect(patched.name).toBe("Edited");
-    expect(patched.connection).toEqual({
-      path: "/dev/ttyUSB0",
+    expect(patched.serialDefaults).toEqual({
       baudRate: 9600,
-      lineEnding: "lf",
+    });
+    expect(patched.codec).toEqual({
+      kind: "text",
+      encoding: "utf8",
+      sendLineEnding: "lf",
     });
     expect(patched.framing).toEqual({
       kind: "line",
-      encoding: "utf8",
       delimiter: "lf",
       trim: true,
       maxFrameBytes: 1024,
@@ -95,11 +97,12 @@ describe("profileEditorModel", () => {
 
 function createProfile(): ProfileConfig {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: "base",
     name: "Base",
-    connection: { baudRate: 115200, lineEnding: "none" },
-    framing: { kind: "line", encoding: "utf8", delimiter: "auto" },
+    serialDefaults: { baudRate: 115200 },
+    codec: { kind: "text", encoding: "utf8", sendLineEnding: "none" },
+    framing: { kind: "line", delimiter: "auto" },
     parser: { kind: "builtin", mode: "auto" },
     outputs: [
       {
@@ -136,10 +139,11 @@ function createPatch(): ProfileEditorPatch {
   return {
     id: "edited",
     name: "Edited",
-    connection: {
-      path: "/dev/ttyUSB0",
+    serialDefaults: {
       baudRate: "9600",
-      lineEnding: "lf",
+    },
+    codec: {
+      sendLineEnding: "lf",
     },
     framing: {
       delimiter: "lf",

@@ -5,11 +5,14 @@ import { defaultProfile } from "./defaultProfile";
 import { parseJsonc } from "./jsonc";
 import {
   isParserMode,
+  type CodecConfig,
   type JsonObject,
+  type LineEnding,
   type OutputConfig,
   type ParserConfig,
   type ProfileConfig,
   type ProfileSummary,
+  type SerialDefaultsConfig,
 } from "../shared/protocol";
 
 export interface LoadedProfile {
@@ -174,8 +177,8 @@ export function normalizeProfileConfig(value: unknown, source = "profile"): Prof
     throw new Error(`${source} must contain a JSON object.`);
   }
 
-  if (value.schemaVersion !== 1) {
-    throw new Error(`${source} must use schemaVersion 1.`);
+  if (value.schemaVersion !== 2) {
+    throw new Error(`${source} must use schemaVersion 2.`);
   }
 
   if (typeof value.id !== "string" || value.id.length === 0) {
@@ -186,16 +189,18 @@ export function normalizeProfileConfig(value: unknown, source = "profile"): Prof
     throw new Error(`${source} must define a non-empty name.`);
   }
 
-  const connection = normalizeConnection(value.connection, source);
+  const serialDefaults = normalizeSerialDefaults(value.serialDefaults);
+  const codec = normalizeCodec(value.codec, source);
   const framing = normalizeFraming(value.framing, source);
   const parser = normalizeParser(value.parser, source);
   const outputs = normalizeOutputs(value.outputs, source);
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     id: value.id,
     name: value.name,
-    connection,
+    serialDefaults,
+    codec,
     framing,
     parser,
     outputs,
@@ -203,17 +208,33 @@ export function normalizeProfileConfig(value: unknown, source = "profile"): Prof
   };
 }
 
-function normalizeConnection(value: unknown, source: string): ProfileConfig["connection"] {
+function normalizeSerialDefaults(value: unknown): SerialDefaultsConfig | undefined {
   if (!isPlainObject(value)) {
-    throw new Error(`${source} must define connection.`);
+    return undefined;
   }
 
-  const baudRate = typeof value.baudRate === "number" ? value.baudRate : 115200;
+  const baudRate = typeof value.baudRate === "number" ? value.baudRate : undefined;
+
+  return baudRate === undefined ? undefined : { baudRate };
+}
+
+function normalizeCodec(value: unknown, source: string): CodecConfig {
+  if (!isPlainObject(value)) {
+    throw new Error(`${source} must define codec.`);
+  }
+
+  if (value.kind !== "text") {
+    throw new Error(`${source} only supports text codec.`);
+  }
+
+  if (value.encoding !== "utf8") {
+    throw new Error(`${source} text codec only supports utf8 encoding.`);
+  }
 
   return {
-    baudRate,
-    path: typeof value.path === "string" ? value.path : undefined,
-    lineEnding: isLineEnding(value.lineEnding) ? value.lineEnding : "none",
+    kind: "text",
+    encoding: "utf8",
+    sendLineEnding: isLineEnding(value.sendLineEnding) ? value.sendLineEnding : "none",
   };
 }
 
@@ -228,7 +249,6 @@ function normalizeFraming(value: unknown, source: string): ProfileConfig["framin
 
   return {
     kind: "line",
-    encoding: "utf8",
     delimiter: isDelimiter(value.delimiter) ? value.delimiter : "auto",
     trim: typeof value.trim === "boolean" ? value.trim : undefined,
     maxFrameBytes: typeof value.maxFrameBytes === "number" ? value.maxFrameBytes : undefined,
@@ -305,9 +325,7 @@ function isDelimiter(value: unknown): value is ProfileConfig["framing"]["delimit
   return value === "auto" || value === "lf" || value === "crlf" || value === "cr";
 }
 
-function isLineEnding(
-  value: unknown,
-): value is NonNullable<ProfileConfig["connection"]["lineEnding"]> {
+function isLineEnding(value: unknown): value is LineEnding {
   return value === "none" || value === "lf" || value === "crlf" || value === "cr";
 }
 

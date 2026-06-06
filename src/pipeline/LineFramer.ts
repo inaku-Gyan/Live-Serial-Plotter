@@ -1,5 +1,5 @@
 import { StringDecoder } from "node:string_decoder";
-import type { Frame, LineFramingConfig } from "../shared/protocol";
+import type { Frame, LineFramingConfig, TextCodecConfig } from "../shared/protocol";
 
 const defaultMaxFrameBytes = 65_536;
 
@@ -9,12 +9,17 @@ interface DelimiterMatch {
 }
 
 export class LineFramer {
-  private readonly decoder = new StringDecoder("utf8");
+  private readonly decoder: StringDecoder;
   private bufferedText = "";
   private droppingOversizedFrame = false;
   private nextSeq = 1;
 
-  constructor(private readonly config: LineFramingConfig = getDefaultLineFramingConfig()) {}
+  constructor(
+    private readonly config: LineFramingConfig = getDefaultLineFramingConfig(),
+    private readonly codec: TextCodecConfig = getDefaultTextCodecConfig(),
+  ) {
+    this.decoder = new StringDecoder(codec.encoding);
+  }
 
   push(chunk: Buffer | Uint8Array, receivedAt = Date.now()): Frame[] {
     this.bufferedText += this.decoder.write(Buffer.from(chunk));
@@ -114,7 +119,7 @@ export class LineFramer {
   }
 
   private exceedsMaxFrameBytes(text: string): boolean {
-    return Buffer.byteLength(text, this.config.encoding) > this.maxFrameBytes;
+    return Buffer.byteLength(text, this.codec.encoding) > this.maxFrameBytes;
   }
 
   private get maxFrameBytes(): number {
@@ -135,8 +140,15 @@ export class LineFramer {
 export function getDefaultLineFramingConfig(): LineFramingConfig {
   return {
     kind: "line",
-    encoding: "utf8",
     delimiter: "auto",
+  };
+}
+
+export function getDefaultTextCodecConfig(): TextCodecConfig {
+  return {
+    kind: "text",
+    encoding: "utf8",
+    sendLineEnding: "none",
   };
 }
 

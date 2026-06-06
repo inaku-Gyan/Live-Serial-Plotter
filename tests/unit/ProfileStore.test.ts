@@ -13,15 +13,19 @@ describe("ProfileStore", () => {
       path.join(profilesDirectory, "sensor.jsonc"),
       `{
         // JSONC comments are supported.
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "id": "sensor",
         "name": "Sensor",
-        "connection": {
-          "baudRate": 9600,
+        "serialDefaults": {
+          "baudRate": 9600
+        },
+        "codec": {
+          "kind": "text",
+          "encoding": "utf8",
+          "sendLineEnding": "lf"
         },
         "framing": {
           "kind": "line",
-          "encoding": "utf8",
           "delimiter": "lf",
         },
         "parser": {
@@ -49,7 +53,8 @@ describe("ProfileStore", () => {
       scope: "workspace",
       filePath: path.join(profilesDirectory, "sensor.jsonc"),
     });
-    expect(loaded.activeProfile.connection.baudRate).toBe(9600);
+    expect(loaded.activeProfile.serialDefaults?.baudRate).toBe(9600);
+    expect(loaded.activeProfile.codec.sendLineEnding).toBe("lf");
   });
 
   test("collects invalid profile errors without dropping builtin profile", async () => {
@@ -69,6 +74,33 @@ describe("ProfileStore", () => {
     expect(loaded.errors[0]).toContain("broken.jsonc");
   });
 
+  test("rejects old schema profiles", async () => {
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-old-schema-"));
+    const profilesDirectory = getWorkspaceProfilesDirectory(workspaceRoot);
+    await mkdir(profilesDirectory, { recursive: true });
+    await writeFile(
+      path.join(profilesDirectory, "old.jsonc"),
+      `{
+        "schemaVersion": 1,
+        "id": "old",
+        "name": "Old",
+        "connection": { "baudRate": 9600 },
+        "framing": { "kind": "line", "encoding": "utf8", "delimiter": "lf" },
+        "parser": { "kind": "builtin", "mode": "raw" },
+        "outputs": [{ "id": "raw", "kind": "terminalAppend" }]
+      }`,
+    );
+
+    const store = new ProfileStore({
+      workspaceProfilesDirectories: [profilesDirectory],
+    });
+    const loaded = await store.loadProfiles("old");
+
+    expect(loaded.activeProfile.id).toBe("default");
+    expect(loaded.profiles).toHaveLength(1);
+    expect(loaded.errors[0]).toContain("must use schemaVersion 2");
+  });
+
   test("saves user profiles and can load them again", async () => {
     const userProfilesDirectory = await mkdtemp(path.join(tmpdir(), "lsp-user-profiles-"));
     const store = new ProfileStore({ userProfilesDirectory });
@@ -77,11 +109,12 @@ describe("ProfileStore", () => {
       scope: "user",
       profileId: "saved-user",
       config: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         id: "draft",
         name: "Saved User",
-        connection: { baudRate: 115200, lineEnding: "none" },
-        framing: { kind: "line", encoding: "utf8", delimiter: "auto" },
+        serialDefaults: { baudRate: 115200 },
+        codec: { kind: "text", encoding: "utf8", sendLineEnding: "none" },
+        framing: { kind: "line", delimiter: "auto" },
         parser: { kind: "builtin", mode: "jsonl", options: { flatten: true } },
         outputs: [{ id: "raw", kind: "terminalAppend", source: "raw" }],
         export: { mode: "parsed", format: "csv", includeMetadata: true },
@@ -111,11 +144,12 @@ describe("ProfileStore", () => {
       scope: "workspace",
       profileId: "workspace-profile",
       config: {
-        schemaVersion: 1,
+        schemaVersion: 2,
         id: "workspace-profile",
         name: "Workspace Profile",
-        connection: { baudRate: 9600 },
-        framing: { kind: "line", encoding: "utf8", delimiter: "lf" },
+        serialDefaults: { baudRate: 9600 },
+        codec: { kind: "text", encoding: "utf8", sendLineEnding: "none" },
+        framing: { kind: "line", delimiter: "lf" },
         parser: { kind: "builtin", mode: "keyValue" },
         outputs: [{ id: "raw", kind: "terminalAppend" }],
       },
@@ -126,5 +160,7 @@ describe("ProfileStore", () => {
       "utf8",
     );
     expect(savedText).toContain('"id": "workspace-profile"');
+    expect(savedText).not.toContain('"connection"');
+    expect(savedText).not.toContain('"encoding": "utf8",\n    "delimiter"');
   });
 });

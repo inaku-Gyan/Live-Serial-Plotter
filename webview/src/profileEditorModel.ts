@@ -1,5 +1,6 @@
 import type {
   JsonObject,
+  LineEnding,
   ParserMode,
   ProfileConfig,
   TerminalAppendOutputConfig,
@@ -10,10 +11,11 @@ import type {
 export interface ProfileEditorPatch {
   id: string;
   name: string;
-  connection: {
-    path: string;
+  serialDefaults: {
     baudRate: string;
-    lineEnding: "none" | "lf" | "crlf" | "cr";
+  };
+  codec: {
+    sendLineEnding: LineEnding;
   };
   framing: {
     delimiter: "auto" | "lf" | "crlf" | "cr";
@@ -77,11 +79,10 @@ export function applyProfileEditorPatch(
     ...profile,
     id: nonEmptyOr(patch.id, profile.id),
     name: nonEmptyOr(patch.name, profile.name),
-    connection: {
-      ...profile.connection,
-      path: emptyToUndefined(patch.connection.path),
-      baudRate: parseNumberOr(patch.connection.baudRate, profile.connection.baudRate),
-      lineEnding: patch.connection.lineEnding,
+    serialDefaults: createSerialDefaults(patch),
+    codec: {
+      ...profile.codec,
+      sendLineEnding: patch.codec.sendLineEnding,
     },
     framing: {
       ...profile.framing,
@@ -130,6 +131,12 @@ function applyTerminalAppendPatch(
     maxLines: parseOptionalNumber(patch.maxLines),
     autoScroll: patch.autoScroll,
   };
+}
+
+function createSerialDefaults(patch: ProfileEditorPatch): ProfileConfig["serialDefaults"] {
+  const baudRate = parseOptionalNumber(patch.serialDefaults.baudRate);
+
+  return baudRate === undefined ? undefined : { baudRate };
 }
 
 function applyTimeSeriesPatch(

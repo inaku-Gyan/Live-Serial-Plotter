@@ -1,6 +1,7 @@
 import { BuiltinLineParser, type LineParser } from "../parsers/parseLine";
 import type {
   BuiltinParserConfig,
+  CodecConfig,
   Frame,
   FramingConfig,
   OutputConfig,
@@ -12,6 +13,7 @@ import { LineFramer } from "./LineFramer";
 import { createOutputMapper, type OutputMapper } from "./OutputMapper";
 
 export interface PipelineRunnerOptions {
+  readonly codec: CodecConfig;
   readonly framing: FramingConfig;
   readonly parser: ParserConfig;
   readonly outputs: readonly OutputConfig[];
@@ -31,7 +33,7 @@ export class PipelineRunner {
   private readonly outputMappers: OutputMapper[];
 
   constructor(private readonly options: PipelineRunnerOptions) {
-    this.framer = new LineFramer(options.framing);
+    this.framer = new LineFramer(options.framing, options.codec);
     this.parser = options.parserInstance ?? createBuiltinParser(options.parser);
     this.outputMappers = options.outputs.map(createOutputMapper);
   }

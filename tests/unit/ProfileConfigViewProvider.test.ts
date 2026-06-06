@@ -75,14 +75,14 @@ describe("ProfileConfigViewProvider", () => {
     webviewView.webview.postMessage.mockClear();
     dispatch({
       type: "saveProfile",
-      profile: { ...defaultProfile, schemaVersion: 2 as 1 },
+      profile: { ...defaultProfile, schemaVersion: 1 as 2 },
     });
     await waitForAsyncWork();
 
     expect(webviewView.webview.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "error",
-        message: expect.stringContaining("schemaVersion 1"),
+        message: expect.stringContaining("schemaVersion 2"),
       }),
     );
   });
