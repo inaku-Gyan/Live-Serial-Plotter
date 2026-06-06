@@ -162,9 +162,6 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
 
   private getHtml(webview: vscode.Webview): string {
     const nonce = getNonce();
-    const sharedStyleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "styles.css"),
-    );
     const profileStyleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.css"),
     );
@@ -178,7 +175,6 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link nonce="${nonce}" href="${sharedStyleUri}" rel="stylesheet">
     <link nonce="${nonce}" href="${profileStyleUri}" rel="stylesheet">
     <title>Live Serial Plotter Profiles</title>
   </head>
