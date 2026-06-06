@@ -272,7 +272,7 @@ export class SerialService {
           : {
               kind: "builtin",
               mode: settings.parserMode,
-          },
+            },
     };
   }
 

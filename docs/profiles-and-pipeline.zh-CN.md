@@ -3,7 +3,7 @@
 Live Serial Plotter 的数据链路按以下顺序处理串口数据：
 
 ```txt
-serial bytes -> framing -> parser -> output mappers -> output sinks -> Webview renderers
+serial bytes -> codec -> framing -> parser -> output mappers -> output sinks -> Webview renderers
 ```
 
 ## Profile 位置
@@ -17,7 +17,10 @@ serial bytes -> framing -> parser -> output mappers -> output sinks -> Webview r
 ```
 
 用户全局 profile 会从 VS Code `globalStorageUri/profiles` 读取。内置 `default`
-profile 等价于当前默认行为：UTF-8 行分割、`auto` parser、raw terminal 和实时折线图。
+profile 等价于当前默认行为：UTF-8 文本 codec、行分割、`auto` parser、raw terminal 和实时折线图。
+
+Profile 只描述协议、解析和输出。具体串口端口和当前波特率属于监控页面的运行时连接设置，不写入 profile。Profile 中的
+`serialDefaults.baudRate` 只作为默认值提示。
 
 ## 侧边栏可视化配置
 
@@ -27,7 +30,8 @@ profile 等价于当前默认行为：UTF-8 行分割、`auto` parser、raw term
 首版支持编辑：
 
 - profile `id` 和 `name`
-- connection：端口、波特率、发送行尾
+- serial defaults：默认波特率
+- codec：UTF-8 文本编码、发送文本时追加的行尾
 - framing：文本行 delimiter、trim、最大 frame 字节数
 - builtin parser：mode 和 options JSON
 - `terminalAppend` output
@@ -42,16 +46,19 @@ profile 等价于当前默认行为：UTF-8 行分割、`auto` parser、raw term
 
 ```jsonc
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "id": "sample-telemetry",
   "name": "Sample Telemetry",
-  "connection": {
+  "serialDefaults": {
     "baudRate": 115200,
-    "lineEnding": "none",
+  },
+  "codec": {
+    "kind": "text",
+    "encoding": "utf8",
+    "sendLineEnding": "none",
   },
   "framing": {
     "kind": "line",
-    "encoding": "utf8",
     "delimiter": "auto",
   },
   "parser": {
@@ -159,3 +166,8 @@ export function createParser(options) {
 ## Output 样式
 
 样式放在 output 配置中，不放进高频数据包。时间序列 output 的颜色、单位、label、线宽和数值格式配置在 `series` 下。packet 只传 `time` 和 `values`，以保持 uPlot 热路径高效。
+
+## 二进制协议方向
+
+当前版本只实现 `codec.kind: "text"` 和 `encoding: "utf8"`。纯二进制协议后续会通过 `codec.kind: "binary"`、
+`fixedLength` / `byteDelimiter` / `rawChunk` framing、hex/base64 terminal 显示，以及 Hex/Base64 发送模式扩展。
