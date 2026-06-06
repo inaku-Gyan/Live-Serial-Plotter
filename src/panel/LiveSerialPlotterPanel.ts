@@ -170,6 +170,9 @@ export class LiveSerialPlotterPanel {
     const scriptUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.js"),
     );
+    const sharedStyleUri = webview.asWebviewUri(
+      vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "styles.css"),
+    );
     const styleUri = webview.asWebviewUri(
       vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.css"),
     );
@@ -180,6 +183,7 @@ export class LiveSerialPlotterPanel {
     <meta charset="UTF-8">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link nonce="${nonce}" href="${sharedStyleUri}" rel="stylesheet">
     <link nonce="${nonce}" href="${styleUri}" rel="stylesheet">
     <title>Live Serial Plotter</title>
   </head>

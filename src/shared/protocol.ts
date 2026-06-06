@@ -40,6 +40,18 @@ export interface ProfileSummary {
   scope: "builtin" | "user" | "workspace";
 }
 
+export interface ProfileSourceMetadata {
+  scope: ProfileSummary["scope"];
+  filePath?: string;
+}
+
+export interface ProfileEditorState {
+  profiles: ProfileSummary[];
+  selectedProfile: ProfileConfig;
+  selectedSource: ProfileSourceMetadata;
+  errors: string[];
+}
+
 export interface ProfileConfig {
   schemaVersion: 1;
   id: string;
@@ -284,6 +296,18 @@ export type ToWebviewMessage =
   | { type: "connectionState"; state: ConnectionState }
   | { type: "rawLine"; line: string; t: number }
   | { type: "seriesAppend"; samples: PlotSample[] }
+  | { type: "error"; message: string };
+
+export type ToProfileEditorMessage =
+  | { type: "requestProfileEditorState"; profileId?: string }
+  | { type: "selectProfileForEdit"; profileId: string }
+  | { type: "saveProfile"; profile: ProfileConfig }
+  | { type: "openProfileJson" };
+
+export type ToProfileEditorWebviewMessage =
+  | { type: "profileEditorState"; state: ProfileEditorState }
+  | { type: "requestSaveProfile" }
+  | { type: "profileSaved"; profileId: string; filePath: string }
   | { type: "error"; message: string };
 
 export function isParserMode(value: string): value is ParserMode {

@@ -23,7 +23,18 @@ export interface MockWebviewPanel {
   readonly reveal: ReturnType<typeof vi.fn>;
 }
 
+export interface MockWebviewView {
+  readonly webview: MockWebviewPanel["webview"] & {
+    options?: unknown;
+  };
+}
+
 const createdPanels: MockWebviewPanel[] = [];
+const registeredWebviewViewProviders: Array<{
+  viewType: string;
+  provider: unknown;
+  options: unknown;
+}> = [];
 
 export const window = {
   createWebviewPanel: vi.fn(
@@ -38,6 +49,25 @@ export const window = {
       return panel;
     },
   ),
+  registerWebviewViewProvider: vi.fn((viewType: string, provider: unknown, options?: unknown) => {
+    registeredWebviewViewProviders.push({ viewType, provider, options });
+    return createDisposable();
+  }),
+  showQuickPick: vi.fn(),
+  showInputBox: vi.fn(),
+  showInformationMessage: vi.fn(),
+  showWarningMessage: vi.fn(),
+  showTextDocument: vi.fn(() => Promise.resolve()),
+};
+
+export const workspace = {
+  isTrusted: true,
+  workspaceFolders: undefined as Array<{ uri: MockUri; name?: string }> | undefined,
+  openTextDocument: vi.fn((uri: MockUri) => Promise.resolve({ uri })),
+};
+
+export const commands = {
+  registerCommand: vi.fn(() => createDisposable()),
 };
 
 export const ViewColumn = {
@@ -51,6 +81,13 @@ export const ExtensionMode = {
 };
 
 export const Uri = {
+  file: vi.fn((filePath: string): MockUri => {
+    return {
+      fsPath: filePath,
+      path: filePath,
+      toString: () => filePath,
+    };
+  }),
   joinPath: vi.fn((base: MockUri, ...parts: string[]): MockUri => {
     const path = [formatUri(base), ...parts].join("/");
 
@@ -64,14 +101,36 @@ export const Uri = {
 
 export const __vscodeMock = {
   createdPanels,
+  registeredWebviewViewProviders,
   createWebviewPanel: window.createWebviewPanel,
+  registerWebviewViewProvider: window.registerWebviewViewProvider,
+  showQuickPick: window.showQuickPick,
+  showInputBox: window.showInputBox,
+  showInformationMessage: window.showInformationMessage,
+  showWarningMessage: window.showWarningMessage,
+  showTextDocument: window.showTextDocument,
+  openTextDocument: workspace.openTextDocument,
+  registerCommand: commands.registerCommand,
   joinPath: Uri.joinPath,
+  file: Uri.file,
 };
 
 export function __resetVscodeMock(): void {
   createdPanels.length = 0;
+  registeredWebviewViewProviders.length = 0;
   window.createWebviewPanel.mockClear();
+  window.registerWebviewViewProvider.mockClear();
+  window.showQuickPick.mockReset();
+  window.showInputBox.mockReset();
+  window.showInformationMessage.mockReset();
+  window.showWarningMessage.mockReset();
+  window.showTextDocument.mockReset();
+  workspace.openTextDocument.mockClear();
+  workspace.isTrusted = true;
+  workspace.workspaceFolders = undefined;
+  commands.registerCommand.mockClear();
   Uri.joinPath.mockClear();
+  Uri.file.mockClear();
 }
 
 function createMockWebviewPanel(title: string): MockWebviewPanel {

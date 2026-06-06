@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import { LiveSerialPlotterPanel } from "./panel/LiveSerialPlotterPanel";
+import { ProfileConfigViewProvider } from "./panel/ProfileConfigViewProvider";
 import { VscodeScriptParserTrustStore } from "./panel/VscodeScriptParserTrustStore";
 import { ScriptParserLoader } from "./parsers/ScriptParserLoader";
 import { getWorkspaceProfilesDirectory, ProfileStore } from "./profiles/ProfileStore";
@@ -10,8 +11,17 @@ export function activate(context: vscode.ExtensionContext): void {
   const serialPortFactory = createSerialPortFactory(context);
   const profileStore = createProfileStore(context);
   const scriptParserLoader = createScriptParserLoader(context);
+  const profileConfigViewProvider = new ProfileConfigViewProvider({
+    extensionUri: context.extensionUri,
+    profileStore,
+  });
 
   context.subscriptions.push(
+    vscode.window.registerWebviewViewProvider(
+      ProfileConfigViewProvider.viewType,
+      profileConfigViewProvider,
+      { webviewOptions: { retainContextWhenHidden: true } },
+    ),
     vscode.commands.registerCommand("liveSerialPlotter.open", () => {
       LiveSerialPlotterPanel.open(context.extensionUri, {
         serialPortFactory,
@@ -19,6 +29,15 @@ export function activate(context: vscode.ExtensionContext): void {
         scriptParserLoader,
       });
     }),
+    vscode.commands.registerCommand("liveSerialPlotter.profiles.refresh", () =>
+      profileConfigViewProvider.refreshProfiles(),
+    ),
+    vscode.commands.registerCommand("liveSerialPlotter.profiles.saveAs", () =>
+      profileConfigViewProvider.requestSaveProfile(),
+    ),
+    vscode.commands.registerCommand("liveSerialPlotter.profiles.openJson", () =>
+      profileConfigViewProvider.openProfileJson(),
+    ),
   );
 }
 
