@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import type { AsyncScriptParserLoader } from "../pipeline/PipelineRunner";
 import { ProfileStore } from "../profiles/ProfileStore";
 import { SerialService, type SerialPortFactory } from "../serial/SerialService";
+import { OutputPacketBatcher } from "../session/OutputPacketBatcher";
 import { isParserMode, type ConnectionState, type ToExtensionMessage } from "../shared/protocol";
 
 const panelViewType = "liveSerialPlotter.panel";
@@ -19,6 +20,9 @@ export class LiveSerialPlotterPanel {
   private readonly disposables: vscode.Disposable[] = [];
   private readonly serialService: SerialService;
   private readonly profileStore: ProfileStore;
+  private readonly outputPacketBatcher = new OutputPacketBatcher(50, (packet) => {
+    this.postMessage({ type: "outputPacket", packet });
+  });
   private activeProfileId = "default";
 
   static open(extensionUri: vscode.Uri, options: LiveSerialPlotterPanelOptions = {}): void {
@@ -48,7 +52,7 @@ export class LiveSerialPlotterPanel {
           this.updatePanelTitle(state);
           this.postMessage({ type: "connectionState", state });
         },
-        onOutputPacket: (packet) => this.postMessage({ type: "outputPacket", packet }),
+        onOutputPacket: (packet) => this.outputPacketBatcher.add(packet),
         onError: (message) => this.postError(message),
       },
       options.serialPortFactory,
@@ -188,6 +192,7 @@ export class LiveSerialPlotterPanel {
 
   private dispose(): void {
     LiveSerialPlotterPanel.activePanels.delete(this);
+    this.outputPacketBatcher.dispose();
     this.serialService.dispose();
 
     while (this.disposables.length > 0) {
