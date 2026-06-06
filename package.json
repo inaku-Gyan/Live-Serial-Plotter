@@ -78,12 +78,6 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "liveSerialPlotter.profiles.copy",
-        "title": "Live Serial Plotter: Copy Profile...",
-        "category": "Live Serial Plotter",
-        "icon": "$(copy)"
-      },
-      {
         "command": "liveSerialPlotter.profiles.openJson",
         "title": "Live Serial Plotter: Open Profile JSONC",
         "category": "Live Serial Plotter",
@@ -117,14 +111,9 @@
           "group": "navigation@1"
         },
         {
-          "command": "liveSerialPlotter.profiles.copy",
-          "when": "view == liveSerialPlotter.profiles",
-          "group": "navigation@2"
-        },
-        {
           "command": "liveSerialPlotter.profiles.openJson",
           "when": "view == liveSerialPlotter.profiles",
-          "group": "navigation@3"
+          "group": "navigation@2"
         }
       ]
     }

@@ -58,21 +58,11 @@ textarea {
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
-.profile-home-toolbar,
 .profile-editor-toolbar {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
-}
-
-.profile-home-actions {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.profile-home-actions .button {
-  min-width: 0;
+  align-items: center;
 }
 
 .profile-list {
@@ -82,16 +72,17 @@ textarea {
 
 .profile-list-item {
   display: grid;
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
   gap: 3px;
   width: 100%;
   min-width: 0;
   border: 1px solid transparent;
   border-radius: 4px;
-  padding: 7px 8px;
+  padding: 0;
   color: var(--vscode-list-foreground, var(--vscode-foreground));
   background: transparent;
-  text-align: left;
-  cursor: pointer;
 }
 
 .profile-list-item:hover {
@@ -117,6 +108,103 @@ textarea {
 }
 
 .profile-list-item span {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.profile-list-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 0;
+  padding: 7px 8px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-list-main:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.profile-list-menu-root {
+  display: grid;
+  position: relative;
+  align-items: center;
+  padding-right: 4px;
+}
+
+.profile-menu-trigger {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0;
+  opacity: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.profile-list-item:hover .profile-menu-trigger,
+.profile-list-item:focus-within .profile-menu-trigger,
+.profile-list-item[data-menu-open="true"] .profile-menu-trigger {
+  opacity: 1;
+}
+
+.profile-menu-trigger:hover,
+.profile-menu-trigger:focus {
+  outline: none;
+  background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.profile-list-menu {
+  display: grid;
+  position: absolute;
+  z-index: 10;
+  top: 28px;
+  right: 0;
+  min-width: 120px;
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  padding: 3px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 24%);
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+}
+
+.profile-list-menu button {
+  min-width: 0;
+  border: 0;
+  padding: 5px 8px;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-list-menu button:hover,
+.profile-list-menu button:focus {
+  outline: none;
+  color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+}
+
+.profile-editor-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-editor-title strong,
+.profile-editor-title span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-editor-title span {
   color: var(--vscode-descriptionForeground);
   font-size: 11px;
 }

@@ -43,6 +43,7 @@ let selectedProfile: ProfileConfig | undefined;
 let selectedProfileKey: string | undefined;
 let selectedSource: ProfileSourceMetadata | undefined;
 let currentView: ProfileEditorView = vscode.getState()?.view ?? "home";
+let openMenuProfileKey: string | undefined;
 let statusText = "";
 let statusElement: HTMLPreElement | undefined;
 let autoSaveTimer: number | undefined;
@@ -67,11 +68,6 @@ window.addEventListener("message", (event: MessageEvent<ToProfileEditorWebviewMe
     return;
   }
 
-  if (message.type === "requestCopyProfile") {
-    copyCurrentProfile();
-    return;
-  }
-
   if (message.type === "profileAutoSaved") {
     selectedProfileKey = message.profileKey;
     persistState();
@@ -89,6 +85,26 @@ window.addEventListener("message", (event: MessageEvent<ToProfileEditorWebviewMe
 
   statusText = message.message;
   renderCurrentView();
+});
+
+document.addEventListener("click", (event) => {
+  if (openMenuProfileKey === undefined) {
+    return;
+  }
+
+  const target = event.target;
+
+  if (target instanceof Element && target.closest(".profile-list-menu-root") !== null) {
+    return;
+  }
+
+  closeProfileMenu();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeProfileMenu();
+  }
 });
 
 function renderLoading(): void {
@@ -119,7 +135,7 @@ function renderHome(): void {
 
   const container = document.createElement("main");
   container.className = "profile-home";
-  container.append(renderHomeToolbar(), renderProfileList(), renderPipelinePreview());
+  container.append(renderProfileList(), renderPipelinePreview());
 
   if (statusText.length > 0) {
     appendStatus(container);
@@ -128,28 +144,21 @@ function renderHome(): void {
   root.append(container);
 }
 
-function renderHomeToolbar(): HTMLElement {
-  const toolbar = document.createElement("header");
-  toolbar.className = "profile-home-toolbar";
-  toolbar.append(
-    createButton("Refresh", () => postMessage({ type: "requestProfileEditorState" })),
-    createButton("Copy Profile", () => copyCurrentProfile(), "button-primary"),
-    createButton("Open JSONC", () => postMessage({ type: "openProfileJson" })),
-  );
-  return toolbar;
-}
-
 function renderProfileList(): HTMLElement {
   const section = createSection("Profiles");
   const list = document.createElement("div");
   list.className = "profile-list";
 
   for (const profile of editorState?.profiles ?? []) {
-    const item = document.createElement("button");
+    const item = document.createElement("article");
     item.className = "profile-list-item";
-    item.type = "button";
     item.dataset.active = profile.key === selectedProfileKey ? "true" : "false";
-    item.addEventListener("click", () => selectProfileOnHome(profile.key));
+    item.dataset.menuOpen = profile.key === openMenuProfileKey ? "true" : "false";
+
+    const mainButton = document.createElement("button");
+    mainButton.className = "profile-list-main";
+    mainButton.type = "button";
+    mainButton.addEventListener("click", () => selectProfileOnHome(profile.key));
 
     const title = document.createElement("strong");
     title.textContent = profile.name;
@@ -157,12 +166,69 @@ function renderProfileList(): HTMLElement {
     const meta = document.createElement("span");
     meta.textContent = formatProfileLocation(profile);
 
-    item.append(title, meta);
+    mainButton.append(title, meta);
+    item.append(mainButton, renderProfileMenuRoot(profile));
     list.append(item);
   }
 
   section.append(list);
   return section;
+}
+
+function renderProfileMenuRoot(profile: ProfileSummary): HTMLElement {
+  const rootElement = document.createElement("div");
+  rootElement.className = "profile-list-menu-root";
+
+  const trigger = document.createElement("button");
+  trigger.className = "profile-menu-trigger";
+  trigger.type = "button";
+  trigger.textContent = "...";
+  trigger.ariaLabel = `Actions for ${profile.name}`;
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleProfileMenu(profile.key);
+  });
+
+  rootElement.append(trigger);
+
+  if (openMenuProfileKey === profile.key) {
+    rootElement.append(renderProfileMenu(profile.key));
+  }
+
+  return rootElement;
+}
+
+function renderProfileMenu(profileKey: string): HTMLElement {
+  const menu = document.createElement("div");
+  menu.className = "profile-list-menu";
+  menu.role = "menu";
+  menu.append(
+    createProfileMenuButton("Edit", () => openEditor(profileKey)),
+    createProfileMenuButton("Copy", () => postMessage({ type: "copyProfileByKey", profileKey })),
+    createProfileMenuButton("Open JSONC", () =>
+      postMessage({ type: "openProfileJson", profileKey }),
+    ),
+  );
+  return menu;
+}
+
+function createProfileMenuButton(label: string, action: () => void): HTMLButtonElement {
+  const button = document.createElement("button");
+  button.type = "button";
+  button.role = "menuitem";
+  button.textContent = label;
+  button.addEventListener("click", (event) => {
+    event.stopPropagation();
+    openMenuProfileKey = undefined;
+    renderHome();
+    action();
+  });
+  return button;
+}
+
+function toggleProfileMenu(profileKey: string): void {
+  openMenuProfileKey = openMenuProfileKey === profileKey ? undefined : profileKey;
+  renderHome();
 }
 
 function renderPipelinePreview(): HTMLElement {
@@ -175,15 +241,6 @@ function renderPipelinePreview(): HTMLElement {
     createReadonlyLine("Parser", formatParser(profile)),
     createReadonlyLine("Outputs", formatOutputs(profile)),
   );
-
-  const actions = document.createElement("div");
-  actions.className = "profile-home-actions";
-  actions.append(
-    createButton("Edit", () => openEditor(selectedProfileKey), "button-primary"),
-    createButton("Copy", () => copyCurrentProfile()),
-    createButton("Open JSONC", () => postMessage({ type: "openProfileJson" })),
-  );
-  section.append(actions);
   return section;
 }
 
@@ -229,22 +286,11 @@ function renderToolbar(): HTMLElement {
   const toolbar = document.createElement("header");
   toolbar.className = "profile-editor-toolbar";
 
-  const profileSelect = document.createElement("select");
-  profileSelect.id = "profileId";
-
-  for (const profile of editorState?.profiles ?? []) {
-    const option = document.createElement("option");
-    option.value = profile.key;
-    option.textContent = formatProfileSummary(profile);
-    profileSelect.append(option);
-  }
-
-  profileSelect.value = selectedProfileKey ?? "";
-  profileSelect.addEventListener("change", () => {
-    selectedProfileKey = profileSelect.value;
-    persistState();
-    postMessage({ type: "selectProfileForEdit", profileKey: profileSelect.value });
-  });
+  const title = document.createElement("div");
+  title.className = "profile-editor-title";
+  const profile = requireSelectedProfile();
+  const source = selectedSource?.workspaceName ?? selectedSource?.scope ?? "builtin";
+  title.append(createTextElement("strong", profile.name), createTextElement("span", source));
 
   toolbar.append(
     createButton("Back", () => {
@@ -252,10 +298,7 @@ function renderToolbar(): HTMLElement {
       persistState();
       renderHome();
     }),
-    profileSelect,
-    createButton("Refresh", () => postMessage({ type: "requestProfileEditorState" })),
-    createButton("Copy Profile", () => copyCurrentProfile(), "button-primary"),
-    createButton("Open JSONC", () => postMessage({ type: "openProfileJson" })),
+    title,
   );
   return toolbar;
 }
@@ -503,25 +546,6 @@ function renderSeriesRow(series: TimeSeriesPatch): HTMLElement {
   return row;
 }
 
-function copyCurrentProfile(): void {
-  if (selectedProfile === undefined) {
-    return;
-  }
-
-  try {
-    const profile =
-      currentView === "editor"
-        ? applyProfileEditorPatch(selectedProfile, collectPatch())
-        : selectedProfile;
-    postMessage({
-      type: "copyProfile",
-      profile,
-    });
-  } catch (error) {
-    setStatusText(error instanceof Error ? error.message : String(error));
-  }
-}
-
 function scheduleAutoSave(event: Event): void {
   if (selectedSource?.scope === "builtin") {
     return;
@@ -595,6 +619,7 @@ function appendStatus(container: HTMLElement): void {
 }
 
 function selectProfileOnHome(profileKey: string): void {
+  openMenuProfileKey = undefined;
   selectedProfileKey = profileKey;
   persistState();
   postMessage({ type: "selectProfileForEdit", profileKey });
@@ -602,6 +627,7 @@ function selectProfileOnHome(profileKey: string): void {
 
 function openEditor(profileKey: string | undefined): void {
   currentView = "editor";
+  openMenuProfileKey = undefined;
   persistState();
 
   if (profileKey !== undefined && profileKey !== selectedProfileKey) {
@@ -614,13 +640,16 @@ function openEditor(profileKey: string | undefined): void {
   renderEditor();
 }
 
-function formatProfileSummary(profile: ProfileSummary): string {
-  if (profile.scope === "workspace") {
-    const workspaceName = profile.workspaceName ?? "workspace";
-    return `${profile.name} (${workspaceName})`;
+function closeProfileMenu(): void {
+  if (openMenuProfileKey === undefined) {
+    return;
   }
 
-  return `${profile.name} (${profile.scope})`;
+  openMenuProfileKey = undefined;
+
+  if (currentView === "home" && editorState !== undefined && selectedProfile !== undefined) {
+    renderHome();
+  }
 }
 
 function formatProfileLocation(profile: ProfileSummary): string {
@@ -834,6 +863,12 @@ function createButton(
   button.textContent = label;
   button.addEventListener("click", onClick);
   return button;
+}
+
+function createTextElement(tagName: "span" | "strong", text: string): HTMLElement {
+  const element = document.createElement(tagName);
+  element.textContent = text;
+  return element;
 }
 
 function getInputValue(name: string): string {

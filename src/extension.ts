@@ -32,9 +32,6 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("liveSerialPlotter.profiles.refresh", () =>
       profileConfigViewProvider.refreshProfiles(),
     ),
-    vscode.commands.registerCommand("liveSerialPlotter.profiles.copy", () =>
-      profileConfigViewProvider.requestCopyProfile(),
-    ),
     vscode.commands.registerCommand("liveSerialPlotter.profiles.openJson", () =>
       profileConfigViewProvider.openProfileJson(),
     ),

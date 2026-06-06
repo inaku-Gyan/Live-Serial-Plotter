@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import { ProfileStore, type ProfileCopyTarget } from "../profiles/ProfileStore";
 import type {
+  ProfileConfig,
   ProfileEditorState,
   ProfileSourceMetadata,
   ToProfileEditorMessage,
@@ -38,21 +39,20 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
     await this.postEditorState();
   }
 
-  requestCopyProfile(): void {
-    this.postMessage({ type: "requestCopyProfile" });
-  }
+  async openProfileJson(profileKey?: string): Promise<void> {
+    const source =
+      profileKey === undefined
+        ? this.selectedSource
+        : (await this.loadProfileByKey(profileKey)).source;
 
-  async openProfileJson(): Promise<void> {
-    if (this.selectedSource?.filePath === undefined) {
+    if (source?.filePath === undefined) {
       await vscode.window.showInformationMessage(
         "Copy this profile before opening its JSONC file.",
       );
       return;
     }
 
-    const document = await vscode.workspace.openTextDocument(
-      vscode.Uri.file(this.selectedSource.filePath),
-    );
+    const document = await vscode.workspace.openTextDocument(vscode.Uri.file(source.filePath));
     await vscode.window.showTextDocument(document);
   }
 
@@ -73,13 +73,14 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      if (message.type === "copyProfile") {
-        await this.copyProfile(message.profile);
+      if (message.type === "copyProfileByKey") {
+        const { profile } = await this.loadProfileByKey(message.profileKey);
+        await this.copyProfile(profile);
         return;
       }
 
       if (message.type === "openProfileJson") {
-        await this.openProfileJson();
+        await this.openProfileJson(message.profileKey);
       }
     } catch (error) {
       this.postMessage({ type: "error", message: formatError(error) });
@@ -120,7 +121,7 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
     });
   }
 
-  private async copyProfile(profile: ProfileEditorState["selectedProfile"]): Promise<void> {
+  private async copyProfile(profile: ProfileConfig): Promise<void> {
     const target = await this.pickCopyTarget();
 
     if (target === undefined) {
@@ -154,6 +155,21 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
       filePath: savedProfile.source.filePath,
     });
     await this.postEditorState(savedProfile.source.key);
+  }
+
+  private async loadProfileByKey(
+    profileKey: string,
+  ): Promise<{ profile: ProfileConfig; source: ProfileSourceMetadata }> {
+    const loadedProfiles = await this.options.profileStore.loadProfiles(profileKey);
+
+    if (loadedProfiles.activeProfileKey !== profileKey) {
+      throw new Error(`Profile "${profileKey}" was not found.`);
+    }
+
+    return {
+      profile: loadedProfiles.activeProfile,
+      source: loadedProfiles.activeProfileSource,
+    };
   }
 
   private async pickCopyTarget(): Promise<ProfileCopyTarget | undefined> {

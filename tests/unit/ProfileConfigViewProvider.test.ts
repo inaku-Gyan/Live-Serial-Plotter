@@ -1,4 +1,5 @@
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import packageJson from "../../package.json";
+import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type * as vscode from "vscode";
@@ -37,7 +38,7 @@ describe("ProfileConfigViewProvider", () => {
     );
   });
 
-  test("copies profiles to the selected workspace directory", async () => {
+  test("copies profiles by key to the selected workspace directory", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-"));
     const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Firmware");
     const profilesDirectory = workspaceDirectory.profilesDirectory;
@@ -55,7 +56,7 @@ describe("ProfileConfigViewProvider", () => {
     provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
     await waitForAsyncWork();
     webviewView.webview.postMessage.mockClear();
-    dispatch({ type: "copyProfile", profile: { ...defaultProfile, name: "Saved Profile" } });
+    dispatch({ type: "copyProfileByKey", profileKey: "builtin:jsonl-telemetry" });
     await waitForAsyncWork();
 
     expect(webviewView.webview.postMessage).toHaveBeenCalledWith(
@@ -69,6 +70,9 @@ describe("ProfileConfigViewProvider", () => {
         filePath: path.join(profilesDirectory, "saved-profile.jsonc"),
       }),
     );
+    await expect(
+      readFile(path.join(profilesDirectory, "saved-profile.jsonc"), "utf8"),
+    ).resolves.toContain('"name": "JSONL Telemetry"');
   });
 
   test("auto-saves workspace profiles to their source file", async () => {
@@ -110,7 +114,7 @@ describe("ProfileConfigViewProvider", () => {
     );
   });
 
-  test("reports copy errors for invalid profiles", async () => {
+  test("reports copy errors for missing profile keys", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-invalid-"));
     const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Invalid");
     const { provider, webviewView, dispatch } = createProvider({
@@ -128,20 +132,52 @@ describe("ProfileConfigViewProvider", () => {
     await waitForAsyncWork();
     webviewView.webview.postMessage.mockClear();
     dispatch({
-      type: "copyProfile",
-      profile: { ...defaultProfile, schemaVersion: 1 as 2 },
+      type: "copyProfileByKey",
+      profileKey: "builtin:missing",
     });
     await waitForAsyncWork();
 
     expect(webviewView.webview.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
         type: "error",
-        message: expect.stringContaining("schemaVersion 2"),
+        message: 'Profile "builtin:missing" was not found.',
       }),
     );
   });
 
-  test("asks users to save builtin profiles before opening JSONC", async () => {
+  test("opens workspace profile JSONC by key", async () => {
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-open-"));
+    const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Firmware");
+    const profilesDirectory = workspaceDirectory.profilesDirectory;
+    await mkdir(profilesDirectory, { recursive: true });
+    const filePath = path.join(profilesDirectory, "editable.jsonc");
+    await writeFile(
+      filePath,
+      `${JSON.stringify({ ...defaultProfile, id: "editable", name: "Editable" }, null, 2)}\n`,
+      "utf8",
+    );
+    const profileKey = createProfileKey({
+      scope: "workspace",
+      id: "editable",
+      workspaceFolderUri: workspaceDirectory.folderUri,
+    });
+    const { provider, webviewView, dispatch } = createProvider({
+      workspaceProfilesDirectories: [workspaceDirectory],
+    });
+
+    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    await waitForAsyncWork();
+    dispatch({ type: "openProfileJson", profileKey });
+    await waitForAsyncWork();
+
+    expect(__vscodeMock.file).toHaveBeenCalledWith(filePath);
+    expect(__vscodeMock.openTextDocument).toHaveBeenCalledWith(
+      expect.objectContaining({ fsPath: filePath }),
+    );
+    expect(__vscodeMock.showTextDocument).toHaveBeenCalled();
+  });
+
+  test("asks users to copy builtin profiles before opening JSONC", async () => {
     const { provider } = createProvider();
 
     await provider.openProfileJson();
@@ -149,6 +185,29 @@ describe("ProfileConfigViewProvider", () => {
     expect(__vscodeMock.showInformationMessage).toHaveBeenCalledWith(
       "Copy this profile before opening its JSONC file.",
     );
+  });
+
+  test("asks users to copy keyed builtin profiles before opening JSONC", async () => {
+    const { provider, webviewView, dispatch } = createProvider();
+
+    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    await waitForAsyncWork();
+    dispatch({ type: "openProfileJson", profileKey: "builtin:jsonl-telemetry" });
+    await waitForAsyncWork();
+
+    expect(__vscodeMock.showInformationMessage).toHaveBeenCalledWith(
+      "Copy this profile before opening its JSONC file.",
+    );
+  });
+
+  test("does not contribute copy profile to the view title", () => {
+    const viewTitleCommands =
+      packageJson.contributes.menus["view/title"]?.map((item) => item.command) ?? [];
+
+    expect(viewTitleCommands).toEqual([
+      "liveSerialPlotter.profiles.refresh",
+      "liveSerialPlotter.profiles.openJson",
+    ]);
   });
 });
 

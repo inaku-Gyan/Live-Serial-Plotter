@@ -330,12 +330,11 @@ export type ToProfileEditorMessage =
   | { type: "requestProfileEditorState"; profileKey?: string }
   | { type: "selectProfileForEdit"; profileKey: string }
   | { type: "autoSaveProfile"; profile: ProfileConfig }
-  | { type: "copyProfile"; profile: ProfileConfig }
-  | { type: "openProfileJson" };
+  | { type: "copyProfileByKey"; profileKey: string }
+  | { type: "openProfileJson"; profileKey?: string };
 
 export type ToProfileEditorWebviewMessage =
   | { type: "profileEditorState"; state: ProfileEditorState }
-  | { type: "requestCopyProfile" }
   | { type: "profileAutoSaved"; profileKey: string; filePath: string }
   | { type: "profileCopied"; profileKey: string; filePath: string }
   | { type: "error"; message: string };
