@@ -104,6 +104,7 @@
         {
           "id": "liveSerialPlotter.profiles",
           "name": "Profiles & Pipeline",
+          "icon": "assets/sidebar.svg",
           "type": "webview"
         }
       ]
