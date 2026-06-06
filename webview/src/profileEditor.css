@@ -48,6 +48,7 @@ textarea {
   background: var(--vscode-button-secondaryHoverBackground);
 }
 
+.profile-home,
 .profile-editor {
   display: grid;
   gap: 12px;
@@ -57,10 +58,67 @@ textarea {
   background: var(--vscode-sideBar-background, var(--vscode-editor-background));
 }
 
+.profile-home-toolbar,
 .profile-editor-toolbar {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 8px;
+}
+
+.profile-home-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.profile-home-actions .button {
+  min-width: 0;
+}
+
+.profile-list {
+  display: grid;
+  gap: 4px;
+}
+
+.profile-list-item {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 7px 8px;
+  color: var(--vscode-list-foreground, var(--vscode-foreground));
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-list-item:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.profile-list-item[data-active="true"] {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+}
+
+.profile-list-item strong,
+.profile-list-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-list-item strong {
+  font-size: 12px;
+}
+
+.profile-list-item span {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
 }
 
 .profile-section {

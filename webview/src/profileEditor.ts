@@ -27,8 +27,11 @@ interface VsCodeApi<State> {
   postMessage(message: ToProfileEditorMessage): void;
 }
 
+type ProfileEditorView = "home" | "editor";
+
 interface PersistedState {
-  selectedProfileKey: string;
+  selectedProfileKey?: string;
+  view?: ProfileEditorView;
 }
 
 declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
@@ -39,6 +42,7 @@ let editorState: ProfileEditorState | undefined;
 let selectedProfile: ProfileConfig | undefined;
 let selectedProfileKey: string | undefined;
 let selectedSource: ProfileSourceMetadata | undefined;
+let currentView: ProfileEditorView = vscode.getState()?.view ?? "home";
 let statusText = "";
 let statusElement: HTMLPreElement | undefined;
 let autoSaveTimer: number | undefined;
@@ -57,9 +61,9 @@ window.addEventListener("message", (event: MessageEvent<ToProfileEditorWebviewMe
     selectedProfile = cloneProfile(message.state.selectedProfile);
     selectedProfileKey = message.state.selectedProfileKey;
     selectedSource = message.state.selectedSource;
-    vscode.setState({ selectedProfileKey: message.state.selectedProfileKey });
+    persistState();
     statusText = message.state.errors.join("\n");
-    renderEditor();
+    renderCurrentView();
     return;
   }
 
@@ -70,18 +74,21 @@ window.addEventListener("message", (event: MessageEvent<ToProfileEditorWebviewMe
 
   if (message.type === "profileAutoSaved") {
     selectedProfileKey = message.profileKey;
+    persistState();
     setStatusText(`Saved to ${message.filePath}`);
     return;
   }
 
   if (message.type === "profileCopied") {
+    currentView = "editor";
     selectedProfileKey = message.profileKey;
+    persistState();
     setStatusText(`Copied to ${message.filePath}`);
     return;
   }
 
   statusText = message.message;
-  renderEditor();
+  renderCurrentView();
 });
 
 function renderLoading(): void {
@@ -92,6 +99,94 @@ function renderLoading(): void {
   root.append(container);
 }
 
+function renderCurrentView(): void {
+  if (currentView === "editor") {
+    renderEditor();
+    return;
+  }
+
+  renderHome();
+}
+
+function renderHome(): void {
+  if (editorState === undefined || selectedProfile === undefined) {
+    renderLoading();
+    return;
+  }
+
+  root.innerHTML = "";
+  statusElement = undefined;
+
+  const container = document.createElement("main");
+  container.className = "profile-home";
+  container.append(renderHomeToolbar(), renderProfileList(), renderPipelinePreview());
+
+  if (statusText.length > 0) {
+    appendStatus(container);
+  }
+
+  root.append(container);
+}
+
+function renderHomeToolbar(): HTMLElement {
+  const toolbar = document.createElement("header");
+  toolbar.className = "profile-home-toolbar";
+  toolbar.append(
+    createButton("Refresh", () => postMessage({ type: "requestProfileEditorState" })),
+    createButton("Copy Profile", () => copyCurrentProfile(), "button-primary"),
+    createButton("Open JSONC", () => postMessage({ type: "openProfileJson" })),
+  );
+  return toolbar;
+}
+
+function renderProfileList(): HTMLElement {
+  const section = createSection("Profiles");
+  const list = document.createElement("div");
+  list.className = "profile-list";
+
+  for (const profile of editorState?.profiles ?? []) {
+    const item = document.createElement("button");
+    item.className = "profile-list-item";
+    item.type = "button";
+    item.dataset.active = profile.key === selectedProfileKey ? "true" : "false";
+    item.addEventListener("click", () => selectProfileOnHome(profile.key));
+
+    const title = document.createElement("strong");
+    title.textContent = profile.name;
+
+    const meta = document.createElement("span");
+    meta.textContent = formatProfileLocation(profile);
+
+    item.append(title, meta);
+    list.append(item);
+  }
+
+  section.append(list);
+  return section;
+}
+
+function renderPipelinePreview(): HTMLElement {
+  const profile = requireSelectedProfile();
+  const section = createSection("Pipeline");
+  section.append(
+    createReadonlyLine("Profile", `${profile.name} / ${profile.id}`),
+    createReadonlyLine("Codec", `${profile.codec.kind} / ${profile.codec.encoding}`),
+    createReadonlyLine("Framing", `${profile.framing.kind} / ${profile.framing.delimiter}`),
+    createReadonlyLine("Parser", formatParser(profile)),
+    createReadonlyLine("Outputs", formatOutputs(profile)),
+  );
+
+  const actions = document.createElement("div");
+  actions.className = "profile-home-actions";
+  actions.append(
+    createButton("Edit", () => openEditor(selectedProfileKey), "button-primary"),
+    createButton("Copy", () => copyCurrentProfile()),
+    createButton("Open JSONC", () => postMessage({ type: "openProfileJson" })),
+  );
+  section.append(actions);
+  return section;
+}
+
 function renderEditor(): void {
   if (editorState === undefined || selectedProfile === undefined) {
     renderLoading();
@@ -99,6 +194,7 @@ function renderEditor(): void {
   }
 
   root.innerHTML = "";
+  statusElement = undefined;
 
   const container = document.createElement("main");
   container.className = "profile-editor";
@@ -121,13 +217,7 @@ function renderEditor(): void {
   container.append(outputsSection);
 
   if (statusText.length > 0) {
-    const status = document.createElement("pre");
-    status.className = "profile-status";
-    status.textContent = statusText;
-    statusElement = status;
-    container.append(status);
-  } else {
-    statusElement = undefined;
+    appendStatus(container);
   }
 
   applyReadonlyState(container);
@@ -151,11 +241,17 @@ function renderToolbar(): HTMLElement {
 
   profileSelect.value = selectedProfileKey ?? "";
   profileSelect.addEventListener("change", () => {
-    vscode.setState({ selectedProfileKey: profileSelect.value });
+    selectedProfileKey = profileSelect.value;
+    persistState();
     postMessage({ type: "selectProfileForEdit", profileKey: profileSelect.value });
   });
 
   toolbar.append(
+    createButton("Back", () => {
+      currentView = "home";
+      persistState();
+      renderHome();
+    }),
     profileSelect,
     createButton("Refresh", () => postMessage({ type: "requestProfileEditorState" })),
     createButton("Copy Profile", () => copyCurrentProfile(), "button-primary"),
@@ -413,9 +509,13 @@ function copyCurrentProfile(): void {
   }
 
   try {
+    const profile =
+      currentView === "editor"
+        ? applyProfileEditorPatch(selectedProfile, collectPatch())
+        : selectedProfile;
     postMessage({
       type: "copyProfile",
-      profile: applyProfileEditorPatch(selectedProfile, collectPatch()),
+      profile,
     });
   } catch (error) {
     setStatusText(error instanceof Error ? error.message : String(error));
@@ -486,6 +586,34 @@ function setStatusText(text: string): void {
   root.querySelector("main")?.append(status);
 }
 
+function appendStatus(container: HTMLElement): void {
+  const status = document.createElement("pre");
+  status.className = "profile-status";
+  status.textContent = statusText;
+  statusElement = status;
+  container.append(status);
+}
+
+function selectProfileOnHome(profileKey: string): void {
+  selectedProfileKey = profileKey;
+  persistState();
+  postMessage({ type: "selectProfileForEdit", profileKey });
+}
+
+function openEditor(profileKey: string | undefined): void {
+  currentView = "editor";
+  persistState();
+
+  if (profileKey !== undefined && profileKey !== selectedProfileKey) {
+    selectedProfileKey = profileKey;
+    renderLoading();
+    postMessage({ type: "selectProfileForEdit", profileKey });
+    return;
+  }
+
+  renderEditor();
+}
+
 function formatProfileSummary(profile: ProfileSummary): string {
   if (profile.scope === "workspace") {
     const workspaceName = profile.workspaceName ?? "workspace";
@@ -493,6 +621,30 @@ function formatProfileSummary(profile: ProfileSummary): string {
   }
 
   return `${profile.name} (${profile.scope})`;
+}
+
+function formatProfileLocation(profile: ProfileSummary): string {
+  if (profile.scope === "workspace") {
+    return `${profile.id} / ${profile.workspaceName ?? "workspace"}`;
+  }
+
+  return `${profile.id} / ${profile.scope}`;
+}
+
+function formatParser(profile: ProfileConfig): string {
+  if (profile.parser.kind === "script") {
+    return `script / ${profile.parser.path}`;
+  }
+
+  return `builtin / ${profile.parser.mode}`;
+}
+
+function formatOutputs(profile: ProfileConfig): string {
+  return profile.outputs.map((output) => `${output.kind}:${output.id}`).join(", ");
+}
+
+function persistState(): void {
+  vscode.setState({ selectedProfileKey, view: currentView });
 }
 
 function collectPatch(): ProfileEditorPatch {
