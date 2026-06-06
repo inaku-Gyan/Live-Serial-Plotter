@@ -9,7 +9,10 @@ export default defineConfig({
     emptyOutDir: true,
     sourcemap: true,
     rollupOptions: {
-      input: resolve(import.meta.dirname, "webview/index.html"),
+      input: {
+        index: resolve(import.meta.dirname, "webview/index.html"),
+        profile: resolve(import.meta.dirname, "webview/profile.html"),
+      },
       output: {
         entryFileNames: "assets/[name].js",
         chunkFileNames: "assets/[name].js",

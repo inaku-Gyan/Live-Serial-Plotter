@@ -70,8 +70,63 @@
         "command": "liveSerialPlotter.open",
         "title": "Live Serial Plotter: New Page",
         "category": "Live Serial Plotter"
+      },
+      {
+        "command": "liveSerialPlotter.profiles.refresh",
+        "title": "Live Serial Plotter: Refresh Profiles",
+        "category": "Live Serial Plotter",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "liveSerialPlotter.profiles.saveAs",
+        "title": "Live Serial Plotter: Save Profile As...",
+        "category": "Live Serial Plotter",
+        "icon": "$(save-as)"
+      },
+      {
+        "command": "liveSerialPlotter.profiles.openJson",
+        "title": "Live Serial Plotter: Open Profile JSONC",
+        "category": "Live Serial Plotter",
+        "icon": "$(json)"
       }
-    ]
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "liveSerialPlotter",
+          "title": "Live Serial Plotter",
+          "icon": "assets/sidebar.svg"
+        }
+      ]
+    },
+    "views": {
+      "liveSerialPlotter": [
+        {
+          "id": "liveSerialPlotter.profiles",
+          "name": "Profiles & Pipeline",
+          "type": "webview"
+        }
+      ]
+    },
+    "menus": {
+      "view/title": [
+        {
+          "command": "liveSerialPlotter.profiles.refresh",
+          "when": "view == liveSerialPlotter.profiles",
+          "group": "navigation@1"
+        },
+        {
+          "command": "liveSerialPlotter.profiles.saveAs",
+          "when": "view == liveSerialPlotter.profiles",
+          "group": "navigation@2"
+        },
+        {
+          "command": "liveSerialPlotter.profiles.openJson",
+          "when": "view == liveSerialPlotter.profiles",
+          "group": "navigation@3"
+        }
+      ]
+    }
   },
   "icon": "assets/icon.png",
   "galleryBanner": {
