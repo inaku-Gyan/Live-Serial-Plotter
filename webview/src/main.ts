@@ -4,11 +4,16 @@ import "./styles.css";
 import appHtml from "./app.html?raw";
 import {
   parserModes,
+  type OutputPacket,
   type ParserMode,
+  type ProfileConfig,
+  type ProfileSummary,
   type SerialPortSummary,
+  type TimeSeriesLineOutputConfig,
   type ToExtensionMessage,
   type ToWebviewMessage,
 } from "../../src/shared/protocol";
+import { defaultProfile } from "../../src/profiles/defaultProfile";
 
 interface VsCodeApi<State> {
   getState(): State | undefined;
@@ -19,6 +24,7 @@ interface VsCodeApi<State> {
 interface PersistedState {
   baudRate: number;
   parserMode: ParserMode;
+  profileId: string;
   selectedPath: string;
 }
 
@@ -28,6 +34,7 @@ const vscode = acquireVsCodeApi<PersistedState>();
 const initialState = vscode.getState() ?? {
   baudRate: 115200,
   parserMode: "auto" satisfies ParserMode,
+  profileId: defaultProfile.id,
   selectedPath: "",
 };
 
@@ -39,6 +46,7 @@ const state: PersistedState & { connected: boolean } = {
 const app = requireElement(document, "#app");
 app.innerHTML = appHtml;
 
+const profileSelect = requireElement<HTMLSelectElement>(document, "#profileSelect");
 const portSelect = requireElement<HTMLSelectElement>(document, "#portSelect");
 const refreshPortsButton = requireElement<HTMLButtonElement>(document, "#refreshPortsButton");
 const baudRateSelect = requireElement<HTMLSelectElement>(document, "#baudRateSelect");
@@ -66,9 +74,12 @@ const colors = ["#4cc9f0", "#f72585", "#ffd166", "#06d6a0", "#c77dff", "#f77f00"
 let firstTimestamp: number | undefined;
 let plot: uPlot | undefined;
 let ports: SerialPortSummary[] = [];
+let profiles: ProfileSummary[] = [];
+let activeProfile: ProfileConfig = defaultProfile;
 
 setupControls();
 rebuildPlot();
+requestProfiles();
 requestPorts();
 
 window.addEventListener("message", (event: MessageEvent<ToWebviewMessage>) => {
@@ -77,6 +88,18 @@ window.addEventListener("message", (event: MessageEvent<ToWebviewMessage>) => {
   if (message.type === "ports") {
     ports = message.ports;
     renderPorts();
+    return;
+  }
+
+  if (message.type === "profiles") {
+    profiles = message.profiles;
+    applyProfile(message.activeProfile);
+    renderProfiles();
+    return;
+  }
+
+  if (message.type === "activeProfile") {
+    applyProfile(message.profile);
     return;
   }
 
@@ -93,6 +116,11 @@ window.addEventListener("message", (event: MessageEvent<ToWebviewMessage>) => {
 
   if (message.type === "seriesAppend") {
     appendSamples(message.samples);
+    return;
+  }
+
+  if (message.type === "outputPacket") {
+    handleOutputPacket(message.packet);
     return;
   }
 
@@ -127,6 +155,12 @@ function setupControls(): void {
   }
 
   parserModeSelect.value = state.parserMode;
+
+  profileSelect.addEventListener("change", () => {
+    state.profileId = profileSelect.value;
+    saveState();
+    postMessage({ type: "selectProfile", profileId: state.profileId });
+  });
 
   refreshPortsButton.addEventListener("click", () => requestPorts());
   connectButton.addEventListener("click", () => toggleConnection());
@@ -166,6 +200,48 @@ function setupControls(): void {
 
 function requestPorts(): void {
   postMessage({ type: "requestPorts" });
+}
+
+function requestProfiles(): void {
+  postMessage({ type: "requestProfiles" });
+}
+
+function renderProfiles(): void {
+  profileSelect.replaceChildren();
+
+  for (const profile of profiles) {
+    const option = document.createElement("option");
+    option.value = profile.id;
+    option.textContent = `${profile.name} (${profile.scope})`;
+    profileSelect.append(option);
+  }
+
+  profileSelect.value = state.profileId;
+}
+
+function applyProfile(profile: ProfileConfig): void {
+  activeProfile = profile;
+  state.profileId = profile.id;
+  state.baudRate = profile.connection.baudRate;
+
+  if (profile.connection.path !== undefined) {
+    state.selectedPath = profile.connection.path;
+  }
+
+  if (profile.parser.kind === "builtin") {
+    state.parserMode = profile.parser.mode;
+    parserModeSelect.value = state.parserMode;
+    parserModeSelect.disabled = state.connected;
+  } else {
+    parserModeSelect.disabled = true;
+  }
+
+  baudRateSelect.value = String(state.baudRate);
+  profileSelect.value = state.profileId;
+  saveState();
+  clearPlot();
+  clearLogView();
+  rebuildPlot();
 }
 
 function renderPorts(): void {
@@ -211,7 +287,8 @@ function toggleConnection(): void {
     settings: {
       path: state.selectedPath,
       baudRate: Number(baudRateSelect.value),
-      parserMode: state.parserMode,
+      profileId: state.profileId,
+      parserMode: activeProfile.parser.kind === "builtin" ? state.parserMode : undefined,
     },
   });
 }
@@ -225,17 +302,39 @@ function updateConnectionControls(): void {
   connectionStatus.classList.toggle("status-connected", state.connected);
   portSelect.disabled = state.connected || ports.length === 0;
   baudRateSelect.disabled = state.connected;
+  profileSelect.disabled = state.connected;
+  parserModeSelect.disabled = state.connected || activeProfile.parser.kind === "script";
   connectButton.disabled = !state.connected && state.selectedPath.length === 0;
   sendInput.disabled = !state.connected;
   sendButton.disabled = !state.connected;
 }
 
-function appendRawLine(line: string, timestamp: number): void {
-  const time = new Date(timestamp).toLocaleTimeString();
-  rawLines.push(`[${time}] ${line}`);
+function handleOutputPacket(packet: OutputPacket): void {
+  if (packet.kind === "terminalAppend") {
+    appendTerminalLines(
+      packet.lines.map((line) => line.text),
+      packet.receivedAt,
+    );
+    return;
+  }
 
-  if (rawLines.length > maxRawLines) {
-    rawLines.splice(0, rawLines.length - maxRawLines);
+  if (packet.kind === "timeSeriesAppend") {
+    appendTimeSeriesSamples(packet.samples);
+  }
+}
+
+function appendRawLine(line: string, timestamp: number): void {
+  appendTerminalLines([line], timestamp);
+}
+
+function appendTerminalLines(lines: readonly string[], timestamp: number): void {
+  const time = new Date(timestamp).toLocaleTimeString();
+  rawLines.push(...lines.map((line) => `[${time}] ${line}`));
+
+  const maxLines = getRawMaxLines();
+
+  if (rawLines.length > maxLines) {
+    rawLines.splice(0, rawLines.length - maxLines);
   }
 
   rawLog.textContent = rawLines.join("\n");
@@ -243,17 +342,27 @@ function appendRawLine(line: string, timestamp: number): void {
 }
 
 function clearLog(): void {
-  rawLines.length = 0;
-  rawLog.textContent = "";
+  clearLogView();
   postMessage({ type: "clearLog" });
 }
 
+function clearLogView(): void {
+  rawLines.length = 0;
+  rawLog.textContent = "";
+}
+
 function appendSamples(samples: readonly { t: number; values: Record<string, number> }[]): void {
+  appendTimeSeriesSamples(samples.map((sample) => ({ time: sample.t, values: sample.values })));
+}
+
+function appendTimeSeriesSamples(
+  samples: readonly { time: number; values: Record<string, number> }[],
+): void {
   let needsRebuild = false;
 
   for (const sample of samples) {
     if (firstTimestamp === undefined) {
-      firstTimestamp = sample.t;
+      firstTimestamp = sample.time;
     }
 
     for (const channelName of Object.keys(sample.values)) {
@@ -267,7 +376,7 @@ function appendSamples(samples: readonly { t: number; values: Record<string, num
       }
     }
 
-    timeValues.push((sample.t - firstTimestamp) / 1000);
+    timeValues.push(sample.time);
 
     for (const [channelName, values] of channelData.entries()) {
       const value = sample.values[channelName];
@@ -286,11 +395,13 @@ function appendSamples(samples: readonly { t: number; values: Record<string, num
 }
 
 function trimPlotData(): void {
-  if (timeValues.length <= maxPlotPoints) {
+  const maxPoints = getPlotMaxPoints();
+
+  if (timeValues.length <= maxPoints) {
     return;
   }
 
-  const removeCount = timeValues.length - maxPlotPoints;
+  const removeCount = timeValues.length - maxPoints;
   timeValues.splice(0, removeCount);
 
   for (const values of channelData.values()) {
@@ -305,10 +416,10 @@ function rebuildPlot(): void {
   const series: uPlot.Series[] = [
     {},
     ...channelNames.map((channelName, index) => ({
-      label: channelName,
-      stroke: colors[index % colors.length],
-      width: 2,
-      show: channelVisibility.get(channelName) ?? true,
+      label: getSeriesLabel(channelName),
+      stroke: getSeriesColor(channelName, index),
+      width: getSeriesWidth(channelName),
+      show: channelVisibility.get(channelName) ?? getSeriesVisible(channelName),
     })),
   ];
 
@@ -366,6 +477,48 @@ function getPlotData(): uPlot.AlignedData {
   return data as uPlot.AlignedData;
 }
 
+function clearPlot(): void {
+  firstTimestamp = undefined;
+  timeValues.length = 0;
+  channelData.clear();
+  channelVisibility.clear();
+}
+
+function getRawMaxLines(): number {
+  const rawOutput = activeProfile.outputs.find((output) => output.kind === "terminalAppend");
+  return rawOutput?.maxLines ?? maxRawLines;
+}
+
+function getPlotMaxPoints(): number {
+  const plotOutput = getTimeSeriesOutput();
+  return plotOutput?.window?.maxPoints ?? maxPlotPoints;
+}
+
+function getTimeSeriesOutput(): TimeSeriesLineOutputConfig | undefined {
+  return activeProfile.outputs.find((output) => output.kind === "timeSeriesLine");
+}
+
+function getSeriesLabel(channelName: string): string {
+  const series = getTimeSeriesOutput()?.series[channelName];
+  const unit = series?.unit;
+  const label = series?.label ?? channelName;
+  return unit === undefined ? label : `${label} (${unit})`;
+}
+
+function getSeriesColor(channelName: string, index: number): string {
+  return (
+    getTimeSeriesOutput()?.series[channelName]?.color ?? colors[index % colors.length] ?? colors[0]
+  );
+}
+
+function getSeriesWidth(channelName: string): number {
+  return getTimeSeriesOutput()?.series[channelName]?.line?.width ?? 2;
+}
+
+function getSeriesVisible(channelName: string): boolean {
+  return getTimeSeriesOutput()?.series[channelName]?.visible ?? true;
+}
+
 function renderLegend(channelNames: string[]): void {
   legendElement.replaceChildren();
 
@@ -391,7 +544,7 @@ function renderLegend(channelNames: string[]): void {
 
     const swatch = document.createElement("span");
     swatch.className = "legend-swatch";
-    swatch.style.backgroundColor = colors[index % colors.length] ?? colors[0];
+    swatch.style.backgroundColor = getSeriesColor(channelName, index);
 
     const text = document.createElement("span");
     text.textContent = channelName;
@@ -421,6 +574,7 @@ function saveState(): void {
   vscode.setState({
     baudRate: state.baudRate,
     parserMode: state.parserMode,
+    profileId: state.profileId,
     selectedPath: state.selectedPath,
   });
 }

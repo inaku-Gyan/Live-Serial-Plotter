@@ -1,11 +1,9 @@
 import * as vscode from "vscode";
-import { PointBatcher } from "../session/PointBatcher";
-import { RingBuffer } from "../session/RingBuffer";
+import { ProfileStore } from "../profiles/ProfileStore";
 import { SerialService, type SerialPortFactory } from "../serial/SerialService";
 import {
   isParserMode,
   type ConnectionState,
-  type PlotSample,
   type ToExtensionMessage,
 } from "../shared/protocol";
 
@@ -13,6 +11,7 @@ const panelViewType = "liveSerialPlotter.panel";
 
 export interface LiveSerialPlotterPanelOptions {
   readonly serialPortFactory?: SerialPortFactory;
+  readonly profileStore?: ProfileStore;
 }
 
 export class LiveSerialPlotterPanel {
@@ -20,12 +19,9 @@ export class LiveSerialPlotterPanel {
   private static nextPanelId = 1;
 
   private readonly disposables: vscode.Disposable[] = [];
-  private readonly rawLines = new RingBuffer<string>(500);
-  private readonly samples = new RingBuffer<PlotSample>(5_000);
   private readonly serialService: SerialService;
-  private readonly pointBatcher = new PointBatcher(50, (samples) => {
-    this.postMessage({ type: "seriesAppend", samples });
-  });
+  private readonly profileStore: ProfileStore;
+  private activeProfileId = "default";
 
   static open(extensionUri: vscode.Uri, options: LiveSerialPlotterPanelOptions = {}): void {
     const title = `Live Serial Plotter #${LiveSerialPlotterPanel.nextPanelId}`;
@@ -47,20 +43,14 @@ export class LiveSerialPlotterPanel {
     private readonly defaultTitle: string,
     options: LiveSerialPlotterPanelOptions,
   ) {
+    this.profileStore = options.profileStore ?? new ProfileStore();
     this.serialService = new SerialService(
       {
         onConnectionState: (state) => {
           this.updatePanelTitle(state);
           this.postMessage({ type: "connectionState", state });
         },
-        onRawLine: (line, t) => {
-          this.rawLines.push(line);
-          this.postMessage({ type: "rawLine", line, t });
-        },
-        onSample: (sample) => {
-          this.samples.push(sample);
-          this.pointBatcher.add(sample);
-        },
+        onOutputPacket: (packet) => this.postMessage({ type: "outputPacket", packet }),
         onError: (message) => this.postError(message),
       },
       options.serialPortFactory,
@@ -76,12 +66,24 @@ export class LiveSerialPlotterPanel {
       undefined,
       this.disposables,
     );
+
+    void this.postProfiles(this.activeProfileId);
   }
 
   private async handleMessage(message: ToExtensionMessage): Promise<void> {
     try {
       if (message.type === "requestPorts") {
         await this.postPorts();
+        return;
+      }
+
+      if (message.type === "requestProfiles") {
+        await this.postProfiles(this.activeProfileId);
+        return;
+      }
+
+      if (message.type === "selectProfile") {
+        await this.selectProfile(message.profileId);
         return;
       }
 
@@ -106,7 +108,7 @@ export class LiveSerialPlotterPanel {
       }
 
       if (message.type === "clearLog") {
-        this.rawLines.clear();
+        return;
       }
     } catch (error) {
       this.postError(formatError(error));
@@ -120,6 +122,32 @@ export class LiveSerialPlotterPanel {
 
   private postError(message: string): void {
     this.postMessage({ type: "error", message });
+  }
+
+  private async postProfiles(activeProfileId: string): Promise<void> {
+    const loadedProfiles = await this.profileStore.loadProfiles(activeProfileId);
+    this.activeProfileId = loadedProfiles.activeProfile.id;
+    this.serialService.setProfile(loadedProfiles.activeProfile);
+    this.postMessage({
+      type: "profiles",
+      profiles: loadedProfiles.profiles.map((profile) => profile.summary),
+      activeProfile: loadedProfiles.activeProfile,
+    });
+
+    for (const error of loadedProfiles.errors) {
+      this.postError(error);
+    }
+  }
+
+  private async selectProfile(profileId: string): Promise<void> {
+    const loadedProfiles = await this.profileStore.loadProfiles(profileId);
+    this.activeProfileId = loadedProfiles.activeProfile.id;
+    this.serialService.setProfile(loadedProfiles.activeProfile);
+    this.postMessage({ type: "activeProfile", profile: loadedProfiles.activeProfile });
+
+    for (const error of loadedProfiles.errors) {
+      this.postError(error);
+    }
   }
 
   private postMessage(message: Parameters<vscode.Webview["postMessage"]>[0]): void {
@@ -161,7 +189,6 @@ export class LiveSerialPlotterPanel {
 
   private dispose(): void {
     LiveSerialPlotterPanel.activePanels.delete(this);
-    this.pointBatcher.dispose();
     this.serialService.dispose();
 
     while (this.disposables.length > 0) {
