@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import { LiveSerialPlotterPanel } from "./panel/LiveSerialPlotterPanel";
+import { VscodeScriptParserTrustStore } from "./panel/VscodeScriptParserTrustStore";
+import { ScriptParserLoader } from "./parsers/ScriptParserLoader";
 import { getWorkspaceProfilesDirectory, ProfileStore } from "./profiles/ProfileStore";
 import { DevelopmentSerialPortFactory } from "./serial/dev/DevelopmentSerialPortFactory";
 import { NodeSerialPortFactory, type SerialPortFactory } from "./serial/SerialService";
@@ -7,10 +9,15 @@ import { NodeSerialPortFactory, type SerialPortFactory } from "./serial/SerialSe
 export function activate(context: vscode.ExtensionContext): void {
   const serialPortFactory = createSerialPortFactory(context);
   const profileStore = createProfileStore(context);
+  const scriptParserLoader = createScriptParserLoader(context);
 
   context.subscriptions.push(
     vscode.commands.registerCommand("liveSerialPlotter.open", () => {
-      LiveSerialPlotterPanel.open(context.extensionUri, { serialPortFactory, profileStore });
+      LiveSerialPlotterPanel.open(context.extensionUri, {
+        serialPortFactory,
+        profileStore,
+        scriptParserLoader,
+      });
     }),
   );
 }
@@ -32,5 +39,12 @@ export function createProfileStore(context: vscode.ExtensionContext): ProfileSto
       vscode.workspace.workspaceFolders?.map((folder) =>
         getWorkspaceProfilesDirectory(folder.uri.fsPath),
       ) ?? [],
+  });
+}
+
+export function createScriptParserLoader(context: vscode.ExtensionContext): ScriptParserLoader {
+  return new ScriptParserLoader({
+    workspaceRoots: vscode.workspace.workspaceFolders?.map((folder) => folder.uri.fsPath) ?? [],
+    trustStore: new VscodeScriptParserTrustStore(context),
   });
 }

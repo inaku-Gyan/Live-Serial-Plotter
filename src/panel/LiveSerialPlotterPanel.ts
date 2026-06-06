@@ -1,17 +1,15 @@
 import * as vscode from "vscode";
+import type { AsyncScriptParserLoader } from "../pipeline/PipelineRunner";
 import { ProfileStore } from "../profiles/ProfileStore";
 import { SerialService, type SerialPortFactory } from "../serial/SerialService";
-import {
-  isParserMode,
-  type ConnectionState,
-  type ToExtensionMessage,
-} from "../shared/protocol";
+import { isParserMode, type ConnectionState, type ToExtensionMessage } from "../shared/protocol";
 
 const panelViewType = "liveSerialPlotter.panel";
 
 export interface LiveSerialPlotterPanelOptions {
   readonly serialPortFactory?: SerialPortFactory;
   readonly profileStore?: ProfileStore;
+  readonly scriptParserLoader?: AsyncScriptParserLoader;
 }
 
 export class LiveSerialPlotterPanel {
@@ -54,6 +52,7 @@ export class LiveSerialPlotterPanel {
         onError: (message) => this.postError(message),
       },
       options.serialPortFactory,
+      { scriptParserLoader: options.scriptParserLoader },
     );
 
     this.panel.webview.html = this.getHtml();

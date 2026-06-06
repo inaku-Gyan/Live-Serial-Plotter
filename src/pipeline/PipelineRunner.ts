@@ -15,13 +15,14 @@ export interface PipelineRunnerOptions {
   readonly framing: FramingConfig;
   readonly parser: ParserConfig;
   readonly outputs: readonly OutputConfig[];
-  readonly scriptParserLoader?: ScriptParserLoader;
+  readonly scriptParserLoader?: AsyncScriptParserLoader;
   readonly onPacket: (packet: OutputPacket) => void;
   readonly onError?: (message: string) => void;
+  readonly parserInstance?: LineParser;
 }
 
-export interface ScriptParserLoader {
-  load(config: Exclude<ParserConfig, BuiltinParserConfig>): LineParser;
+export interface AsyncScriptParserLoader {
+  load(config: Exclude<ParserConfig, BuiltinParserConfig>): Promise<LineParser>;
 }
 
 export class PipelineRunner {
@@ -31,8 +32,23 @@ export class PipelineRunner {
 
   constructor(private readonly options: PipelineRunnerOptions) {
     this.framer = new LineFramer(options.framing);
-    this.parser = createParser(options.parser, options.scriptParserLoader);
+    this.parser = options.parserInstance ?? createBuiltinParser(options.parser);
     this.outputMappers = options.outputs.map(createOutputMapper);
+  }
+
+  static async create(options: PipelineRunnerOptions): Promise<PipelineRunner> {
+    if (options.parser.kind === "builtin") {
+      return new PipelineRunner(options);
+    }
+
+    if (options.scriptParserLoader === undefined) {
+      throw new Error("Script parser support is not configured.");
+    }
+
+    return new PipelineRunner({
+      ...options,
+      parserInstance: await options.scriptParserLoader.load(options.parser),
+    });
   }
 
   handleBytes(chunk: Buffer | Uint8Array, receivedAt = Date.now()): void {
@@ -90,19 +106,12 @@ export class PipelineRunner {
   }
 }
 
-function createParser(
-  config: ParserConfig,
-  scriptParserLoader: ScriptParserLoader | undefined,
-): LineParser {
-  if (config.kind === "builtin") {
-    return new BuiltinLineParser(config);
+function createBuiltinParser(config: ParserConfig): LineParser {
+  if (config.kind !== "builtin") {
+    throw new Error("Script parser support requires PipelineRunner.create().");
   }
 
-  if (scriptParserLoader === undefined) {
-    throw new Error("Script parser support is not configured.");
-  }
-
-  return scriptParserLoader.load(config);
+  return new BuiltinLineParser(config);
 }
 
 function formatError(error: unknown): string {

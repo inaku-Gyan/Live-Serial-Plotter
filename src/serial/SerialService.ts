@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import { SerialPort } from "serialport";
-import { PipelineRunner } from "../pipeline/PipelineRunner";
+import { PipelineRunner, type AsyncScriptParserLoader } from "../pipeline/PipelineRunner";
 import { defaultProfile } from "../profiles/defaultProfile";
 import type {
   ConnectionSettings,
@@ -30,6 +30,10 @@ export interface SerialServiceEvents {
   onSample?(sample: PlotSample): void;
   onOutputPacket?(packet: OutputPacket): void;
   onError?(message: string): void;
+}
+
+export interface SerialServiceOptions {
+  readonly scriptParserLoader?: AsyncScriptParserLoader;
 }
 
 export class NodeSerialPortFactory implements SerialPortFactory {
@@ -65,6 +69,7 @@ export class SerialService {
   constructor(
     private readonly events: SerialServiceEvents = {},
     private readonly factory: SerialPortFactory = new NodeSerialPortFactory(),
+    private readonly options: SerialServiceOptions = {},
   ) {}
 
   async listPorts(): Promise<SerialPortSummary[]> {
@@ -77,7 +82,7 @@ export class SerialService {
     this.parserMode = settings.parserMode ?? "auto";
     this.currentSettings = settings;
     this.pipelineRunner?.dispose();
-    this.pipelineRunner = this.createPipelineRunner(settings);
+    this.pipelineRunner = await this.createPipelineRunner(settings);
     this.disconnecting = false;
 
     const port = this.factory.create(settings);
@@ -182,10 +187,7 @@ export class SerialService {
     }
 
     this.pipelineRunner?.dispose();
-    this.pipelineRunner =
-      this.currentSettings === undefined
-        ? undefined
-        : this.createPipelineRunner(this.currentSettings);
+    void this.recreatePipelineRunner();
   }
 
   setProfile(profile: ProfileConfig): void {
@@ -197,7 +199,7 @@ export class SerialService {
     }
 
     this.pipelineRunner?.dispose();
-    this.pipelineRunner = this.createPipelineRunner(this.currentSettings);
+    void this.recreatePipelineRunner();
   }
 
   dispose(): void {
@@ -232,16 +234,31 @@ export class SerialService {
     port.off("close", this.handleClose);
   }
 
-  private createPipelineRunner(settings: ConnectionSettings): PipelineRunner {
+  private async createPipelineRunner(settings: ConnectionSettings): Promise<PipelineRunner> {
     const profile = this.createRuntimeProfile(settings);
 
-    return new PipelineRunner({
+    return PipelineRunner.create({
       framing: profile.framing,
       parser: profile.parser,
       outputs: profile.outputs,
+      scriptParserLoader: this.options.scriptParserLoader,
       onPacket: (packet) => this.handleOutputPacket(packet),
       onError: (message) => this.events.onError?.(message),
     });
+  }
+
+  private async recreatePipelineRunner(): Promise<void> {
+    if (this.currentSettings === undefined) {
+      this.pipelineRunner = undefined;
+      return;
+    }
+
+    try {
+      this.pipelineRunner = await this.createPipelineRunner(this.currentSettings);
+    } catch (error) {
+      this.pipelineRunner = undefined;
+      this.events.onError?.(formatError(error));
+    }
   }
 
   private createRuntimeProfile(settings: ConnectionSettings): ProfileConfig {
