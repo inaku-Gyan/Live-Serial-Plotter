@@ -88,8 +88,17 @@ class TimeSeriesLineMapper implements OutputMapper {
     }
 
     const values: Record<string, number> = {};
+    const configuredSeries = Object.entries(this.config.series);
 
-    for (const [seriesName, series] of Object.entries(this.config.series)) {
+    if (configuredSeries.length === 0) {
+      for (const [field, value] of Object.entries(record.fields)) {
+        if (typeof value === "number" && Number.isFinite(value)) {
+          values[field] = value;
+        }
+      }
+    }
+
+    for (const [seriesName, series] of configuredSeries) {
       const value = getNumberField(record.fields, series.field);
 
       if (value !== null) {
