@@ -20,7 +20,6 @@ export interface ConnectionSettings {
   path: string;
   baudRate: number;
   parserMode?: ParserMode;
-  profileId?: string;
 }
 
 export interface PlotSample {
@@ -34,20 +33,36 @@ export interface ConnectionState {
   baudRate?: number;
 }
 
+export type ProfileScope = "builtin" | "user" | "workspace";
+
+export interface ProfileRef {
+  scope: ProfileScope;
+  id: string;
+  workspaceFolderUri?: string;
+}
+
 export interface ProfileSummary {
+  key: string;
+  ref: ProfileRef;
   id: string;
   name: string;
-  scope: "builtin" | "user" | "workspace";
+  scope: ProfileScope;
+  workspaceName?: string;
 }
 
 export interface ProfileSourceMetadata {
-  scope: ProfileSummary["scope"];
+  key: string;
+  ref: ProfileRef;
+  scope: ProfileScope;
   filePath?: string;
+  workspaceFolderUri?: string;
+  workspaceName?: string;
 }
 
 export interface ProfileEditorState {
   profiles: ProfileSummary[];
   selectedProfile: ProfileConfig;
+  selectedProfileKey: string;
   selectedSource: ProfileSourceMetadata;
   errors: string[];
 }
@@ -288,8 +303,8 @@ export interface Plot2dPoint {
 
 export type ToExtensionMessage =
   | { type: "requestPorts" }
-  | { type: "requestProfiles"; profileId?: string }
-  | { type: "selectProfile"; profileId: string }
+  | { type: "requestProfiles"; profileKey?: string }
+  | { type: "selectProfile"; profileKey: string }
   | { type: "connect"; settings: ConnectionSettings }
   | { type: "disconnect" }
   | { type: "send"; text: string }
@@ -298,8 +313,13 @@ export type ToExtensionMessage =
 
 export type ToWebviewMessage =
   | { type: "ports"; ports: SerialPortSummary[] }
-  | { type: "profiles"; profiles: ProfileSummary[]; activeProfile: ProfileConfig }
-  | { type: "activeProfile"; profile: ProfileConfig }
+  | {
+      type: "profiles";
+      profiles: ProfileSummary[];
+      activeProfile: ProfileConfig;
+      activeProfileKey: string;
+    }
+  | { type: "activeProfile"; profile: ProfileConfig; profileKey: string }
   | { type: "outputPacket"; packet: OutputPacket }
   | { type: "connectionState"; state: ConnectionState }
   | { type: "rawLine"; line: string; t: number }
@@ -307,15 +327,17 @@ export type ToWebviewMessage =
   | { type: "error"; message: string };
 
 export type ToProfileEditorMessage =
-  | { type: "requestProfileEditorState"; profileId?: string }
-  | { type: "selectProfileForEdit"; profileId: string }
-  | { type: "saveProfile"; profile: ProfileConfig }
+  | { type: "requestProfileEditorState"; profileKey?: string }
+  | { type: "selectProfileForEdit"; profileKey: string }
+  | { type: "autoSaveProfile"; profile: ProfileConfig }
+  | { type: "copyProfile"; profile: ProfileConfig }
   | { type: "openProfileJson" };
 
 export type ToProfileEditorWebviewMessage =
   | { type: "profileEditorState"; state: ProfileEditorState }
-  | { type: "requestSaveProfile" }
-  | { type: "profileSaved"; profileId: string; filePath: string }
+  | { type: "requestCopyProfile" }
+  | { type: "profileAutoSaved"; profileKey: string; filePath: string }
+  | { type: "profileCopied"; profileKey: string; filePath: string }
   | { type: "error"; message: string };
 
 export function isParserMode(value: string): value is ParserMode {

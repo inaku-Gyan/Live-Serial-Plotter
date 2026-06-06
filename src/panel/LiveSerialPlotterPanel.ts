@@ -23,7 +23,7 @@ export class LiveSerialPlotterPanel {
   private readonly outputPacketBatcher = new OutputPacketBatcher(50, (packet) => {
     this.postMessage({ type: "outputPacket", packet });
   });
-  private activeProfileId = "default";
+  private activeProfileKey: string | undefined;
 
   static open(extensionUri: vscode.Uri, options: LiveSerialPlotterPanelOptions = {}): void {
     const title = `Live Serial Plotter #${LiveSerialPlotterPanel.nextPanelId}`;
@@ -70,7 +70,7 @@ export class LiveSerialPlotterPanel {
       this.disposables,
     );
 
-    void this.postProfiles(this.activeProfileId);
+    void this.postProfiles(this.activeProfileKey);
   }
 
   private async handleMessage(message: ToExtensionMessage): Promise<void> {
@@ -81,12 +81,12 @@ export class LiveSerialPlotterPanel {
       }
 
       if (message.type === "requestProfiles") {
-        await this.postProfiles(message.profileId ?? this.activeProfileId);
+        await this.postProfiles(message.profileKey ?? this.activeProfileKey);
         return;
       }
 
       if (message.type === "selectProfile") {
-        await this.selectProfile(message.profileId);
+        await this.selectProfile(message.profileKey);
         return;
       }
 
@@ -127,14 +127,15 @@ export class LiveSerialPlotterPanel {
     this.postMessage({ type: "error", message });
   }
 
-  private async postProfiles(activeProfileId: string): Promise<void> {
-    const loadedProfiles = await this.profileStore.loadProfiles(activeProfileId);
-    this.activeProfileId = loadedProfiles.activeProfile.id;
+  private async postProfiles(activeProfileKey: string | undefined): Promise<void> {
+    const loadedProfiles = await this.profileStore.loadProfiles(activeProfileKey);
+    this.activeProfileKey = loadedProfiles.activeProfileKey;
     this.serialService.setProfile(loadedProfiles.activeProfile);
     this.postMessage({
       type: "profiles",
       profiles: loadedProfiles.profiles.map((profile) => profile.summary),
       activeProfile: loadedProfiles.activeProfile,
+      activeProfileKey: loadedProfiles.activeProfileKey,
     });
 
     for (const error of loadedProfiles.errors) {
@@ -142,11 +143,15 @@ export class LiveSerialPlotterPanel {
     }
   }
 
-  private async selectProfile(profileId: string): Promise<void> {
-    const loadedProfiles = await this.profileStore.loadProfiles(profileId);
-    this.activeProfileId = loadedProfiles.activeProfile.id;
+  private async selectProfile(profileKey: string): Promise<void> {
+    const loadedProfiles = await this.profileStore.loadProfiles(profileKey);
+    this.activeProfileKey = loadedProfiles.activeProfileKey;
     this.serialService.setProfile(loadedProfiles.activeProfile);
-    this.postMessage({ type: "activeProfile", profile: loadedProfiles.activeProfile });
+    this.postMessage({
+      type: "activeProfile",
+      profile: loadedProfiles.activeProfile,
+      profileKey: loadedProfiles.activeProfileKey,
+    });
 
     for (const error of loadedProfiles.errors) {
       this.postError(error);

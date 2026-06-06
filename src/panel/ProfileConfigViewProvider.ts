@@ -1,15 +1,11 @@
 import * as vscode from "vscode";
-import { defaultProfile } from "../profiles/defaultProfile";
-import { ProfileStore } from "../profiles/ProfileStore";
+import { ProfileStore, type ProfileCopyTarget } from "../profiles/ProfileStore";
 import type {
   ProfileEditorState,
   ProfileSourceMetadata,
   ToProfileEditorMessage,
   ToProfileEditorWebviewMessage,
 } from "../shared/protocol";
-
-const saveTargetUser = "User profiles";
-const saveTargetWorkspace = "Workspace profiles";
 
 export interface ProfileConfigViewProviderOptions {
   readonly extensionUri: vscode.Uri;
@@ -20,8 +16,8 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = "liveSerialPlotter.profiles";
 
   private webviewView: vscode.WebviewView | undefined;
-  private selectedProfileId = defaultProfile.id;
-  private selectedSource: ProfileSourceMetadata = { scope: "builtin" };
+  private selectedProfileKey: string | undefined;
+  private selectedSource: ProfileSourceMetadata | undefined;
 
   constructor(private readonly options: ProfileConfigViewProviderOptions) {}
 
@@ -42,14 +38,14 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
     await this.postEditorState();
   }
 
-  requestSaveProfile(): void {
-    this.postMessage({ type: "requestSaveProfile" });
+  requestCopyProfile(): void {
+    this.postMessage({ type: "requestCopyProfile" });
   }
 
   async openProfileJson(): Promise<void> {
-    if (this.selectedSource.filePath === undefined) {
+    if (this.selectedSource?.filePath === undefined) {
       await vscode.window.showInformationMessage(
-        "Save this profile before opening its JSONC file.",
+        "Copy this profile before opening its JSONC file.",
       );
       return;
     }
@@ -63,17 +59,22 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
   private async handleMessage(message: ToProfileEditorMessage): Promise<void> {
     try {
       if (message.type === "requestProfileEditorState") {
-        await this.postEditorState(message.profileId ?? this.selectedProfileId);
+        await this.postEditorState(message.profileKey ?? this.selectedProfileKey);
         return;
       }
 
       if (message.type === "selectProfileForEdit") {
-        await this.postEditorState(message.profileId);
+        await this.postEditorState(message.profileKey);
         return;
       }
 
-      if (message.type === "saveProfile") {
-        await this.saveProfile(message.profile);
+      if (message.type === "autoSaveProfile") {
+        await this.autoSaveProfile(message.profile);
+        return;
+      }
+
+      if (message.type === "copyProfile") {
+        await this.copyProfile(message.profile);
         return;
       }
 
@@ -85,30 +86,49 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private async postEditorState(profileId = this.selectedProfileId): Promise<void> {
-    const loadedProfiles = await this.options.profileStore.loadProfiles(profileId);
-    this.selectedProfileId = loadedProfiles.activeProfile.id;
+  private async postEditorState(profileKey = this.selectedProfileKey): Promise<void> {
+    const loadedProfiles = await this.options.profileStore.loadProfiles(profileKey);
+    this.selectedProfileKey = loadedProfiles.activeProfileKey;
     this.selectedSource = loadedProfiles.activeProfileSource;
     this.postMessage({
       type: "profileEditorState",
       state: {
         profiles: loadedProfiles.profiles.map((profile) => profile.summary),
         selectedProfile: loadedProfiles.activeProfile,
+        selectedProfileKey: loadedProfiles.activeProfileKey,
         selectedSource: loadedProfiles.activeProfileSource,
         errors: loadedProfiles.errors,
       },
     });
   }
 
-  private async saveProfile(profile: ProfileEditorState["selectedProfile"]): Promise<void> {
-    const scope = await this.pickSaveScope();
+  private async autoSaveProfile(profile: ProfileEditorState["selectedProfile"]): Promise<void> {
+    if (this.selectedSource === undefined) {
+      throw new Error("No profile is selected.");
+    }
 
-    if (scope === undefined) {
+    const savedProfile = await this.options.profileStore.autoSaveProfile({
+      config: profile,
+      source: this.selectedSource,
+    });
+    this.selectedProfileKey = savedProfile.source.key;
+    this.selectedSource = savedProfile.source;
+    this.postMessage({
+      type: "profileAutoSaved",
+      profileKey: savedProfile.source.key,
+      filePath: savedProfile.source.filePath,
+    });
+  }
+
+  private async copyProfile(profile: ProfileEditorState["selectedProfile"]): Promise<void> {
+    const target = await this.pickCopyTarget();
+
+    if (target === undefined) {
       return;
     }
 
     const profileId = await vscode.window.showInputBox({
-      title: "Save Profile As",
+      title: "Copy Profile",
       prompt: "Profile id",
       value: profile.id,
       validateInput: (value) =>
@@ -124,36 +144,32 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
     const savedProfile = await this.options.profileStore.saveProfile({
       config: profile,
       profileId,
-      scope,
+      target,
     });
-    this.selectedProfileId = savedProfile.config.id;
+    this.selectedProfileKey = savedProfile.source.key;
     this.selectedSource = savedProfile.source;
     this.postMessage({
-      type: "profileSaved",
-      profileId: savedProfile.config.id,
+      type: "profileCopied",
+      profileKey: savedProfile.source.key,
       filePath: savedProfile.source.filePath,
     });
-    await this.postEditorState(savedProfile.config.id);
+    await this.postEditorState(savedProfile.source.key);
   }
 
-  private async pickSaveScope(): Promise<"user" | "workspace" | undefined> {
-    const items: Array<{ label: string; scope: "user" | "workspace" }> = [
-      { label: saveTargetUser, scope: "user" },
-    ];
+  private async pickCopyTarget(): Promise<ProfileCopyTarget | undefined> {
+    const items = this.options.profileStore.getCopyTargets();
 
-    if (
-      vscode.workspace.workspaceFolders !== undefined &&
-      vscode.workspace.workspaceFolders.length > 0
-    ) {
-      items.push({ label: saveTargetWorkspace, scope: "workspace" });
+    if (items.length === 0) {
+      await vscode.window.showInformationMessage("No profile copy target is configured.");
+      return undefined;
     }
 
     const selected = await vscode.window.showQuickPick(items, {
-      title: "Save Profile",
-      placeHolder: "Choose where to save the profile",
+      title: "Copy Profile",
+      placeHolder: "Choose where to copy the profile",
     });
 
-    return selected?.scope;
+    return selected;
   }
 
   private postMessage(message: ToProfileEditorWebviewMessage): void {

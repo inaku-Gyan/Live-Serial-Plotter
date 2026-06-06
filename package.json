@@ -78,10 +78,10 @@
         "icon": "$(refresh)"
       },
       {
-        "command": "liveSerialPlotter.profiles.saveAs",
-        "title": "Live Serial Plotter: Save Profile As...",
+        "command": "liveSerialPlotter.profiles.copy",
+        "title": "Live Serial Plotter: Copy Profile...",
         "category": "Live Serial Plotter",
-        "icon": "$(save-as)"
+        "icon": "$(copy)"
       },
       {
         "command": "liveSerialPlotter.profiles.openJson",
@@ -116,7 +116,7 @@
           "group": "navigation@1"
         },
         {
-          "command": "liveSerialPlotter.profiles.saveAs",
+          "command": "liveSerialPlotter.profiles.copy",
           "when": "view == liveSerialPlotter.profiles",
           "group": "navigation@2"
         },

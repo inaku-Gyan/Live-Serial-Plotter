@@ -24,7 +24,7 @@ interface VsCodeApi<State> {
 interface PersistedState {
   baudRate: number;
   parserMode: ParserMode;
-  profileId: string;
+  profileKey: string;
   selectedPath: string;
 }
 
@@ -32,11 +32,12 @@ declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
 
 const vscode = acquireVsCodeApi<PersistedState>();
 const persistedState = vscode.getState();
-const initialState = persistedState ?? {
-  baudRate: defaultProfile.serialDefaults?.baudRate ?? 115200,
-  parserMode: "auto" satisfies ParserMode,
-  profileId: defaultProfile.id,
-  selectedPath: "",
+const defaultProfileKey = `builtin:${defaultProfile.id}`;
+const initialState: PersistedState = {
+  baudRate: persistedState?.baudRate ?? defaultProfile.serialDefaults?.baudRate ?? 115200,
+  parserMode: persistedState?.parserMode ?? ("auto" satisfies ParserMode),
+  profileKey: persistedState?.profileKey ?? defaultProfileKey,
+  selectedPath: persistedState?.selectedPath ?? "",
 };
 
 const state: PersistedState & { connected: boolean } = {
@@ -95,13 +96,13 @@ window.addEventListener("message", (event: MessageEvent<ToWebviewMessage>) => {
 
   if (message.type === "profiles") {
     profiles = message.profiles;
-    applyProfile(message.activeProfile);
+    applyProfile(message.activeProfile, message.activeProfileKey);
     renderProfiles();
     return;
   }
 
   if (message.type === "activeProfile") {
-    applyProfile(message.profile);
+    applyProfile(message.profile, message.profileKey);
     return;
   }
 
@@ -159,9 +160,9 @@ function setupControls(): void {
   parserModeSelect.value = state.parserMode;
 
   profileSelect.addEventListener("change", () => {
-    state.profileId = profileSelect.value;
+    state.profileKey = profileSelect.value;
     saveState();
-    postMessage({ type: "selectProfile", profileId: state.profileId });
+    postMessage({ type: "selectProfile", profileKey: state.profileKey });
   });
 
   refreshPortsButton.addEventListener("click", () => requestPorts());
@@ -206,7 +207,7 @@ function requestPorts(): void {
 }
 
 function requestProfiles(): void {
-  postMessage({ type: "requestProfiles", profileId: state.profileId });
+  postMessage({ type: "requestProfiles", profileKey: state.profileKey });
 }
 
 function renderProfiles(): void {
@@ -214,17 +215,17 @@ function renderProfiles(): void {
 
   for (const profile of profiles) {
     const option = document.createElement("option");
-    option.value = profile.id;
-    option.textContent = `${profile.name} (${profile.scope})`;
+    option.value = profile.key;
+    option.textContent = formatProfileSummary(profile);
     profileSelect.append(option);
   }
 
-  profileSelect.value = state.profileId;
+  profileSelect.value = state.profileKey;
 }
 
-function applyProfile(profile: ProfileConfig): void {
+function applyProfile(profile: ProfileConfig, profileKey: string): void {
   activeProfile = profile;
-  state.profileId = profile.id;
+  state.profileKey = profileKey;
 
   if (!userChangedBaudRate && profile.serialDefaults?.baudRate !== undefined) {
     state.baudRate = profile.serialDefaults.baudRate;
@@ -239,7 +240,7 @@ function applyProfile(profile: ProfileConfig): void {
     parserModeSelect.disabled = true;
   }
 
-  profileSelect.value = state.profileId;
+  profileSelect.value = state.profileKey;
   saveState();
   clearPlot();
   clearLogView();
@@ -289,7 +290,6 @@ function toggleConnection(): void {
     settings: {
       path: state.selectedPath,
       baudRate: Number(baudRateSelect.value),
-      profileId: state.profileId,
       parserMode: activeProfile.parser.kind === "builtin" ? state.parserMode : undefined,
     },
   });
@@ -576,9 +576,18 @@ function saveState(): void {
   vscode.setState({
     baudRate: state.baudRate,
     parserMode: state.parserMode,
-    profileId: state.profileId,
+    profileKey: state.profileKey,
     selectedPath: state.selectedPath,
   });
+}
+
+function formatProfileSummary(profile: ProfileSummary): string {
+  if (profile.scope === "workspace") {
+    const workspace = profile.workspaceName ?? "workspace";
+    return `${profile.name} (${workspace})`;
+  }
+
+  return `${profile.name} (${profile.scope})`;
 }
 
 function postMessage(message: ToExtensionMessage): void {

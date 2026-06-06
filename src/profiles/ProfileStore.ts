@@ -11,7 +11,10 @@ import {
   type OutputConfig,
   type ParserConfig,
   type ProfileConfig,
+  type ProfileRef,
+  type ProfileScope,
   type ProfileSummary,
+  type ProfileSourceMetadata,
   type SerialDefaultsConfig,
 } from "../shared/protocol";
 
@@ -21,14 +24,12 @@ export interface LoadedProfile {
   source: ProfileSource;
 }
 
-export interface ProfileSource {
-  scope: ProfileSummary["scope"];
-  filePath?: string;
-}
+export type ProfileSource = ProfileSourceMetadata;
 
 export interface LoadedProfiles {
   profiles: LoadedProfile[];
   activeProfile: ProfileConfig;
+  activeProfileKey: string;
   activeProfileSource: ProfileSource;
   errors: string[];
 }
@@ -36,58 +37,117 @@ export interface LoadedProfiles {
 export interface SaveProfileRequest {
   config: ProfileConfig;
   profileId: string;
-  scope: "user" | "workspace";
-  workspaceIndex?: number;
+  target: ProfileCopyTarget;
+}
+
+export interface AutoSaveProfileRequest {
+  config: ProfileConfig;
+  source: ProfileSource;
 }
 
 export interface SavedProfile {
   config: ProfileConfig;
-  source: Required<ProfileSource>;
+  source: ProfileSource & { filePath: string };
+}
+
+export interface ProfileCopyTarget {
+  label: string;
+  scope: "user" | "workspace";
+  workspaceFolderUri?: string;
+  workspaceName?: string;
 }
 
 export interface ProfileStoreOptions {
   readonly userProfilesDirectory?: string;
-  readonly workspaceProfilesDirectories?: readonly string[];
+  readonly workspaceProfilesDirectories?: readonly WorkspaceProfilesDirectory[];
+}
+
+export interface WorkspaceProfilesDirectory {
+  readonly folderUri: string;
+  readonly folderName?: string;
+  readonly profilesDirectory: string;
+}
+
+interface ProfileNamespace {
+  readonly scope: ProfileScope;
+  readonly workspaceFolderUri?: string;
+  readonly workspaceName?: string;
 }
 
 export class ProfileStore {
   constructor(private readonly options: ProfileStoreOptions = {}) {}
 
-  async loadProfiles(activeProfileId = defaultProfile.id): Promise<LoadedProfiles> {
-    const profiles: LoadedProfile[] = [
-      {
-        summary: {
-          id: defaultProfile.id,
-          name: defaultProfile.name,
-          scope: "builtin",
-        },
-        config: defaultProfile,
-        source: {
-          scope: "builtin",
-        },
-      },
-    ];
+  async loadProfiles(activeProfileKey?: string): Promise<LoadedProfiles> {
+    const profiles: LoadedProfile[] = [];
     const errors: string[] = [];
 
-    await this.loadDirectoryProfiles("user", this.options.userProfilesDirectory, profiles, errors);
-
     for (const directory of this.options.workspaceProfilesDirectories ?? []) {
-      await this.loadDirectoryProfiles("workspace", directory, profiles, errors);
+      await this.loadDirectoryProfiles(
+        {
+          scope: "workspace",
+          workspaceFolderUri: directory.folderUri,
+          workspaceName: directory.folderName,
+        },
+        directory.profilesDirectory,
+        profiles,
+        errors,
+      );
     }
 
+    await this.loadDirectoryProfiles(
+      {
+        scope: "user",
+      },
+      this.options.userProfilesDirectory,
+      profiles,
+      errors,
+    );
+
+    profiles.push(createLoadedProfile(defaultProfile, { scope: "builtin" }));
+
+    const fallbackProfile =
+      profiles.find((profile) => profile.summary.key === getBuiltinProfileKey(defaultProfile.id)) ??
+      profiles.at(-1);
     const activeProfile =
-      profiles.find((profile) => profile.config.id === activeProfileId) ?? profiles[0];
+      activeProfileKey === undefined
+        ? fallbackProfile
+        : (profiles.find((profile) => profile.summary.key === activeProfileKey) ?? fallbackProfile);
 
     return {
       profiles,
       activeProfile: activeProfile?.config ?? defaultProfile,
-      activeProfileSource: activeProfile?.source ?? { scope: "builtin" },
+      activeProfileKey: activeProfile?.summary.key ?? getBuiltinProfileKey(defaultProfile.id),
+      activeProfileSource:
+        activeProfile?.source ?? createProfileSource({ scope: "builtin", id: defaultProfile.id }),
       errors,
     };
   }
 
+  getCopyTargets(): ProfileCopyTarget[] {
+    const targets: ProfileCopyTarget[] = [];
+
+    for (const directory of this.options.workspaceProfilesDirectories ?? []) {
+      targets.push({
+        label:
+          directory.folderName === undefined ? "Workspace" : `Workspace: ${directory.folderName}`,
+        scope: "workspace",
+        workspaceFolderUri: directory.folderUri,
+        workspaceName: directory.folderName,
+      });
+    }
+
+    if (this.options.userProfilesDirectory !== undefined) {
+      targets.push({
+        label: "User",
+        scope: "user",
+      });
+    }
+
+    return targets;
+  }
+
   async saveProfile(request: SaveProfileRequest): Promise<SavedProfile> {
-    const directory = this.resolveSaveDirectory(request);
+    const directory = this.resolveTargetDirectory(request.target);
     await mkdir(directory, { recursive: true });
 
     const config = normalizeProfileConfig(
@@ -98,19 +158,54 @@ export class ProfileStore {
       request.profileId,
     );
     const filePath = path.join(directory, `${sanitizeProfileId(request.profileId)}.jsonc`);
+
+    if (existsSync(filePath)) {
+      throw new Error(`Profile "${request.profileId}" already exists in ${request.target.label}.`);
+    }
+
     await writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+    const source = {
+      ...createProfileSource(
+        createProfileRef(config.id, request.target.scope, request.target.workspaceFolderUri),
+        {
+          filePath,
+          workspaceName: request.target.workspaceName,
+        },
+      ),
+      filePath,
+    };
+
+    return {
+      config,
+      source,
+    };
+  }
+
+  async autoSaveProfile(request: AutoSaveProfileRequest): Promise<SavedProfile> {
+    if (request.source.scope === "builtin" || request.source.filePath === undefined) {
+      throw new Error("Builtin profiles cannot be auto-saved. Copy the profile first.");
+    }
+
+    const config = normalizeProfileConfig(
+      {
+        ...request.config,
+        id: request.source.ref.id,
+      },
+      request.source.filePath,
+    );
+    await writeFile(request.source.filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 
     return {
       config,
       source: {
-        scope: request.scope,
-        filePath,
+        ...request.source,
+        filePath: request.source.filePath,
       },
     };
   }
 
   private async loadDirectoryProfiles(
-    scope: ProfileSummary["scope"],
+    namespace: ProfileNamespace,
     directory: string | undefined,
     profiles: LoadedProfile[],
     errors: string[],
@@ -120,6 +215,7 @@ export class ProfileStore {
     }
 
     const entries = await readdir(directory, { withFileTypes: true });
+    entries.sort((left, right) => left.name.localeCompare(right.name));
 
     for (const entry of entries) {
       if (!entry.isFile() || !entry.name.endsWith(".jsonc")) {
@@ -131,26 +227,19 @@ export class ProfileStore {
       try {
         const raw = await readFile(filePath, "utf8");
         const config = normalizeProfileConfig(parseJsonc(raw), filePath);
-        profiles.push({
-          summary: {
-            id: config.id,
-            name: config.name,
-            scope,
-          },
-          config,
-          source: {
-            scope,
+        profiles.push(
+          createLoadedProfile(config, namespace, {
             filePath,
-          },
-        });
+          }),
+        );
       } catch (error) {
         errors.push(`${filePath}: ${formatError(error)}`);
       }
     }
   }
 
-  private resolveSaveDirectory(request: SaveProfileRequest): string {
-    if (request.scope === "user") {
+  private resolveTargetDirectory(target: ProfileCopyTarget): string {
+    if (target.scope === "user") {
       if (this.options.userProfilesDirectory === undefined) {
         throw new Error("User profile directory is not configured.");
       }
@@ -158,7 +247,9 @@ export class ProfileStore {
       return this.options.userProfilesDirectory;
     }
 
-    const directory = this.options.workspaceProfilesDirectories?.[request.workspaceIndex ?? 0];
+    const directory = this.options.workspaceProfilesDirectories?.find(
+      (candidate) => candidate.folderUri === target.workspaceFolderUri,
+    )?.profilesDirectory;
 
     if (directory === undefined) {
       throw new Error("Workspace profile directory is not configured.");
@@ -170,6 +261,70 @@ export class ProfileStore {
 
 export function getWorkspaceProfilesDirectory(workspaceRoot: string): string {
   return path.join(workspaceRoot, ".live-serial-plotter", "profiles");
+}
+
+export function getBuiltinProfileKey(profileId = defaultProfile.id): string {
+  return createProfileKey({ scope: "builtin", id: profileId });
+}
+
+export function createProfileKey(ref: ProfileRef): string {
+  if (ref.scope === "workspace") {
+    return `workspace:${encodeURIComponent(ref.workspaceFolderUri ?? "")}:${ref.id}`;
+  }
+
+  return `${ref.scope}:${ref.id}`;
+}
+
+function createLoadedProfile(
+  config: ProfileConfig,
+  namespace: ProfileNamespace,
+  options: { filePath?: string } = {},
+): LoadedProfile {
+  const ref = createProfileRef(config.id, namespace.scope, namespace.workspaceFolderUri);
+  const source = createProfileSource(ref, {
+    filePath: options.filePath,
+    workspaceName: namespace.workspaceName,
+  });
+
+  return {
+    summary: {
+      key: source.key,
+      ref,
+      id: config.id,
+      name: config.name,
+      scope: namespace.scope,
+      workspaceName: namespace.workspaceName,
+    },
+    config,
+    source,
+  };
+}
+
+function createProfileRef(
+  id: string,
+  scope: ProfileScope,
+  workspaceFolderUri?: string,
+): ProfileRef {
+  return scope === "workspace"
+    ? { scope, id, workspaceFolderUri }
+    : {
+        scope,
+        id,
+      };
+}
+
+function createProfileSource(
+  ref: ProfileRef,
+  options: { filePath?: string; workspaceName?: string } = {},
+): ProfileSource {
+  return {
+    key: createProfileKey(ref),
+    ref,
+    scope: ref.scope,
+    filePath: options.filePath,
+    workspaceFolderUri: ref.workspaceFolderUri,
+    workspaceName: options.workspaceName,
+  };
 }
 
 export function normalizeProfileConfig(value: unknown, source = "profile"): ProfileConfig {

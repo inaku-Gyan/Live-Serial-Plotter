@@ -1,11 +1,16 @@
-import { mkdtemp } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type * as vscode from "vscode";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ProfileConfigViewProvider } from "../../src/panel/ProfileConfigViewProvider";
 import { defaultProfile } from "../../src/profiles/defaultProfile";
-import { getWorkspaceProfilesDirectory, ProfileStore } from "../../src/profiles/ProfileStore";
+import {
+  createProfileKey,
+  getWorkspaceProfilesDirectory,
+  ProfileStore,
+  type WorkspaceProfilesDirectory,
+} from "../../src/profiles/ProfileStore";
 import type { ToProfileEditorMessage } from "../../src/shared/protocol";
 import { __resetVscodeMock, __vscodeMock } from "../mocks/vscode";
 
@@ -25,48 +30,97 @@ describe("ProfileConfigViewProvider", () => {
         type: "profileEditorState",
         state: expect.objectContaining({
           selectedProfile: expect.objectContaining({ id: "default" }),
-          selectedSource: { scope: "builtin" },
+          selectedProfileKey: "builtin:default",
+          selectedSource: expect.objectContaining({ scope: "builtin", key: "builtin:default" }),
         }),
       }),
     );
   });
 
-  test("saves profiles to the selected workspace directory", async () => {
+  test("copies profiles to the selected workspace directory", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-"));
-    const profilesDirectory = getWorkspaceProfilesDirectory(workspaceRoot);
+    const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Firmware");
+    const profilesDirectory = workspaceDirectory.profilesDirectory;
     const { provider, webviewView, dispatch } = createProvider({
-      workspaceProfilesDirectories: [profilesDirectory],
+      workspaceProfilesDirectories: [workspaceDirectory],
     });
     __vscodeMock.showQuickPick.mockResolvedValue({
-      label: "Workspace profiles",
+      label: "Workspace: Firmware",
       scope: "workspace",
+      workspaceFolderUri: workspaceDirectory.folderUri,
+      workspaceName: workspaceDirectory.folderName,
     });
     __vscodeMock.showInputBox.mockResolvedValue("saved-profile");
 
     provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
     await waitForAsyncWork();
     webviewView.webview.postMessage.mockClear();
-    dispatch({ type: "saveProfile", profile: { ...defaultProfile, name: "Saved Profile" } });
+    dispatch({ type: "copyProfile", profile: { ...defaultProfile, name: "Saved Profile" } });
     await waitForAsyncWork();
 
     expect(webviewView.webview.postMessage).toHaveBeenCalledWith(
       expect.objectContaining({
-        type: "profileSaved",
-        profileId: "saved-profile",
+        type: "profileCopied",
+        profileKey: createProfileKey({
+          scope: "workspace",
+          id: "saved-profile",
+          workspaceFolderUri: workspaceDirectory.folderUri,
+        }),
         filePath: path.join(profilesDirectory, "saved-profile.jsonc"),
       }),
     );
   });
 
-  test("reports save errors for invalid profiles", async () => {
-    const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-invalid-"));
-    const profilesDirectory = getWorkspaceProfilesDirectory(workspaceRoot);
+  test("auto-saves workspace profiles to their source file", async () => {
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-autosave-"));
+    const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Firmware");
+    const profilesDirectory = workspaceDirectory.profilesDirectory;
+    await mkdir(profilesDirectory, { recursive: true });
+    await writeFile(
+      path.join(profilesDirectory, "editable.jsonc"),
+      `${JSON.stringify({ ...defaultProfile, id: "editable", name: "Editable" }, null, 2)}\n`,
+      "utf8",
+    );
+    const profileKey = createProfileKey({
+      scope: "workspace",
+      id: "editable",
+      workspaceFolderUri: workspaceDirectory.folderUri,
+    });
     const { provider, webviewView, dispatch } = createProvider({
-      workspaceProfilesDirectories: [profilesDirectory],
+      workspaceProfilesDirectories: [workspaceDirectory],
+    });
+
+    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    await waitForAsyncWork();
+    dispatch({ type: "selectProfileForEdit", profileKey });
+    await waitForAsyncWork();
+    webviewView.webview.postMessage.mockClear();
+    dispatch({
+      type: "autoSaveProfile",
+      profile: { ...defaultProfile, id: "editable", name: "Auto Saved" },
+    });
+    await waitForAsyncWork();
+
+    expect(webviewView.webview.postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: "profileAutoSaved",
+        profileKey,
+        filePath: path.join(profilesDirectory, "editable.jsonc"),
+      }),
+    );
+  });
+
+  test("reports copy errors for invalid profiles", async () => {
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-invalid-"));
+    const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Invalid");
+    const { provider, webviewView, dispatch } = createProvider({
+      workspaceProfilesDirectories: [workspaceDirectory],
     });
     __vscodeMock.showQuickPick.mockResolvedValue({
-      label: "Workspace profiles",
+      label: "Workspace: Invalid",
       scope: "workspace",
+      workspaceFolderUri: workspaceDirectory.folderUri,
+      workspaceName: workspaceDirectory.folderName,
     });
     __vscodeMock.showInputBox.mockResolvedValue("invalid-profile");
 
@@ -74,7 +128,7 @@ describe("ProfileConfigViewProvider", () => {
     await waitForAsyncWork();
     webviewView.webview.postMessage.mockClear();
     dispatch({
-      type: "saveProfile",
+      type: "copyProfile",
       profile: { ...defaultProfile, schemaVersion: 1 as 2 },
     });
     await waitForAsyncWork();
@@ -93,13 +147,13 @@ describe("ProfileConfigViewProvider", () => {
     await provider.openProfileJson();
 
     expect(__vscodeMock.showInformationMessage).toHaveBeenCalledWith(
-      "Save this profile before opening its JSONC file.",
+      "Copy this profile before opening its JSONC file.",
     );
   });
 });
 
 interface CreateProviderOptions {
-  readonly workspaceProfilesDirectories?: readonly string[];
+  readonly workspaceProfilesDirectories?: readonly WorkspaceProfilesDirectory[];
 }
 
 function createProvider(options: CreateProviderOptions = {}): {
@@ -156,4 +210,15 @@ interface MockWebviewView {
 
 async function waitForAsyncWork(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 25));
+}
+
+function createWorkspaceDirectory(
+  workspaceRoot: string,
+  folderName: string,
+): WorkspaceProfilesDirectory {
+  return {
+    folderUri: `file://${workspaceRoot}`,
+    folderName,
+    profilesDirectory: getWorkspaceProfilesDirectory(workspaceRoot),
+  };
 }

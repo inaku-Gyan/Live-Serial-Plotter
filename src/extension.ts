@@ -32,8 +32,8 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("liveSerialPlotter.profiles.refresh", () =>
       profileConfigViewProvider.refreshProfiles(),
     ),
-    vscode.commands.registerCommand("liveSerialPlotter.profiles.saveAs", () =>
-      profileConfigViewProvider.requestSaveProfile(),
+    vscode.commands.registerCommand("liveSerialPlotter.profiles.copy", () =>
+      profileConfigViewProvider.requestCopyProfile(),
     ),
     vscode.commands.registerCommand("liveSerialPlotter.profiles.openJson", () =>
       profileConfigViewProvider.openProfileJson(),
@@ -55,9 +55,11 @@ export function createProfileStore(context: vscode.ExtensionContext): ProfileSto
   return new ProfileStore({
     userProfilesDirectory: vscode.Uri.joinPath(context.globalStorageUri, "profiles").fsPath,
     workspaceProfilesDirectories:
-      vscode.workspace.workspaceFolders?.map((folder) =>
-        getWorkspaceProfilesDirectory(folder.uri.fsPath),
-      ) ?? [],
+      vscode.workspace.workspaceFolders?.map((folder) => ({
+        folderUri: folder.uri.toString(),
+        folderName: folder.name,
+        profilesDirectory: getWorkspaceProfilesDirectory(folder.uri.fsPath),
+      })) ?? [],
   });
 }
 

@@ -2,12 +2,19 @@ import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
-import { getWorkspaceProfilesDirectory, ProfileStore } from "../../src/profiles/ProfileStore";
+import { defaultProfile } from "../../src/profiles/defaultProfile";
+import {
+  createProfileKey,
+  getWorkspaceProfilesDirectory,
+  ProfileStore,
+  type WorkspaceProfilesDirectory,
+} from "../../src/profiles/ProfileStore";
 
 describe("ProfileStore", () => {
   test("loads builtin and workspace JSONC profiles", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-workspace-"));
-    const profilesDirectory = getWorkspaceProfilesDirectory(workspaceRoot);
+    const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Firmware");
+    const profilesDirectory = workspaceDirectory.profilesDirectory;
     await mkdir(profilesDirectory, { recursive: true });
     await writeFile(
       path.join(profilesDirectory, "sensor.jsonc"),
@@ -39,19 +46,50 @@ describe("ProfileStore", () => {
     );
 
     const store = new ProfileStore({
-      workspaceProfilesDirectories: [profilesDirectory],
+      workspaceProfilesDirectories: [workspaceDirectory],
     });
-    const loaded = await store.loadProfiles("sensor");
+    const sensorKey = createProfileKey({
+      scope: "workspace",
+      id: "sensor",
+      workspaceFolderUri: workspaceDirectory.folderUri,
+    });
+    const loaded = await store.loadProfiles(sensorKey);
 
     expect(loaded.errors).toEqual([]);
     expect(loaded.profiles.map((profile) => profile.summary)).toEqual([
-      { id: "default", name: "Default Auto Plot", scope: "builtin" },
-      { id: "sensor", name: "Sensor", scope: "workspace" },
+      {
+        key: sensorKey,
+        ref: {
+          scope: "workspace",
+          id: "sensor",
+          workspaceFolderUri: workspaceDirectory.folderUri,
+        },
+        id: "sensor",
+        name: "Sensor",
+        scope: "workspace",
+        workspaceName: "Firmware",
+      },
+      {
+        key: "builtin:default",
+        ref: { scope: "builtin", id: "default" },
+        id: "default",
+        name: "Default Auto Plot",
+        scope: "builtin",
+      },
     ]);
     expect(loaded.activeProfile.id).toBe("sensor");
+    expect(loaded.activeProfileKey).toBe(sensorKey);
     expect(loaded.activeProfileSource).toEqual({
+      key: sensorKey,
+      ref: {
+        scope: "workspace",
+        id: "sensor",
+        workspaceFolderUri: workspaceDirectory.folderUri,
+      },
       scope: "workspace",
       filePath: path.join(profilesDirectory, "sensor.jsonc"),
+      workspaceFolderUri: workspaceDirectory.folderUri,
+      workspaceName: "Firmware",
     });
     expect(loaded.activeProfile.serialDefaults?.baudRate).toBe(9600);
     expect(loaded.activeProfile.codec.sendLineEnding).toBe("lf");
@@ -64,7 +102,13 @@ describe("ProfileStore", () => {
     await writeFile(path.join(profilesDirectory, "broken.jsonc"), "{");
 
     const store = new ProfileStore({
-      workspaceProfilesDirectories: [profilesDirectory],
+      workspaceProfilesDirectories: [
+        {
+          folderUri: `file://${workspaceRoot}`,
+          folderName: "Broken",
+          profilesDirectory,
+        },
+      ],
     });
     const loaded = await store.loadProfiles("missing");
 
@@ -72,6 +116,71 @@ describe("ProfileStore", () => {
     expect(loaded.profiles).toHaveLength(1);
     expect(loaded.errors).toHaveLength(1);
     expect(loaded.errors[0]).toContain("broken.jsonc");
+  });
+
+  test("keeps same id profiles in separate namespaces", async () => {
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-namespaces-"));
+    const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Firmware");
+    const userProfilesDirectory = await mkdtemp(path.join(tmpdir(), "lsp-user-namespace-"));
+    await mkdir(workspaceDirectory.profilesDirectory, { recursive: true });
+    await mkdir(userProfilesDirectory, { recursive: true });
+    await writeProfile(workspaceDirectory.profilesDirectory, "default", "Workspace Default");
+    await writeProfile(userProfilesDirectory, "default", "User Default");
+
+    const store = new ProfileStore({
+      userProfilesDirectory,
+      workspaceProfilesDirectories: [workspaceDirectory],
+    });
+    const loaded = await store.loadProfiles();
+
+    expect(loaded.activeProfileKey).toBe("builtin:default");
+    expect(loaded.profiles.map((profile) => profile.summary.key)).toEqual([
+      createProfileKey({
+        scope: "workspace",
+        id: "default",
+        workspaceFolderUri: workspaceDirectory.folderUri,
+      }),
+      "user:default",
+      "builtin:default",
+    ]);
+  });
+
+  test("keeps same id profiles in separate workspace namespaces", async () => {
+    const firmwareRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-firmware-"));
+    const dashboardRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-dashboard-"));
+    const firmwareDirectory = createWorkspaceDirectory(firmwareRoot, "Firmware");
+    const dashboardDirectory = createWorkspaceDirectory(dashboardRoot, "Dashboard");
+    await mkdir(firmwareDirectory.profilesDirectory, { recursive: true });
+    await mkdir(dashboardDirectory.profilesDirectory, { recursive: true });
+    await writeProfile(firmwareDirectory.profilesDirectory, "sensor", "Firmware Sensor");
+    await writeProfile(dashboardDirectory.profilesDirectory, "sensor", "Dashboard Sensor");
+
+    const store = new ProfileStore({
+      workspaceProfilesDirectories: [firmwareDirectory, dashboardDirectory],
+    });
+    const loaded = await store.loadProfiles();
+
+    expect(loaded.profiles.map((profile) => profile.summary)).toEqual([
+      expect.objectContaining({
+        key: createProfileKey({
+          scope: "workspace",
+          id: "sensor",
+          workspaceFolderUri: firmwareDirectory.folderUri,
+        }),
+        id: "sensor",
+        workspaceName: "Firmware",
+      }),
+      expect.objectContaining({
+        key: createProfileKey({
+          scope: "workspace",
+          id: "sensor",
+          workspaceFolderUri: dashboardDirectory.folderUri,
+        }),
+        id: "sensor",
+        workspaceName: "Dashboard",
+      }),
+      expect.objectContaining({ key: "builtin:default" }),
+    ]);
   });
 
   test("rejects old schema profiles", async () => {
@@ -92,7 +201,13 @@ describe("ProfileStore", () => {
     );
 
     const store = new ProfileStore({
-      workspaceProfilesDirectories: [profilesDirectory],
+      workspaceProfilesDirectories: [
+        {
+          folderUri: `file://${workspaceRoot}`,
+          folderName: "Old",
+          profilesDirectory,
+        },
+      ],
     });
     const loaded = await store.loadProfiles("old");
 
@@ -106,7 +221,7 @@ describe("ProfileStore", () => {
     const store = new ProfileStore({ userProfilesDirectory });
 
     const saved = await store.saveProfile({
-      scope: "user",
+      target: { label: "User", scope: "user" },
       profileId: "saved-user",
       config: {
         schemaVersion: 2,
@@ -122,11 +237,15 @@ describe("ProfileStore", () => {
     });
 
     expect(saved.source).toEqual({
+      key: "user:saved-user",
+      ref: { scope: "user", id: "saved-user" },
       scope: "user",
       filePath: path.join(userProfilesDirectory, "saved-user.jsonc"),
+      workspaceFolderUri: undefined,
+      workspaceName: undefined,
     });
 
-    const loaded = await store.loadProfiles("saved-user");
+    const loaded = await store.loadProfiles("user:saved-user");
     expect(loaded.activeProfile.id).toBe("saved-user");
     expect(loaded.activeProfile.export).toEqual({
       mode: "parsed",
@@ -137,11 +256,17 @@ describe("ProfileStore", () => {
 
   test("saves workspace profiles and creates the directory", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-save-workspace-"));
-    const profilesDirectory = getWorkspaceProfilesDirectory(workspaceRoot);
-    const store = new ProfileStore({ workspaceProfilesDirectories: [profilesDirectory] });
+    const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Workspace");
+    const profilesDirectory = workspaceDirectory.profilesDirectory;
+    const store = new ProfileStore({ workspaceProfilesDirectories: [workspaceDirectory] });
 
     await store.saveProfile({
-      scope: "workspace",
+      target: {
+        label: "Workspace: Workspace",
+        scope: "workspace",
+        workspaceFolderUri: workspaceDirectory.folderUri,
+        workspaceName: workspaceDirectory.folderName,
+      },
       profileId: "workspace-profile",
       config: {
         schemaVersion: 2,
@@ -163,4 +288,54 @@ describe("ProfileStore", () => {
     expect(savedText).not.toContain('"connection"');
     expect(savedText).not.toContain('"encoding": "utf8",\n    "delimiter"');
   });
+
+  test("does not overwrite copied profiles in the same namespace", async () => {
+    const userProfilesDirectory = await mkdtemp(path.join(tmpdir(), "lsp-user-copy-exists-"));
+    const store = new ProfileStore({ userProfilesDirectory });
+    const request = {
+      target: { label: "User", scope: "user" as const },
+      profileId: "copy",
+      config: defaultProfile,
+    };
+
+    await store.saveProfile(request);
+
+    await expect(store.saveProfile(request)).rejects.toThrow(
+      'Profile "copy" already exists in User.',
+    );
+  });
+
+  test("rejects auto-saving builtin profiles", async () => {
+    const store = new ProfileStore();
+
+    await expect(
+      store.autoSaveProfile({
+        config: defaultProfile,
+        source: {
+          key: "builtin:default",
+          ref: { scope: "builtin", id: "default" },
+          scope: "builtin",
+        },
+      }),
+    ).rejects.toThrow("Builtin profiles cannot be auto-saved");
+  });
 });
+
+function createWorkspaceDirectory(
+  workspaceRoot: string,
+  folderName: string,
+): WorkspaceProfilesDirectory {
+  return {
+    folderUri: `file://${workspaceRoot}`,
+    folderName,
+    profilesDirectory: getWorkspaceProfilesDirectory(workspaceRoot),
+  };
+}
+
+async function writeProfile(directory: string, id: string, name: string): Promise<void> {
+  await writeFile(
+    path.join(directory, `${id}.jsonc`),
+    `${JSON.stringify({ ...defaultProfile, id, name }, null, 2)}\n`,
+    "utf8",
+  );
+}
