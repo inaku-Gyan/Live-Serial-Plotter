@@ -3,6 +3,8 @@ import type uPlot from "uplot";
 interface TimeSeriesInteractionPluginOptions {
   config?: TimeSeriesInteractionConfig;
   onScaleChanged(scaleKey: string): void;
+  onUserInteraction?(): void;
+  onUserInteractionSettled?(): void;
   resetView(): void;
 }
 
@@ -15,9 +17,10 @@ interface TimeSeriesInteractionConfig {
 
 interface WheelInteractionConfig {
   minXRange: number;
+  minYRange: number;
   panX: WheelPanBinding[];
   panY: WheelPanBinding[];
-  zoomX: WheelZoomBinding;
+  zoom: WheelZoomBinding;
 }
 
 interface WheelBinding {
@@ -43,7 +46,7 @@ interface WheelZoomBinding extends WheelBinding {
 
 interface PointerInteractionConfig {
   pan: PointerPanBinding[];
-  pinchZoomX: boolean;
+  pinchZoom: boolean;
 }
 
 interface PointerPanBinding {
@@ -68,21 +71,27 @@ interface PointerPosition {
   clientY: number;
 }
 
+interface ScaleRange {
+  min: number;
+  max: number;
+}
+
 interface PanState {
   pointerId: number;
   startClientX: number;
-  startMin: number;
-  startMax: number;
-  unitsPerPixel: number;
+  startClientY: number;
+  xRange?: ScaleRange;
+  yRanges: Map<string, ScaleRange>;
 }
 
 interface PinchState {
   firstPointerId: number;
   secondPointerId: number;
-  anchorValue: number;
-  minRange: number;
+  xAnchorValue?: number;
+  xStartRange?: number;
+  yAnchorValues: Map<string, number>;
+  yStartRanges: Map<string, number>;
   startDistance: number;
-  startRange: number;
 }
 
 export const defaultTimeSeriesInteractionConfig: TimeSeriesInteractionConfig = {
@@ -105,6 +114,7 @@ export const defaultTimeSeriesInteractionConfig: TimeSeriesInteractionConfig = {
   },
   wheel: {
     minXRange: 1e-9,
+    minYRange: 1e-9,
     panX: [
       {
         deltaAxis: "y",
@@ -130,7 +140,7 @@ export const defaultTimeSeriesInteractionConfig: TimeSeriesInteractionConfig = {
         },
       },
     ],
-    zoomX: {
+    zoom: {
       deltaAxis: "y",
       factor: 0.5,
       modifiers: {
@@ -156,7 +166,7 @@ export const defaultTimeSeriesInteractionConfig: TimeSeriesInteractionConfig = {
         pointerTypes: ["mouse"],
       },
     ],
-    pinchZoomX: true,
+    pinchZoom: true,
   },
   doubleClick: {
     resetView: true,
@@ -216,10 +226,11 @@ function installGestureHandlers(
       return;
     }
 
-    if (matchesWheelBinding(event, config.wheel.zoomX)) {
-      const zoomDelta = getWheelDelta(event, config.wheel.zoomX.deltaAxis, rect);
+    if (matchesWheelBinding(event, config.wheel.zoom)) {
+      const zoomDelta = getWheelDelta(event, config.wheel.zoom.deltaAxis, rect);
 
-      if (zoomDelta !== 0 && applyWheelZoomX(plot, event, rect, zoomDelta, config.wheel)) {
+      if (zoomDelta !== 0 && applyWheelZoom(plot, event, rect, zoomDelta, config.wheel)) {
+        notifyUserInteraction();
         event.preventDefault();
       }
 
@@ -232,39 +243,33 @@ function installGestureHandlers(
     const didPanY = panYDelta !== 0 && panYScales(plot, panYDelta, rect.height);
 
     if (didPanX || didPanY) {
+      notifyUserInteraction();
       event.preventDefault();
     }
   }
 
-  function applyWheelZoomX(
+  function applyWheelZoom(
     targetPlot: uPlot,
     event: WheelEvent,
     rect: DOMRect,
     zoomDelta: number,
     wheelConfig: WheelInteractionConfig,
   ): boolean {
-    const xScale = getFiniteScale(targetPlot, "x");
-
-    if (xScale === undefined) {
-      return false;
-    }
-
     const left = clampNumber(event.clientX - rect.left, 0, rect.width);
-    const anchorRatio = left / rect.width;
-    const anchorValue = targetPlot.posToVal(left, "x");
-    const currentRange = xScale.max - xScale.min;
+    const top = clampNumber(event.clientY - rect.top, 0, rect.height);
     const zoomRatio = Math.pow(
-      wheelConfig.zoomX.factor,
-      Math.abs(zoomDelta) / wheelConfig.zoomX.referenceDelta,
+      wheelConfig.zoom.factor,
+      Math.abs(zoomDelta) / wheelConfig.zoom.referenceDelta,
     );
-    const nextRange = zoomDelta < 0 ? currentRange * zoomRatio : currentRange / zoomRatio;
+    const rangeMultiplier = zoomDelta < 0 ? zoomRatio : 1 / zoomRatio;
 
-    return setXRangeAroundAnchor(
+    return zoomScalesAroundPosition(
       targetPlot,
-      anchorValue,
-      anchorRatio,
-      nextRange,
+      left,
+      top,
+      rangeMultiplier,
       wheelConfig.minXRange,
+      wheelConfig.minYRange,
     );
   }
 
@@ -273,10 +278,9 @@ function installGestureHandlers(
       return;
     }
 
-    const xScale = getFiniteScale(plot, "x");
     const rect = plot.over.getBoundingClientRect();
 
-    if (xScale === undefined || rect.width <= 0) {
+    if (rect.width <= 0 || rect.height <= 0) {
       return;
     }
 
@@ -284,19 +288,13 @@ function installGestureHandlers(
     activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
     capturePointer(overlay, event.pointerId);
 
-    if (activePointers.size >= 2 && event.pointerType !== "mouse" && config.pointer.pinchZoomX) {
+    if (activePointers.size >= 2 && event.pointerType !== "mouse" && config.pointer.pinchZoom) {
       panState = undefined;
-      pinchState = createPinchState(plot, activePointers, rect, config.wheel.minXRange);
+      pinchState = createPinchState(plot, activePointers, rect);
       return;
     }
 
-    panState = {
-      pointerId: event.pointerId,
-      startClientX: event.clientX,
-      startMin: xScale.min,
-      startMax: xScale.max,
-      unitsPerPixel: (xScale.max - xScale.min) / rect.width,
-    };
+    panState = createPanState(plot, event);
   }
 
   function handlePointerMove(event: PointerEvent): void {
@@ -308,7 +306,9 @@ function installGestureHandlers(
     activePointers.set(event.pointerId, { clientX: event.clientX, clientY: event.clientY });
 
     if (pinchState !== undefined) {
-      applyPinch(plot, pinchState, activePointers);
+      if (applyPinch(plot, pinchState, activePointers, config.wheel)) {
+        notifyUserInteraction();
+      }
       return;
     }
 
@@ -316,13 +316,17 @@ function installGestureHandlers(
       return;
     }
 
-    const deltaX = event.clientX - panState.startClientX;
-    const deltaUnits = deltaX * panState.unitsPerPixel;
-
-    setFiniteScale(plot, "x", panState.startMin - deltaUnits, panState.startMax - deltaUnits);
+    if (applyPan(plot, panState, event)) {
+      notifyUserInteraction();
+    }
   }
 
   function handlePointerUp(event: PointerEvent): void {
+    const hadInteraction =
+      panState?.pointerId === event.pointerId ||
+      pinchState?.firstPointerId === event.pointerId ||
+      pinchState?.secondPointerId === event.pointerId;
+
     activePointers.delete(event.pointerId);
     releasePointer(overlay, event.pointerId);
 
@@ -337,6 +341,10 @@ function installGestureHandlers(
     ) {
       pinchState = undefined;
     }
+
+    if (hadInteraction) {
+      options.onUserInteractionSettled?.();
+    }
   }
 
   function handleDoubleClick(event: MouseEvent): void {
@@ -346,6 +354,10 @@ function installGestureHandlers(
 
     event.preventDefault();
     options.resetView();
+  }
+
+  function notifyUserInteraction(): void {
+    options.onUserInteraction?.();
   }
 
   overlay.addEventListener("wheel", handleWheel, { passive: false });
@@ -370,32 +382,52 @@ function createPinchState(
   plot: uPlot,
   activePointers: ReadonlyMap<number, PointerPosition>,
   rect: DOMRect,
-  minRange: number,
 ): PinchState | undefined {
   const first = [...activePointers.entries()].slice(0, 2);
   const firstPointer = first[0];
   const secondPointer = first[1];
-  const xScale = getFiniteScale(plot, "x");
 
-  if (firstPointer === undefined || secondPointer === undefined || xScale === undefined) {
+  if (firstPointer === undefined || secondPointer === undefined) {
     return undefined;
   }
 
   const centerClientX = (firstPointer[1].clientX + secondPointer[1].clientX) / 2;
+  const centerClientY = (firstPointer[1].clientY + secondPointer[1].clientY) / 2;
   const centerLeft = clampNumber(centerClientX - rect.left, 0, rect.width);
+  const centerTop = clampNumber(centerClientY - rect.top, 0, rect.height);
   const distance = getPointerDistance(firstPointer[1], secondPointer[1]);
 
   if (distance <= 0) {
     return undefined;
   }
 
+  const xScale = getFiniteScale(plot, "x");
+  const yAnchorValues = new Map<string, number>();
+  const yStartRanges = new Map<string, number>();
+
+  for (const scaleKey of getYScaleKeys(plot)) {
+    const yScale = getFiniteScale(plot, scaleKey);
+
+    if (yScale === undefined) {
+      continue;
+    }
+
+    yAnchorValues.set(scaleKey, plot.posToVal(centerTop, scaleKey));
+    yStartRanges.set(scaleKey, yScale.max - yScale.min);
+  }
+
+  if (xScale === undefined && yAnchorValues.size === 0) {
+    return undefined;
+  }
+
   return {
     firstPointerId: firstPointer[0],
     secondPointerId: secondPointer[0],
-    anchorValue: plot.posToVal(centerLeft, "x"),
-    minRange,
+    xAnchorValue: xScale === undefined ? undefined : plot.posToVal(centerLeft, "x"),
+    xStartRange: xScale === undefined ? undefined : xScale.max - xScale.min,
+    yAnchorValues,
+    yStartRanges,
     startDistance: distance,
-    startRange: xScale.max - xScale.min,
   };
 }
 
@@ -403,35 +435,179 @@ function applyPinch(
   plot: uPlot,
   pinchState: PinchState,
   activePointers: ReadonlyMap<number, PointerPosition>,
-): void {
+  wheelConfig: WheelInteractionConfig,
+): boolean {
   const firstPointer = activePointers.get(pinchState.firstPointerId);
   const secondPointer = activePointers.get(pinchState.secondPointerId);
   const rect = plot.over.getBoundingClientRect();
 
-  if (firstPointer === undefined || secondPointer === undefined || rect.width <= 0) {
-    return;
+  if (
+    firstPointer === undefined ||
+    secondPointer === undefined ||
+    rect.width <= 0 ||
+    rect.height <= 0
+  ) {
+    return false;
   }
 
   const centerClientX = (firstPointer.clientX + secondPointer.clientX) / 2;
+  const centerClientY = (firstPointer.clientY + secondPointer.clientY) / 2;
   const centerLeft = clampNumber(centerClientX - rect.left, 0, rect.width);
-  const anchorRatio = centerLeft / rect.width;
+  const centerTop = clampNumber(centerClientY - rect.top, 0, rect.height);
   const distance = getPointerDistance(firstPointer, secondPointer);
 
   if (distance <= 0) {
-    return;
+    return false;
   }
 
-  setXRangeAroundAnchor(
-    plot,
-    pinchState.anchorValue,
-    anchorRatio,
-    pinchState.startRange * (pinchState.startDistance / distance),
-    pinchState.minRange,
-  );
+  const rangeMultiplier = pinchState.startDistance / distance;
+  let didZoom = false;
+
+  if (pinchState.xAnchorValue !== undefined && pinchState.xStartRange !== undefined) {
+    didZoom =
+      setRangeAroundAnchor(
+        plot,
+        "x",
+        pinchState.xAnchorValue,
+        centerLeft / rect.width,
+        pinchState.xStartRange * rangeMultiplier,
+        wheelConfig.minXRange,
+      ) || didZoom;
+  }
+
+  for (const [scaleKey, anchorValue] of pinchState.yAnchorValues.entries()) {
+    const startRange = pinchState.yStartRanges.get(scaleKey);
+
+    if (startRange === undefined) {
+      continue;
+    }
+
+    didZoom =
+      setRangeAroundAnchor(
+        plot,
+        scaleKey,
+        anchorValue,
+        getYAnchorRatio(centerTop, rect.height),
+        startRange * rangeMultiplier,
+        wheelConfig.minYRange,
+      ) || didZoom;
+  }
+
+  return didZoom;
 }
 
-function setXRangeAroundAnchor(
+function createPanState(plot: uPlot, event: PointerEvent): PanState | undefined {
+  const xRange = getFiniteScale(plot, "x");
+  const yRanges = new Map<string, ScaleRange>();
+
+  for (const scaleKey of getYScaleKeys(plot)) {
+    const yRange = getFiniteScale(plot, scaleKey);
+
+    if (yRange !== undefined) {
+      yRanges.set(scaleKey, yRange);
+    }
+  }
+
+  if (xRange === undefined && yRanges.size === 0) {
+    return undefined;
+  }
+
+  return {
+    pointerId: event.pointerId,
+    startClientX: event.clientX,
+    startClientY: event.clientY,
+    xRange,
+    yRanges,
+  };
+}
+
+function applyPan(plot: uPlot, panState: PanState, event: PointerEvent): boolean {
+  const rect = plot.over.getBoundingClientRect();
+
+  if (rect.width <= 0 || rect.height <= 0) {
+    return false;
+  }
+
+  let didPan = false;
+
+  if (panState.xRange !== undefined) {
+    const deltaX = event.clientX - panState.startClientX;
+    const xUnitsPerPixel = (panState.xRange.max - panState.xRange.min) / rect.width;
+    const xDeltaUnits = deltaX * xUnitsPerPixel;
+    didPan =
+      setFiniteScale(
+        plot,
+        "x",
+        panState.xRange.min - xDeltaUnits,
+        panState.xRange.max - xDeltaUnits,
+      ) || didPan;
+  }
+
+  for (const [scaleKey, startRange] of panState.yRanges.entries()) {
+    const deltaY = event.clientY - panState.startClientY;
+    const yUnitsPerPixel = (startRange.max - startRange.min) / rect.height;
+    const yDeltaUnits = deltaY * yUnitsPerPixel;
+    didPan =
+      setFiniteScale(plot, scaleKey, startRange.min + yDeltaUnits, startRange.max + yDeltaUnits) ||
+      didPan;
+  }
+
+  return didPan;
+}
+
+function zoomScalesAroundPosition(
   plot: uPlot,
+  left: number,
+  top: number,
+  rangeMultiplier: number,
+  minXRange: number,
+  minYRange: number,
+): boolean {
+  const rect = plot.over.getBoundingClientRect();
+
+  if (rect.width <= 0 || rect.height <= 0 || !Number.isFinite(rangeMultiplier)) {
+    return false;
+  }
+
+  let didZoom = false;
+  const xScale = getFiniteScale(plot, "x");
+
+  if (xScale !== undefined) {
+    didZoom =
+      setRangeAroundAnchor(
+        plot,
+        "x",
+        plot.posToVal(left, "x"),
+        left / rect.width,
+        (xScale.max - xScale.min) * rangeMultiplier,
+        minXRange,
+      ) || didZoom;
+  }
+
+  for (const scaleKey of getYScaleKeys(plot)) {
+    const yScale = getFiniteScale(plot, scaleKey);
+
+    if (yScale === undefined) {
+      continue;
+    }
+
+    didZoom =
+      setRangeAroundAnchor(
+        plot,
+        scaleKey,
+        plot.posToVal(top, scaleKey),
+        getYAnchorRatio(top, rect.height),
+        (yScale.max - yScale.min) * rangeMultiplier,
+        minYRange,
+      ) || didZoom;
+  }
+
+  return didZoom;
+}
+
+function setRangeAroundAnchor(
+  plot: uPlot,
+  scaleKey: string,
   anchorValue: number,
   anchorRatio: number,
   nextRange: number,
@@ -444,7 +620,11 @@ function setXRangeAroundAnchor(
   const range = Math.max(minRange, nextRange);
   const min = anchorValue - anchorRatio * range;
   const max = min + range;
-  return setFiniteScale(plot, "x", min, max);
+  return setFiniteScale(plot, scaleKey, min, max);
+}
+
+function getYAnchorRatio(top: number, height: number): number {
+  return 1 - top / height;
 }
 
 function getWheelPanDelta(

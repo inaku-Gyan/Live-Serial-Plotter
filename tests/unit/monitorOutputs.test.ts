@@ -2,6 +2,7 @@
 
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import type {
+  LayoutConfig,
   OutputConfig,
   OutputPacket,
   TimeSeriesLineOutputConfig,
@@ -142,7 +143,8 @@ vi.mock("uplot", () => {
           return leftTop;
         }
 
-        return scale.min + (leftTop / 400) * (scale.max - scale.min);
+        const dimension = scaleKey === "x" ? 400 : 260;
+        return scale.min + (leftTop / dimension) * (scale.max - scale.min);
       });
       this.redraw = vi.fn<(rebuildPaths?: boolean, recalcAxes?: boolean) => void>();
       this.setData = vi.fn<(nextData: unknown[], resetScales?: boolean) => void>((nextData) => {
@@ -523,11 +525,11 @@ describe("MonitorOutputController", () => {
     const rpmCheckbox = root.querySelector<HTMLInputElement>(
       '[data-output-id="plot"] .legend-item:nth-child(2) input',
     );
-    const followButton = [
-      ...root.querySelectorAll<HTMLButtonElement>('[data-output-id="plot"] button'),
-    ].find((button) => button.textContent === "Follow");
+    const followButton = root.querySelector<HTMLButtonElement>(
+      '[data-output-id="plot"] .output-follow-button',
+    );
 
-    if (rpmCheckbox === null || followButton === undefined) {
+    if (rpmCheckbox === null || followButton === null) {
       throw new Error("Missing plot follow controls.");
     }
 
@@ -582,7 +584,160 @@ describe("MonitorOutputController", () => {
     expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 3.5, max: 4 });
   });
 
-  test("zooms the x range with ctrl wheel through the uPlot interaction config", () => {
+  test("uses one plot header button for follow, following, and locked follow states", () => {
+    const { controller, root } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    const followButton = root.querySelector<HTMLButtonElement>(
+      '[data-output-id="plot"] .output-follow-button',
+    );
+
+    if (followButton === null) {
+      throw new Error("Missing plot follow button.");
+    }
+
+    expect(followButton.textContent).toBe("Following");
+    expect(followButton.getAttribute("aria-pressed")).toBe("false");
+
+    followButton.click();
+    expect(followButton.textContent).toBe("Locked Follow");
+    expect(followButton.getAttribute("aria-pressed")).toBe("true");
+
+    followButton.click();
+    expect(followButton.textContent).toBe("Following");
+    expect(followButton.getAttribute("aria-pressed")).toBe("false");
+
+    plot.setScale("x", { min: 1.5, max: 2 });
+    expect(followButton.textContent).toBe("Follow");
+
+    followButton.click();
+    expect(followButton.textContent).toBe("Following");
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 1.5, max: 2 });
+  });
+
+  test("resumes locked follow after a debounce while preserving x span and y ranges", () => {
+    vi.useFakeTimers();
+
+    try {
+      const { controller, root } = createController();
+      controller.renderOutputs(
+        [
+          {
+            ...createTimeSeriesOutput(),
+            window: { mode: "points", maxPoints: 5 },
+          },
+        ],
+        createLayout({
+          kind: "timeSeriesLine",
+          followMode: "locked",
+        }),
+      );
+      controller.appendPacket({
+        kind: "timeSeriesAppend",
+        outputId: "plot",
+        seq: 1,
+        receivedAt: 1_000,
+        samples: [
+          { time: 0, values: { temp: 20, rpm: 1 } },
+          { time: 1, values: { temp: 21, rpm: 2 } },
+          { time: 2, values: { temp: 22, rpm: 3 } },
+        ],
+      });
+      const plot = latestPlot();
+      const followButton = root.querySelector<HTMLButtonElement>(
+        '[data-output-id="plot"] .output-follow-button',
+      );
+
+      if (followButton === null) {
+        throw new Error("Missing plot follow button.");
+      }
+
+      expect(followButton.textContent).toBe("Locked Follow");
+      plot.scales.y1 = { min: 10, max: 30 };
+      plot.setScale("x", { min: 1.25, max: 2 });
+      plot.setScale("y1", { min: 15, max: 35 });
+      expect(followButton.textContent).toBe("Follow");
+
+      controller.appendPacket({
+        kind: "timeSeriesAppend",
+        outputId: "plot",
+        seq: 2,
+        receivedAt: 1_100,
+        samples: [{ time: 3, values: { temp: 23, rpm: 4 } }],
+      });
+
+      expect(plot.setData).toHaveBeenLastCalledWith(
+        [
+          [0, 1, 2, 3],
+          [20, 21, 22, 23],
+          [1, 2, 3, 4],
+        ],
+        false,
+      );
+      expect(plot.scales.y1).toEqual({ min: 15, max: 35 });
+
+      vi.advanceTimersByTime(349);
+      expect(followButton.textContent).toBe("Follow");
+
+      vi.advanceTimersByTime(1);
+      expect(followButton.textContent).toBe("Locked Follow");
+      expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 2.25, max: 3 });
+      expect(plot.scales.y1).toEqual({ min: 15, max: 35 });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  test("captures and restores locked follow mode in saved layouts", () => {
+    const { controller, root } = createController();
+    controller.renderOutputs([createTimeSeriesOutput()]);
+    const followButton = root.querySelector<HTMLButtonElement>(
+      '[data-output-id="plot"] .output-follow-button',
+    );
+
+    if (followButton === null) {
+      throw new Error("Missing plot follow button.");
+    }
+
+    followButton.click();
+
+    expect(controller.captureSavableViewState().outputs.plot?.view).toMatchObject({
+      kind: "timeSeriesLine",
+      followMode: "locked",
+      autoFollow: true,
+    });
+
+    controller.renderOutputs(
+      [createTimeSeriesOutput()],
+      createLayout({
+        kind: "timeSeriesLine",
+        followMode: "locked",
+      }),
+    );
+
+    const restoredFollowButton = root.querySelector<HTMLButtonElement>(
+      '[data-output-id="plot"] .output-follow-button',
+    );
+    expect(restoredFollowButton?.textContent).toBe("Locked Follow");
+  });
+
+  test("zooms the x and y ranges with ctrl wheel through the uPlot interaction config", () => {
     const { controller } = createController();
     controller.renderOutputs([
       {
@@ -603,21 +758,27 @@ describe("MonitorOutputController", () => {
     });
     const plot = latestPlot();
     const setScaleCallCount = plot.setScale.mock.calls.length;
+    plot.scales.y1 = { min: 0, max: 100 };
 
     plot.over.dispatchEvent(
       new WheelEvent("wheel", {
         bubbles: true,
         cancelable: true,
         clientX: 200,
+        clientY: 130,
         ctrlKey: true,
         deltaY: -100,
       }),
     );
 
-    const zoomCall = plot.setScale.mock.calls.at(-1);
-    expect(zoomCall?.[0]).toBe("x");
-    expect(zoomCall?.[1].min).toBeCloseTo(0.08);
-    expect(zoomCall?.[1].max).toBeCloseTo(1.92);
+    expect(plot.setScale).toHaveBeenCalledWith("x", {
+      min: 0.5,
+      max: 1.5,
+    });
+    expect(plot.setScale).toHaveBeenCalledWith("y1", {
+      min: 25,
+      max: 75,
+    });
 
     controller.appendPacket({
       kind: "timeSeriesAppend",
@@ -627,7 +788,7 @@ describe("MonitorOutputController", () => {
       samples: [{ time: 3, values: { temp: 23, rpm: 4 } }],
     });
 
-    expect(plot.setScale).toHaveBeenCalledTimes(setScaleCallCount + 1);
+    expect(plot.setScale).toHaveBeenCalledTimes(setScaleCallCount + 2);
     expect(plot.setData).toHaveBeenLastCalledWith(
       [
         [1, 2, 3],
@@ -748,7 +909,7 @@ describe("MonitorOutputController", () => {
     expect(plot.setScale).toHaveBeenCalledWith("y1", { min: 10, max: 110 });
   });
 
-  test("pans the x range with the uPlot pointer interaction plugin", () => {
+  test("pinch-zooms x and y ranges with the uPlot pointer interaction plugin", () => {
     const { controller } = createController();
     controller.renderOutputs([
       {
@@ -768,6 +929,66 @@ describe("MonitorOutputController", () => {
       ],
     });
     const plot = latestPlot();
+    plot.scales.y1 = { min: 0, max: 100 };
+
+    plot.over.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        clientX: 150,
+        clientY: 130,
+        pointerId: 1,
+        pointerType: "touch",
+      }),
+    );
+    plot.over.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        clientX: 250,
+        clientY: 130,
+        pointerId: 2,
+        pointerType: "touch",
+      }),
+    );
+    plot.over.dispatchEvent(
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        clientX: 300,
+        clientY: 130,
+        pointerId: 2,
+        pointerType: "touch",
+      }),
+    );
+
+    expect(plot.setScale).toHaveBeenCalledWith("x", {
+      min: 0.25,
+      max: 1.5833333333333333,
+    });
+    const yZoomCall = plot.setScale.mock.calls.find((call) => call[0] === "y1");
+    expect(yZoomCall?.[1].min).toBeCloseTo(16.666666666666664);
+    expect(yZoomCall?.[1].max).toBeCloseTo(83.33333333333334);
+  });
+
+  test("pans x and y ranges with the uPlot pointer interaction plugin", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    plot.scales.y1 = { min: 0, max: 100 };
 
     plot.over.dispatchEvent(
       new PointerEvent("pointerdown", {
@@ -783,7 +1004,7 @@ describe("MonitorOutputController", () => {
       new PointerEvent("pointermove", {
         bubbles: true,
         clientX: 240,
-        clientY: 100,
+        clientY: 126,
         pointerId: 1,
         pointerType: "mouse",
       }),
@@ -796,10 +1017,14 @@ describe("MonitorOutputController", () => {
       }),
     );
 
-    const panCall = plot.setScale.mock.calls.at(-1);
-    expect(panCall?.[0]).toBe("x");
-    expect(panCall?.[1].min).toBeCloseTo(-0.2);
-    expect(panCall?.[1].max).toBeCloseTo(1.8);
+    expect(plot.setScale).toHaveBeenCalledWith("x", {
+      min: -0.2,
+      max: 1.8,
+    });
+    expect(plot.setScale).toHaveBeenCalledWith("y1", {
+      min: 10,
+      max: 110,
+    });
   });
 
   test("resets plot view without clearing data", () => {
@@ -983,6 +1208,20 @@ function renderProfile(root: HTMLElement, outputs: readonly OutputConfig[]): voi
     postMessage: (message) => messages.push(message),
   });
   controller.renderOutputs(outputs);
+}
+
+function createLayout(view: NonNullable<LayoutConfig["outputs"][string]["view"]>): LayoutConfig {
+  return {
+    schemaVersion: 1,
+    id: "test-layout",
+    name: "Test Layout",
+    page: { mode: "grid", columns: "auto", density: "normal" },
+    outputs: {
+      plot: {
+        view,
+      },
+    },
+  };
 }
 
 function createOutputs(): OutputConfig[] {

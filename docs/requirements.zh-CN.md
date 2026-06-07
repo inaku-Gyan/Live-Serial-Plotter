@@ -25,7 +25,7 @@
 - layout preset 使用 `schemaVersion: 1`，包含 `id`、`name`、`page` 和按 `outputId` 索引的 `outputs`。
 - 每次打开新 monitor 窗口，都必须按当前 profile 的 `layout.defaultPreset` 解析初始页面布局。
 - layout preset 可保存页面级设置，例如 grid 列策略、density、输出面板 order、columnSpan、minHeight、collapsed、maximized。
-- layout preset 可保存输出视图默认值，例如 plot legend、auto-follow、显式保存后的 zoom 范围、terminal auto-scroll、2D frame bounds。
+- layout preset 可保存输出视图默认值，例如 plot legend、auto-follow/follow lock、显式保存后的 zoom 范围、terminal auto-scroll、2D frame bounds。
 - 当前窗口内由用户拖拽、点击、缩放产生的视图变化先进入 window session override，不自动覆盖 profile 或 layout 文件。
 - 用户显式 Save Layout 才覆盖当前 layout preset；Save As Layout 创建新 layout preset，并更新当前 profile 的 `layout.defaultPreset`。
 - 每个 output 面板应支持单独 Reset View；页面应支持 Reset Layout。reset 只恢复布局/视图状态，不清空实时数据。
@@ -47,12 +47,15 @@
 - `timeSeriesLine` 应固定显示一个滚动窗口，并持续追踪最新数据点。
 - 用户用鼠标拖拽放大 time-series 图表区域后，缩放视图应保持，不应被下一次数据刷新立刻回弹到默认滚动窗口。
 - time-series 图表交互入口应优先实现为 uPlot plugin/hooks：包括手动 scale 变更检测、鼠标滚轮缩放、拖拽平移、触摸平移/捏合缩放和双击重置视图。
-- time-series 图表交互绑定应集中在统一配置中；普通左键保持 uPlot 默认框选缩放，普通滚轮上下平移，`Shift + 滚轮` 左右平移，`Ctrl + 滚轮` 缩放；触控板双指滚动沿 `deltaX/deltaY` 平移，触控板捏合按 `Ctrl + wheel` 缩放处理。
+- time-series 图表交互绑定应集中在统一配置中；普通左键保持 uPlot 默认框选缩放，普通滚轮上下平移，`Shift + 滚轮` 左右平移，`Ctrl + 滚轮` 做二维等比缩放；触控板双指滚动沿 `deltaX/deltaY` 平移，触控板捏合按 `Ctrl + wheel` 做二维等比缩放处理。
 - time-series wheel/触控板缩放应按 wheel delta 连续计算，避免触控板小步高频事件导致缩放过于敏感。
 - 普通左键框选缩放应设置最小拖拽距离死区，避免点击或极小拖拽误触发缩放。
+- time-series 指针拖拽平移不应锁定纵轴；中键、`Shift + 左键`、触摸/笔平移应可同时移动横轴和纵轴。
 - time-series 十字准线可保留 hover marker，但 marker 只应在鼠标接近某条可见曲线时显示；鼠标离开曲线或图表时不应把最近点残留在曲线上。
-- 默认状态仍自动滚动追踪最新数据；一旦用户手动缩放，应暂停自动追踪，直到图表结构重建、清空或切换 profile。
-- time-series 面板应提供恢复追踪操作，将当前 X 轴跨度平移到最新点并重新启用 auto-follow；该操作不清空数据、不重置 legend 可见性、不改变纵轴范围。
+- 默认状态仍自动滚动追踪最新数据；unlocked follow 模式下一旦用户手动缩放或平移，应暂停自动追踪，直到用户恢复追踪、图表结构重建、清空或切换 profile。
+- time-series 面板应提供合并的三态追踪操作：`Follow` 表示当前暂停并可恢复 unlocked follow，`Following` 表示 unlocked 自动追踪中，`Locked Follow` 表示用户操作结束后自动恢复追踪。
+- `Locked Follow` 恢复追踪应在用户操作停止后约 350ms debounce 执行，只平移 X 轴到最新点，保持当前 X 轴跨度和所有纵轴范围。
+- 恢复追踪操作不清空数据、不重置 legend 可见性、不改变纵轴范围。
 - `window.mode: "points"` 保留并显示最新 `maxPoints` 个采样点。
 - `window.mode: "points"` 的默认可视 X 轴窗口应有合理上限，避免 profile 配置较大的 `maxPoints` 导致初始视图过度压缩；数据保留上限仍按 `maxPoints` 执行。
 - `window.mode: "duration"` 按最新样本时间显示最近 `seconds` 秒。

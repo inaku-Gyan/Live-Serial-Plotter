@@ -132,6 +132,10 @@
         "autoFollow": {
           "type": "boolean"
         },
+        "followMode": {
+          "type": "string",
+          "enum": ["unlocked", "locked"]
+        },
         "zoom": {
           "$ref": "#/definitions/AxisRangeLayoutConfig"
         }

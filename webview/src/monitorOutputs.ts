@@ -60,6 +60,8 @@ type PlotWindowConfig =
   | { mode: "points"; maxPoints: number }
   | { mode: "duration"; seconds: number };
 
+type TimeSeriesFollowMode = NonNullable<TimeSeriesViewLayoutConfig["followMode"]>;
+
 interface UnitGroup {
   unit: string;
   channelNames: string[];
@@ -373,10 +375,13 @@ class TimeSeriesLineView implements OutputView {
   private readonly seriesData = new Map<string, Array<number | null>>();
   private readonly seriesVisibility = new Map<string, boolean>();
   private readonly chartElement: HTMLElement;
+  private followButton: HTMLButtonElement | undefined;
   private readonly legendElement: HTMLElement;
   private readonly resizeObserver: ResizeObserver | undefined;
   private isAutoFollowEnabled = true;
   private isApplyingScaleUpdate = false;
+  private followMode: TimeSeriesFollowMode = "unlocked";
+  private lockedFollowResumeTimer: ReturnType<typeof setTimeout> | undefined;
   private shouldPreserveScaleWhileFollowing = false;
   private viewLayout: TimeSeriesViewLayoutConfig | undefined;
   private plot: uPlot | undefined;
@@ -394,13 +399,14 @@ class TimeSeriesLineView implements OutputView {
     this.legendElement.className = "output-legend";
 
     const header = createPanelHeader(config, "Time Series");
-    appendPanelHeaderButton(
+    this.followButton = appendPanelHeaderButton(
       header,
       "Follow",
-      () => this.resumeAutoFollow(),
+      () => this.toggleFollowMode(),
       "output-follow-button",
     );
     appendPanelHeaderButton(header, "Reset", () => this.resetView(), "output-reset-button");
+    this.updateFollowButton();
 
     parent.append(header, this.chartElement, this.legendElement);
     this.initializeConfiguredSeries();
@@ -461,16 +467,20 @@ class TimeSeriesLineView implements OutputView {
   }
 
   clear(): void {
+    this.clearLockedFollowResumeTimer();
+    this.followMode = this.getDefaultFollowMode();
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();
     this.shouldPreserveScaleWhileFollowing = false;
     this.timeValues.length = 0;
     this.seriesData.clear();
     this.seriesVisibility.clear();
     this.initializeConfiguredSeries();
+    this.updateFollowButton();
     this.rebuildPlot();
   }
 
   dispose(): void {
+    this.clearLockedFollowResumeTimer();
     this.resizeObserver?.disconnect();
     this.plot?.destroy();
     this.plot = undefined;
@@ -478,8 +488,10 @@ class TimeSeriesLineView implements OutputView {
 
   applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
     this.viewLayout = layout?.kind === "timeSeriesLine" ? layout : undefined;
+    this.followMode = this.getDefaultFollowMode();
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();
     this.shouldPreserveScaleWhileFollowing = false;
+    this.updateFollowButton();
   }
 
   resetView(): void {
@@ -491,12 +503,16 @@ class TimeSeriesLineView implements OutputView {
     this.applyViewDefaults();
     this.renderLegend([...this.seriesData.keys()]);
     this.syncSeriesVisibility();
+    this.updateFollowButton();
   }
 
   resumeAutoFollow(): void {
+    this.clearLockedFollowResumeTimer();
+    this.followMode = "unlocked";
     this.isAutoFollowEnabled = true;
     this.shouldPreserveScaleWhileFollowing = true;
     this.applyAutoFollowRange(true);
+    this.updateFollowButton();
   }
 
   captureViewLayout(): OutputLayoutConfig["view"] {
@@ -504,6 +520,7 @@ class TimeSeriesLineView implements OutputView {
       kind: "timeSeriesLine",
       showLegend: !this.legendElement.hidden,
       autoFollow: this.isAutoFollowEnabled,
+      followMode: this.followMode,
       zoom: this.captureZoom(),
     };
   }
@@ -516,8 +533,11 @@ class TimeSeriesLineView implements OutputView {
   }
 
   private rebuildPlot(): void {
+    this.clearLockedFollowResumeTimer();
+    this.followMode = this.getDefaultFollowMode();
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();
     this.shouldPreserveScaleWhileFollowing = false;
+    this.updateFollowButton();
     this.plot?.destroy();
 
     const channelNames = [...this.seriesData.keys()];
@@ -581,6 +601,8 @@ class TimeSeriesLineView implements OutputView {
         plugins: createTimeSeriesInteractionPlugins({
           config: defaultTimeSeriesInteractionConfig,
           onScaleChanged: (scaleKey) => this.handlePlotScaleChanged(scaleKey),
+          onUserInteraction: () => this.handlePlotUserInteraction(),
+          onUserInteractionSettled: () => this.handlePlotUserInteractionSettled(),
           resetView: () => this.resetView(),
         }),
         series,
@@ -624,7 +646,25 @@ class TimeSeriesLineView implements OutputView {
     }
 
     if (scaleKey === "x" || scaleKey.startsWith("y")) {
+      this.handlePlotUserInteraction();
+    }
+  }
+
+  private handlePlotUserInteraction(): void {
+    if (this.followMode === "locked") {
       this.isAutoFollowEnabled = false;
+      this.scheduleLockedFollowResume();
+    } else {
+      this.clearLockedFollowResumeTimer();
+      this.isAutoFollowEnabled = false;
+    }
+
+    this.updateFollowButton();
+  }
+
+  private handlePlotUserInteractionSettled(): void {
+    if (this.followMode === "locked") {
+      this.scheduleLockedFollowResume();
     }
   }
 
@@ -884,8 +924,91 @@ class TimeSeriesLineView implements OutputView {
     return this.viewLayout?.showLegend ?? this.config.style?.showLegend !== false;
   }
 
+  private getDefaultFollowMode(): TimeSeriesFollowMode {
+    return this.viewLayout?.followMode ?? "unlocked";
+  }
+
   private getDefaultAutoFollow(): boolean {
+    if (this.getDefaultFollowMode() === "locked") {
+      return true;
+    }
+
     return this.viewLayout?.autoFollow ?? true;
+  }
+
+  private toggleFollowMode(): void {
+    this.clearLockedFollowResumeTimer();
+
+    if (!this.isAutoFollowEnabled) {
+      this.followMode = "unlocked";
+      this.isAutoFollowEnabled = true;
+      this.shouldPreserveScaleWhileFollowing = true;
+      this.applyAutoFollowRange(true);
+      this.updateFollowButton();
+      return;
+    }
+
+    if (this.followMode === "locked") {
+      this.followMode = "unlocked";
+      this.isAutoFollowEnabled = true;
+      this.updateFollowButton();
+      return;
+    }
+
+    this.followMode = "locked";
+    this.isAutoFollowEnabled = true;
+    this.shouldPreserveScaleWhileFollowing = true;
+    this.applyAutoFollowRange(true);
+    this.updateFollowButton();
+  }
+
+  private scheduleLockedFollowResume(): void {
+    this.clearLockedFollowResumeTimer();
+    this.lockedFollowResumeTimer = setTimeout(() => {
+      this.lockedFollowResumeTimer = undefined;
+
+      if (this.followMode !== "locked") {
+        return;
+      }
+
+      this.isAutoFollowEnabled = true;
+      this.shouldPreserveScaleWhileFollowing = true;
+      this.applyAutoFollowRange(true);
+      this.updateFollowButton();
+    }, 350);
+  }
+
+  private clearLockedFollowResumeTimer(): void {
+    if (this.lockedFollowResumeTimer === undefined) {
+      return;
+    }
+
+    clearTimeout(this.lockedFollowResumeTimer);
+    this.lockedFollowResumeTimer = undefined;
+  }
+
+  private updateFollowButton(): void {
+    if (this.followButton === undefined) {
+      return;
+    }
+
+    if (!this.isAutoFollowEnabled) {
+      this.followButton.textContent = "Follow";
+      this.followButton.title = "Resume following latest data";
+      this.followButton.setAttribute("aria-pressed", "false");
+      return;
+    }
+
+    if (this.followMode === "locked") {
+      this.followButton.textContent = "Locked Follow";
+      this.followButton.title = "Keep following latest data after interactions";
+      this.followButton.setAttribute("aria-pressed", "true");
+      return;
+    }
+
+    this.followButton.textContent = "Following";
+    this.followButton.title = "Lock follow after interactions";
+    this.followButton.setAttribute("aria-pressed", "false");
   }
 
   private applyViewDefaults(): void {
@@ -897,13 +1020,33 @@ class TimeSeriesLineView implements OutputView {
 
     if (zoom?.x !== undefined) {
       this.setPlotScale("x", zoom.x);
+    }
+
+    if (zoom?.y !== undefined) {
+      for (const [scaleKey, range] of Object.entries(zoom.y)) {
+        this.setPlotScale(scaleKey, range);
+      }
+    }
+
+    if (zoom?.x !== undefined || zoom?.y !== undefined) {
+      if (this.followMode === "locked") {
+        this.isAutoFollowEnabled = true;
+        this.shouldPreserveScaleWhileFollowing = true;
+        this.applyAutoFollowRange(true);
+        this.updateFollowButton();
+        return;
+      }
+
       this.isAutoFollowEnabled = false;
+      this.updateFollowButton();
       return;
     }
 
     if (this.isAutoFollowEnabled) {
       this.applyAutoFollowRange(false);
     }
+
+    this.updateFollowButton();
   }
 
   private applyAutoFollowRange(preserveCurrentSpan: boolean): void {
@@ -966,21 +1109,36 @@ class TimeSeriesLineView implements OutputView {
   private captureZoom(): TimeSeriesViewLayoutConfig["zoom"] {
     const xScale = this.plot?.scales.x;
 
-    if (
-      xScale === undefined ||
-      typeof xScale.min !== "number" ||
-      typeof xScale.max !== "number" ||
-      this.isAutoFollowEnabled
-    ) {
+    if (this.plot === undefined || this.isAutoFollowEnabled) {
       return undefined;
     }
 
-    return {
-      x: {
+    const zoom: NonNullable<TimeSeriesViewLayoutConfig["zoom"]> = {};
+
+    if (xScale !== undefined && typeof xScale.min === "number" && typeof xScale.max === "number") {
+      zoom.x = {
         min: xScale.min,
         max: xScale.max,
-      },
-    };
+      };
+    }
+
+    for (const [scaleKey, scale] of Object.entries(this.plot.scales)) {
+      if (scaleKey === "x") {
+        continue;
+      }
+
+      if (typeof scale.min !== "number" || typeof scale.max !== "number") {
+        continue;
+      }
+
+      zoom.y ??= {};
+      zoom.y[scaleKey] = {
+        min: scale.min,
+        max: scale.max,
+      };
+    }
+
+    return zoom.x === undefined && zoom.y === undefined ? undefined : zoom;
   }
 }
 
@@ -1171,7 +1329,7 @@ function appendPanelHeaderButton(
   label: string,
   onClick: () => void,
   className: string,
-): void {
+): HTMLButtonElement {
   const actions = getPanelHeaderActions(header);
   const button = document.createElement("button");
   button.className = `button button-secondary ${className}`;
@@ -1179,6 +1337,7 @@ function appendPanelHeaderButton(
   button.textContent = label;
   button.addEventListener("click", onClick);
   actions.append(button);
+  return button;
 }
 
 function getPanelHeaderActions(header: HTMLElement): HTMLElement {

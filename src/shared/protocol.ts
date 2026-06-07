@@ -717,6 +717,7 @@ export interface TimeSeriesViewLayoutConfig {
   kind: "timeSeriesLine";
   showLegend?: boolean;
   autoFollow?: boolean;
+  followMode?: "unlocked" | "locked";
   zoom?: AxisRangeLayoutConfig;
 }
 
