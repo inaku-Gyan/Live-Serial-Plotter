@@ -245,6 +245,8 @@ class TimeSeriesLineView implements OutputView {
   private readonly chartElement: HTMLElement;
   private readonly legendElement: HTMLElement;
   private readonly resizeObserver: ResizeObserver | undefined;
+  private isAutoFollowEnabled = true;
+  private isApplyingScaleUpdate = false;
   private plot: uPlot | undefined;
 
   constructor(
@@ -316,6 +318,7 @@ class TimeSeriesLineView implements OutputView {
   }
 
   clear(): void {
+    this.isAutoFollowEnabled = true;
     this.timeValues.length = 0;
     this.seriesData.clear();
     this.seriesVisibility.clear();
@@ -337,6 +340,7 @@ class TimeSeriesLineView implements OutputView {
   }
 
   private rebuildPlot(): void {
+    this.isAutoFollowEnabled = true;
     this.plot?.destroy();
 
     const channelNames = [...this.seriesData.keys()];
@@ -394,6 +398,13 @@ class TimeSeriesLineView implements OutputView {
         legend: {
           show: false,
         },
+        hooks: {
+          setScale: [
+            (_plot, scaleKey) => {
+              this.handlePlotScaleChanged(scaleKey);
+            },
+          ],
+        },
         series,
       },
       this.getPlotData(),
@@ -408,12 +419,27 @@ class TimeSeriesLineView implements OutputView {
       return;
     }
 
-    this.plot.setData(this.getPlotData());
+    this.isApplyingScaleUpdate = true;
+    try {
+      this.plot.setData(this.getPlotData(), this.isAutoFollowEnabled);
 
-    const xWindowRange = this.getXWindowRange();
+      const xWindowRange = this.getXWindowRange();
 
-    if (hasScaleRange(xWindowRange)) {
-      this.plot.setScale("x", xWindowRange);
+      if (this.isAutoFollowEnabled && hasScaleRange(xWindowRange)) {
+        this.plot.setScale("x", xWindowRange);
+      }
+    } finally {
+      this.isApplyingScaleUpdate = false;
+    }
+  }
+
+  private handlePlotScaleChanged(scaleKey: string): void {
+    if (this.plot === undefined || this.isApplyingScaleUpdate) {
+      return;
+    }
+
+    if (scaleKey === "x" || scaleKey.startsWith("y")) {
+      this.isAutoFollowEnabled = false;
     }
   }
 

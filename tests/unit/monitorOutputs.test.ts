@@ -12,17 +12,22 @@ import { MonitorOutputController } from "../../webview/src/monitorOutputs";
 interface MockUPlotInstance {
   options: {
     axes?: Array<{ label?: string; side?: number }>;
+    hooks?: {
+      setScale?: Array<(plot: MockUPlotInstance, scaleKey: string) => void>;
+    };
     legend?: { show?: boolean };
     scales?: Record<string, { min?: number; max?: number; time?: boolean }>;
     series: Array<{ label?: string; scale?: string; show?: boolean }>;
   };
   data: unknown[];
   target: HTMLElement;
-  destroy: () => void;
-  setData: (nextData: unknown[]) => void;
-  setScale: (scaleKey: string, range: { min?: number; max?: number }) => void;
-  setSeries: (index: number, options: { show: boolean }) => void;
-  setSize: (size: { width: number; height: number }) => void;
+  destroy: ReturnType<typeof vi.fn<() => void>>;
+  setData: ReturnType<typeof vi.fn<(nextData: unknown[], resetScales?: boolean) => void>>;
+  setScale: ReturnType<
+    typeof vi.fn<(scaleKey: string, range: { min?: number; max?: number }) => void>
+  >;
+  setSeries: ReturnType<typeof vi.fn<(index: number, options: { show: boolean }) => void>>;
+  setSize: ReturnType<typeof vi.fn<(size: { width: number; height: number }) => void>>;
 }
 
 const mockUPlot = vi.hoisted(() => ({
@@ -48,7 +53,7 @@ vi.mock("uplot", () => {
       this.data = data;
       this.target = target;
       this.destroy = vi.fn<() => void>();
-      this.setData = vi.fn<(nextData: unknown[]) => void>((nextData) => {
+      this.setData = vi.fn<(nextData: unknown[], resetScales?: boolean) => void>((nextData) => {
         this.data = nextData;
       });
       this.setScale = vi.fn<(scaleKey: string, range: { min?: number; max?: number }) => void>(
@@ -250,6 +255,53 @@ describe("MonitorOutputController", () => {
       [4, 5],
     ]);
     expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 2, max: 4 });
+  });
+
+  test("preserves manual zoom instead of snapping back to the rolling x range", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    const setScaleCallCount = plot.setScale.mock.calls.length;
+
+    plot.options.hooks?.setScale?.[0]?.(plot, "x");
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 2,
+      receivedAt: 1_100,
+      samples: [{ time: 3, values: { temp: 23, rpm: 4 } }],
+    });
+
+    expect(plot.data).toEqual([
+      [1, 2, 3],
+      [21, 22, 23],
+      [2, 3, 4],
+    ]);
+    expect(plot.setScale).toHaveBeenCalledTimes(setScaleCallCount);
+    expect(plot.setData).toHaveBeenLastCalledWith(
+      [
+        [1, 2, 3],
+        [21, 22, 23],
+        [2, 3, 4],
+      ],
+      false,
+    );
   });
 
   test("routes output packets by outputId", () => {
