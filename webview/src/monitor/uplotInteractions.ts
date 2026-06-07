@@ -91,6 +91,15 @@ export const defaultTimeSeriesInteractionConfig: TimeSeriesInteractionConfig = {
       x: true,
       y: false,
     },
+    focus: {
+      prox: 10,
+    },
+    hover: {
+      prox: 10,
+    },
+    points: {
+      one: true,
+    },
   },
   wheel: {
     minXRange: 1e-9,

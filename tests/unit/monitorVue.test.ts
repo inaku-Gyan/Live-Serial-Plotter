@@ -100,6 +100,8 @@ describe("MonitorApp", () => {
     }
 
     expect(connectButton.attributes("disabled")).toBeUndefined();
+    expect(connectButton.classes()).toContain("button-primary");
+    expect(connectButton.classes()).not.toContain("button-secondary");
     await connectButton.trigger("click");
     expect(vscode.messages).toContainEqual({
       type: "connect",
@@ -116,6 +118,16 @@ describe("MonitorApp", () => {
     });
     await nextTick();
 
+    const disconnectButton = wrapper
+      .findAll("button")
+      .find((button) => button.text() === "Disconnect");
+
+    if (disconnectButton === undefined) {
+      throw new Error("Missing disconnect button.");
+    }
+
+    expect(disconnectButton.classes()).toContain("button-secondary");
+    expect(disconnectButton.classes()).not.toContain("button-danger");
     expect(wrapper.find(".status").classes()).toContain("status-connected");
     expect(wrapper.find(".status").text()).toBe("Connected to /dev/ttyUSB0");
     expect(

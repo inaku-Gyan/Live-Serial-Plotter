@@ -123,8 +123,8 @@ function formatParserMode(parserMode: ParserMode): string {
       </select>
     </label>
     <button
-      class="button button-primary"
-      :class="{ 'button-danger': store.state.connected }"
+      class="button"
+      :class="store.state.connected ? 'button-secondary' : 'button-primary'"
       type="button"
       :disabled="store.connectDisabled.value"
       @click="store.toggleConnection()"

@@ -31,6 +31,7 @@
 - 每个 output 面板应支持单独 Reset View；页面应支持 Reset Layout。reset 只恢复布局/视图状态，不清空实时数据。
 - 实时数据点、terminal 当前文本、canvas frame、hover/cursor、临时选区、toast 和串口连接状态永不写入 profile 或 layout。
 - monitor layout 控制条（当前 layout 名称、Reset Layout、Save Layout、Save As）应紧跟连接 toolbar 显示，使用内容高度，不应占用 workspace 的可伸缩空间。
+- 连接按钮在可连接状态使用 primary 样式；已连接时的 Disconnect 按钮使用中性 secondary 样式，不使用错误/危险色。
 
 ### 监视器页面 Vue 外壳与高频渲染边界
 
@@ -47,6 +48,7 @@
 - 用户用鼠标拖拽放大 time-series 图表区域后，缩放视图应保持，不应被下一次数据刷新立刻回弹到默认滚动窗口。
 - time-series 图表交互入口应优先实现为 uPlot plugin/hooks：包括手动 scale 变更检测、鼠标滚轮缩放、拖拽平移、触摸平移/捏合缩放和双击重置视图。
 - time-series 图表交互绑定应集中在统一配置中；普通左键保持 uPlot 默认框选缩放，普通滚轮上下平移，`Shift + 滚轮` 左右平移，`Ctrl + 滚轮` 缩放；触控板双指滚动沿 `deltaX/deltaY` 平移，触控板捏合按 `Ctrl + wheel` 缩放处理。
+- time-series 十字准线可保留 hover marker，但 marker 只应在鼠标接近某条可见曲线时显示；鼠标离开曲线或图表时不应把最近点残留在曲线上。
 - 默认状态仍自动滚动追踪最新数据；一旦用户手动缩放，应暂停自动追踪，直到图表结构重建、清空或切换 profile。
 - `window.mode: "points"` 保留并显示最新 `maxPoints` 个采样点。
 - `window.mode: "duration"` 按最新样本时间显示最近 `seconds` 秒。
