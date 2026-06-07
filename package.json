@@ -111,13 +111,13 @@
     "menus": {
       "view/title": [
         {
-          "command": "liveSerialPlotter.profiles.refresh",
-          "when": "view == liveSerialPlotter.profiles",
+          "command": "liveSerialPlotter.profiles.openJson",
+          "when": "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorView == editor",
           "group": "navigation@1"
         },
         {
-          "command": "liveSerialPlotter.profiles.openJson",
-          "when": "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorView == editor",
+          "command": "liveSerialPlotter.profiles.refresh",
+          "when": "view == liveSerialPlotter.profiles",
           "group": "navigation@2"
         }
       ]
