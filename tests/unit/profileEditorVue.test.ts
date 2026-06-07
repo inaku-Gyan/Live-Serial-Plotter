@@ -1,0 +1,243 @@
+// @vitest-environment jsdom
+
+import { mount } from "@vue/test-utils";
+import { nextTick } from "vue";
+import { afterEach, describe, expect, test, vi } from "vitest";
+import { builtinProfiles, defaultProfile } from "../../src/profiles/defaultProfile";
+import type {
+  ProfileConfig,
+  ProfileEditorState,
+  ToProfileEditorMessage,
+} from "../../src/shared/protocol";
+import ProfileEditorApp from "../../webview/src/profile-editor/ProfileEditorApp.vue";
+import {
+  createProfileEditorStore,
+  type ProfileEditorPersistedState,
+  type VsCodeApi,
+} from "../../webview/src/profile-editor/store";
+
+describe("ProfileEditorApp", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  test("profile item click selects preview without entering editor", async () => {
+    const { wrapper, vscode } = mountProfileEditor();
+    const jsonlProfile = requireBuiltinProfile("jsonl-telemetry");
+    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
+    await nextTick();
+
+    await wrapper.findAll(".profile-list-main")[1]!.trigger("click");
+    expect(vscode.messages).toContainEqual({
+      type: "selectProfileForEdit",
+      profileKey: "builtin:jsonl-telemetry",
+    });
+    expect(wrapper.find("main").classes()).toContain("profile-home");
+
+    dispatchEditorState(createEditorState({ selectedProfile: jsonlProfile }));
+    await nextTick();
+
+    expect(wrapper.text()).toContain("JSONL Telemetry / jsonl-telemetry");
+    expect(wrapper.find("main").classes()).toContain("profile-home");
+  });
+
+  test("profile action menu opens and closes on outside pointerdown", async () => {
+    const { wrapper } = mountProfileEditor();
+    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
+    await nextTick();
+
+    await wrapper.find(".profile-menu-trigger").trigger("click");
+    expect(wrapper.find(".profile-list-menu").exists()).toBe(true);
+
+    document.body.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true }));
+    await nextTick();
+
+    expect(wrapper.find(".profile-list-menu").exists()).toBe(false);
+  });
+
+  test("profile action menu sends keyed copy and open messages", async () => {
+    const { wrapper, vscode } = mountProfileEditor();
+    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
+    await nextTick();
+
+    await wrapper.find(".profile-menu-trigger").trigger("click");
+    const menuButtons = wrapper.findAll(".profile-list-menu button");
+    await menuButtons[1]!.trigger("click");
+
+    await wrapper.find(".profile-menu-trigger").trigger("click");
+    await wrapper.findAll(".profile-list-menu button")[2]!.trigger("click");
+
+    expect(vscode.messages).toContainEqual({
+      type: "copyProfileByKey",
+      profileKey: "builtin:default",
+    });
+    expect(vscode.messages).toContainEqual({
+      type: "openProfileJson",
+      profileKey: "builtin:default",
+    });
+  });
+
+  test("builtin profile editor is read-only", async () => {
+    const { wrapper } = mountProfileEditor();
+    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
+    await nextTick();
+
+    await wrapper.find(".profile-menu-trigger").trigger("click");
+    await wrapper.findAll(".profile-list-menu button")[0]!.trigger("click");
+    await nextTick();
+
+    expect(wrapper.find("main").classes()).toContain("profile-editor");
+    expect(wrapper.find<HTMLInputElement>('input[name="profile.name"]').element.disabled).toBe(
+      true,
+    );
+  });
+
+  test("editable profile autosaves valid changes after debounce", async () => {
+    vi.useFakeTimers();
+    const { wrapper, vscode } = mountProfileEditor();
+    const profile = { ...defaultProfile, id: "editable", name: "Editable" };
+    dispatchEditorState(createEditorState({ selectedProfile: profile, sourceScope: "workspace" }));
+    await nextTick();
+
+    await wrapper.find(".profile-menu-trigger").trigger("click");
+    await wrapper.findAll(".profile-list-menu button")[0]!.trigger("click");
+    await nextTick();
+    await wrapper.find<HTMLInputElement>('input[name="profile.name"]').setValue("Edited");
+    vi.advanceTimersByTime(350);
+    await nextTick();
+
+    expect(vscode.messages).toContainEqual({
+      type: "autoSaveProfile",
+      profile: expect.objectContaining({ id: "editable", name: "Edited" }),
+    });
+  });
+
+  test("invalid parser options do not autosave", async () => {
+    vi.useFakeTimers();
+    const { wrapper, vscode } = mountProfileEditor();
+    const profile = { ...defaultProfile, id: "editable", name: "Editable" };
+    dispatchEditorState(createEditorState({ selectedProfile: profile, sourceScope: "workspace" }));
+    await nextTick();
+
+    await wrapper.find(".profile-menu-trigger").trigger("click");
+    await wrapper.findAll(".profile-list-menu button")[0]!.trigger("click");
+    await nextTick();
+    await wrapper.find<HTMLTextAreaElement>('textarea[name="parser.options"]').setValue("{");
+    vi.advanceTimersByTime(350);
+    await nextTick();
+
+    expect(vscode.messages).not.toContainEqual(
+      expect.objectContaining({ type: "autoSaveProfile" }),
+    );
+    expect(wrapper.text()).toContain("Expected");
+  });
+
+  test("copy success moves to the copied profile editor", async () => {
+    const { wrapper } = mountProfileEditor();
+    const copiedProfile = { ...defaultProfile, id: "copied", name: "Copied" };
+    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
+    await nextTick();
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "profileCopied",
+          profileKey: "workspace:file:///workspace:copied",
+          filePath: "/workspace/.live-serial-plotter/profiles/copied.jsonc",
+        },
+      }),
+    );
+    dispatchEditorState(
+      createEditorState({ selectedProfile: copiedProfile, sourceScope: "workspace" }),
+    );
+    await nextTick();
+
+    expect(wrapper.find("main").classes()).toContain("profile-editor");
+    expect(wrapper.find(".profile-editor-title").text()).toContain("Copied");
+  });
+});
+
+function mountProfileEditor(): {
+  wrapper: ReturnType<typeof mount>;
+  vscode: ReturnType<typeof createVscodeApi>;
+} {
+  const vscode = createVscodeApi();
+  const store = createProfileEditorStore(vscode.api);
+  const wrapper = mount(ProfileEditorApp, {
+    props: { store },
+    attachTo: document.body,
+  });
+
+  return { wrapper, vscode };
+}
+
+function dispatchEditorState(state: ProfileEditorState): void {
+  window.dispatchEvent(
+    new MessageEvent("message", { data: { type: "profileEditorState", state } }),
+  );
+}
+
+function createVscodeApi(): {
+  api: VsCodeApi<ProfileEditorPersistedState>;
+  messages: ToProfileEditorMessage[];
+  persistedState: ProfileEditorPersistedState | undefined;
+} {
+  const messages: ToProfileEditorMessage[] = [];
+  let persistedState: ProfileEditorPersistedState | undefined;
+
+  return {
+    api: {
+      getState: () => persistedState,
+      setState: (nextState) => {
+        persistedState = nextState;
+      },
+      postMessage: (message) => messages.push(message),
+    },
+    messages,
+    get persistedState() {
+      return persistedState;
+    },
+  };
+}
+
+function createEditorState(options: {
+  selectedProfile: ProfileConfig;
+  sourceScope?: "builtin" | "workspace" | "user";
+}): ProfileEditorState {
+  const sourceScope = options.sourceScope ?? "builtin";
+  const selectedKey = `${sourceScope}:${options.selectedProfile.id}`;
+
+  return {
+    profiles: builtinProfiles.map((profile) => ({
+      key: `builtin:${profile.id}`,
+      ref: { scope: "builtin", id: profile.id },
+      id: profile.id,
+      name: profile.name,
+      scope: "builtin",
+    })),
+    selectedProfile: options.selectedProfile,
+    selectedProfileKey: selectedKey,
+    selectedSource: {
+      key: selectedKey,
+      ref: { scope: sourceScope, id: options.selectedProfile.id },
+      scope: sourceScope,
+      filePath:
+        sourceScope === "builtin"
+          ? undefined
+          : `/workspace/.live-serial-plotter/profiles/${options.selectedProfile.id}.jsonc`,
+      workspaceFolderUri: sourceScope === "workspace" ? "file:///workspace" : undefined,
+      workspaceName: sourceScope === "workspace" ? "workspace" : undefined,
+    },
+    errors: [],
+  };
+}
+
+function requireBuiltinProfile(profileId: string): ProfileConfig {
+  const profile = builtinProfiles.find((candidate) => candidate.id === profileId);
+
+  if (profile === undefined) {
+    throw new Error(`Missing builtin profile ${profileId}.`);
+  }
+
+  return profile;
+}
