@@ -14,20 +14,39 @@ interface MockUPlotInstance {
     axes?: Array<{ label?: string; side?: number }>;
     hooks?: {
       setScale?: Array<(plot: MockUPlotInstance, scaleKey: string) => void>;
+      ready?: Array<(plot: MockUPlotInstance) => void>;
+      destroy?: Array<(plot: MockUPlotInstance) => void>;
     };
     legend?: { show?: boolean };
     scales?: Record<string, { min?: number; max?: number; time?: boolean }>;
+    plugins?: MockUPlotPlugin[];
     series: Array<{ label?: string; scale?: string; show?: boolean }>;
   };
+  hooks: {
+    destroy: Array<() => void>;
+  };
+  over: HTMLDivElement;
+  scales: Record<string, { min?: number; max?: number; time?: boolean }>;
   data: unknown[];
   target: HTMLElement;
   destroy: ReturnType<typeof vi.fn<() => void>>;
+  posToVal: ReturnType<typeof vi.fn<(leftTop: number, scaleKey: string) => number>>;
   setData: ReturnType<typeof vi.fn<(nextData: unknown[], resetScales?: boolean) => void>>;
   setScale: ReturnType<
     typeof vi.fn<(scaleKey: string, range: { min?: number; max?: number }) => void>
   >;
   setSeries: ReturnType<typeof vi.fn<(index: number, options: { show: boolean }) => void>>;
   setSize: ReturnType<typeof vi.fn<(size: { width: number; height: number }) => void>>;
+}
+
+interface MockUPlotPlugin {
+  hooks: {
+    setScale?:
+      | ((plot: MockUPlotInstance, scaleKey: string) => void)
+      | Array<(plot: MockUPlotInstance, scaleKey: string) => void>;
+    ready?: ((plot: MockUPlotInstance) => void) | Array<(plot: MockUPlotInstance) => void>;
+    destroy?: ((plot: MockUPlotInstance) => void) | Array<(plot: MockUPlotInstance) => void>;
+  };
 }
 
 const mockUPlot = vi.hoisted(() => ({
@@ -50,9 +69,48 @@ vi.mock("uplot", () => {
       target: HTMLElement,
     ) {
       this.options = options;
+      this.options.hooks ??= {};
+      mergePluginHooks(this.options);
       this.data = data;
       this.target = target;
-      this.destroy = vi.fn<() => void>();
+      this.over = document.createElement("div");
+      this.over.className = "u-over";
+      this.over.getBoundingClientRect = vi.fn<() => DOMRect>(
+        () =>
+          ({
+            left: 0,
+            top: 0,
+            width: 400,
+            height: 260,
+            right: 400,
+            bottom: 260,
+            x: 0,
+            y: 0,
+            toJSON: () => ({}),
+          }) as DOMRect,
+      );
+      target.append(this.over);
+      this.scales = this.options.scales ?? {};
+      this.hooks = {
+        destroy: [],
+      };
+      this.destroy = vi.fn<() => void>(() => {
+        for (const cleanup of this.hooks.destroy) {
+          cleanup();
+        }
+        for (const hook of this.options.hooks?.destroy ?? []) {
+          hook(this);
+        }
+      });
+      this.posToVal = vi.fn<(leftTop: number, scaleKey: string) => number>((leftTop, scaleKey) => {
+        const scale = this.scales[scaleKey];
+
+        if (scale?.min === undefined || scale.max === undefined) {
+          return leftTop;
+        }
+
+        return scale.min + (leftTop / 400) * (scale.max - scale.min);
+      });
       this.setData = vi.fn<(nextData: unknown[], resetScales?: boolean) => void>((nextData) => {
         this.data = nextData;
       });
@@ -63,14 +121,46 @@ vi.mock("uplot", () => {
             ...this.options.scales[scaleKey],
             ...range,
           };
+          this.scales = this.options.scales;
+          for (const hook of this.options.hooks?.setScale ?? []) {
+            hook(this, scaleKey);
+          }
         },
       );
       this.setSeries = vi.fn<(index: number, options: { show: boolean }) => void>();
       this.setSize = vi.fn<(size: { width: number; height: number }) => void>();
       mockUPlot.instances.push(this);
+      for (const hook of this.options.hooks.ready ?? []) {
+        hook(this);
+      }
     }),
   };
 });
+
+function mergePluginHooks(options: MockUPlotInstance["options"]): void {
+  for (const plugin of options.plugins ?? []) {
+    appendHooks(options, "setScale", plugin.hooks.setScale);
+    appendHooks(options, "ready", plugin.hooks.ready);
+    appendHooks(options, "destroy", plugin.hooks.destroy);
+  }
+}
+
+function appendHooks<Key extends keyof NonNullable<MockUPlotInstance["options"]["hooks"]>>(
+  options: MockUPlotInstance["options"],
+  key: Key,
+  hooks: NonNullable<MockUPlotPlugin["hooks"][Key]> | undefined,
+): void {
+  if (hooks === undefined) {
+    return;
+  }
+
+  options.hooks ??= {};
+  const existingHooks = options.hooks[key] ?? [];
+  options.hooks[key] = [
+    ...existingHooks,
+    ...(Array.isArray(hooks) ? hooks : [hooks]),
+  ] as NonNullable<MockUPlotInstance["options"]["hooks"]>[Key];
+}
 
 describe("MonitorOutputController", () => {
   beforeEach(() => {
@@ -304,6 +394,115 @@ describe("MonitorOutputController", () => {
     );
   });
 
+  test("zooms the x range with the uPlot wheel interaction plugin", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    const setScaleCallCount = plot.setScale.mock.calls.length;
+
+    plot.over.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 200,
+        deltaY: -100,
+      }),
+    );
+
+    const zoomCall = plot.setScale.mock.calls.at(-1);
+    expect(zoomCall?.[0]).toBe("x");
+    expect(zoomCall?.[1].min).toBeCloseTo(0.15);
+    expect(zoomCall?.[1].max).toBeCloseTo(1.85);
+
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 2,
+      receivedAt: 1_100,
+      samples: [{ time: 3, values: { temp: 23, rpm: 4 } }],
+    });
+
+    expect(plot.setScale).toHaveBeenCalledTimes(setScaleCallCount + 1);
+    expect(plot.setData).toHaveBeenLastCalledWith(
+      [
+        [1, 2, 3],
+        [21, 22, 23],
+        [2, 3, 4],
+      ],
+      false,
+    );
+  });
+
+  test("pans the x range with the uPlot pointer interaction plugin", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+
+    plot.over.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        button: 1,
+        clientX: 200,
+        clientY: 100,
+        pointerId: 1,
+        pointerType: "mouse",
+      }),
+    );
+    plot.over.dispatchEvent(
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        clientX: 240,
+        clientY: 100,
+        pointerId: 1,
+        pointerType: "mouse",
+      }),
+    );
+    plot.over.dispatchEvent(
+      new PointerEvent("pointerup", {
+        bubbles: true,
+        pointerId: 1,
+        pointerType: "mouse",
+      }),
+    );
+
+    const panCall = plot.setScale.mock.calls.at(-1);
+    expect(panCall?.[0]).toBe("x");
+    expect(panCall?.[1].min).toBeCloseTo(-0.2);
+    expect(panCall?.[1].max).toBeCloseTo(1.8);
+  });
+
   test("resets plot view without clearing data", () => {
     const { controller, root } = createController();
     controller.renderOutputs([
@@ -344,6 +543,45 @@ describe("MonitorOutputController", () => {
       [1, 2, 3],
     ]);
     expect(plot.setSeries).toHaveBeenLastCalledWith(2, { show: false });
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 0, max: 2 });
+  });
+
+  test("resets the plot view with the uPlot double-click interaction plugin", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+
+    plot.over.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 200,
+        deltaY: -100,
+      }),
+    );
+    plot.over.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, cancelable: true }));
+
+    expect(plot.data).toEqual([
+      [0, 1, 2],
+      [20, 21, 22],
+      [1, 2, 3],
+    ]);
     expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 0, max: 2 });
   });
 

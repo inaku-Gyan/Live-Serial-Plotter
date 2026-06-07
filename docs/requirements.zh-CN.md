@@ -45,6 +45,7 @@
 
 - `timeSeriesLine` 应固定显示一个滚动窗口，并持续追踪最新数据点。
 - 用户用鼠标拖拽放大 time-series 图表区域后，缩放视图应保持，不应被下一次数据刷新立刻回弹到默认滚动窗口。
+- time-series 图表交互入口应优先实现为 uPlot plugin/hooks：包括手动 scale 变更检测、鼠标滚轮缩放、拖拽平移、触摸平移/捏合缩放和双击重置视图。
 - 默认状态仍自动滚动追踪最新数据；一旦用户手动缩放，应暂停自动追踪，直到图表结构重建、清空或切换 profile。
 - `window.mode: "points"` 保留并显示最新 `maxPoints` 个采样点。
 - `window.mode: "duration"` 按最新样本时间显示最近 `seconds` 秒。
