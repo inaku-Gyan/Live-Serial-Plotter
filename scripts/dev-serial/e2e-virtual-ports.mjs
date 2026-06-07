@@ -3,6 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { setTimeout as sleepTimer } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { SerialPort } from "serialport";
@@ -326,22 +327,22 @@ function waitForPath(targetPath) {
   });
 }
 
-function sleep(ms, signal) {
+async function sleep(ms, signal) {
   if (signal.aborted) {
-    return Promise.resolve();
+    return;
   }
 
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
-  });
+  try {
+    await sleepTimer(ms, undefined, { signal });
+  } catch (error) {
+    if (!isAbortError(error)) {
+      throw error;
+    }
+  }
+}
+
+function isAbortError(error) {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 async function shutdown(exitCode) {

@@ -13,16 +13,27 @@ export interface ProfileConfigViewProviderOptions {
   readonly profileStore: ProfileStore;
 }
 
+interface ProfileConfigWebviewView {
+  readonly webview: {
+    readonly cspSource: string;
+    html: string;
+    options: unknown;
+    asWebviewUri: (uri: vscode.Uri) => vscode.Uri;
+    onDidReceiveMessage: (listener: (message: ToProfileEditorMessage) => void) => vscode.Disposable;
+    postMessage: (message: ToProfileEditorWebviewMessage) => Thenable<boolean>;
+  };
+}
+
 export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = "liveSerialPlotter.profiles";
 
-  private webviewView: vscode.WebviewView | undefined;
+  private webviewView: ProfileConfigWebviewView | undefined;
   private selectedProfileKey: string | undefined;
   private selectedSource: ProfileSourceMetadata | undefined;
 
   constructor(private readonly options: ProfileConfigViewProviderOptions) {}
 
-  resolveWebviewView(webviewView: vscode.WebviewView): void {
+  resolveWebviewView(webviewView: ProfileConfigWebviewView): void {
     this.webviewView = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
@@ -201,13 +212,17 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
     void this.webviewView?.webview.postMessage(message);
   }
 
-  private getHtml(webview: vscode.Webview): string {
+  private getHtml(webview: ProfileConfigWebviewView["webview"]): string {
     const nonce = getNonce();
-    const profileStyleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.css"),
+    const profileStyleUri = String(
+      webview.asWebviewUri(
+        vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.css"),
+      ),
     );
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.js"),
+    const scriptUri = String(
+      webview.asWebviewUri(
+        vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.js"),
+      ),
     );
 
     return `<!DOCTYPE html>

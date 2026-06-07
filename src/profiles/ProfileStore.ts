@@ -446,16 +446,36 @@ function normalizeOutputs(value: unknown, source: string): OutputConfig[] {
   }
 
   return value.map((output, index) => {
-    if (
-      !isPlainObject(output) ||
-      typeof output.id !== "string" ||
-      typeof output.kind !== "string"
-    ) {
+    if (!isOutputConfig(output)) {
       throw new Error(`${source} output at index ${index} is invalid.`);
     }
 
-    return output as unknown as OutputConfig;
+    return output;
   });
+}
+
+function isOutputConfig(value: unknown): value is OutputConfig {
+  if (!isPlainObject(value) || typeof value.id !== "string") {
+    return false;
+  }
+
+  if (value.kind === "terminalAppend") {
+    return true;
+  }
+
+  if (value.kind === "terminalFrame") {
+    return typeof value.template === "string";
+  }
+
+  if (value.kind === "timeSeriesLine") {
+    return isPlainObject(value.time) && isPlainObject(value.series);
+  }
+
+  if (value.kind === "framePlot2d") {
+    return isPlainObject(value.points);
+  }
+
+  return false;
 }
 
 function normalizeExport(value: unknown): ProfileConfig["export"] {

@@ -250,7 +250,7 @@ export function createProfileEditorStore(
 export type ProfileEditorStore = ReturnType<typeof createProfileEditorStore>;
 
 function cloneProfile(profile: ProfileConfig): ProfileConfig {
-  return JSON.parse(JSON.stringify(profile)) as ProfileConfig;
+  return JSON.parse(JSON.stringify(profile));
 }
 
 function formatError(error: unknown): string {

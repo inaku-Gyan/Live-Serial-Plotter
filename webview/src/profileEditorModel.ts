@@ -344,16 +344,37 @@ function parseJsonObjectOrUndefined(text: string): JsonObject | undefined {
 
   const parsed = JSON.parse(trimmed) as unknown;
 
-  if (!isPlainObject(parsed)) {
+  if (!isJsonObject(parsed)) {
     throw new Error("Parser options must be a JSON object.");
   }
 
-  return parsed as JsonObject;
+  return parsed;
 }
 
 function nonEmptyOr(value: string, fallback: string): string {
   const trimmed = value.trim();
   return trimmed.length === 0 ? fallback : trimmed;
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return isPlainObject(value) && Object.values(value).every(isJsonValue);
+}
+
+function isJsonValue(value: unknown): value is JsonObject[keyof JsonObject] {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  ) {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.every(isJsonValue);
+  }
+
+  return isJsonObject(value);
 }
 
 function emptyToUndefined(value: string): string | undefined {

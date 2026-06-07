@@ -3,6 +3,7 @@ import "uplot/dist/uPlot.min.css";
 import "./styles.css";
 import appHtml from "./app.html?raw";
 import {
+  isParserMode,
   parserModes,
   type OutputPacket,
   type ParserMode,
@@ -45,24 +46,24 @@ const state: PersistedState & { connected: boolean } = {
   connected: false,
 };
 
-const app = requireElement(document, "#app");
+const app = requireElement(document, "#app", HTMLElement);
 app.innerHTML = appHtml;
 
-const profileSelect = requireElement<HTMLSelectElement>(document, "#profileSelect");
-const portSelect = requireElement<HTMLSelectElement>(document, "#portSelect");
-const refreshPortsButton = requireElement<HTMLButtonElement>(document, "#refreshPortsButton");
-const baudRateSelect = requireElement<HTMLSelectElement>(document, "#baudRateSelect");
-const parserModeSelect = requireElement<HTMLSelectElement>(document, "#parserModeSelect");
-const connectButton = requireElement<HTMLButtonElement>(document, "#connectButton");
-const connectionStatus = requireElement(document, "#connectionStatus");
-const chartElement = requireElement(document, "#chart");
-const legendElement = requireElement(document, "#legend");
-const clearLogButton = requireElement<HTMLButtonElement>(document, "#clearLogButton");
-const rawLog = requireElement<HTMLPreElement>(document, "#rawLog");
-const sendForm = requireElement<HTMLFormElement>(document, "#sendForm");
-const sendInput = requireElement<HTMLInputElement>(document, "#sendInput");
-const sendButton = requireElement<HTMLButtonElement>(document, "#sendButton");
-const errorToast = requireElement(document, "#errorToast");
+const profileSelect = requireElement(document, "#profileSelect", HTMLSelectElement);
+const portSelect = requireElement(document, "#portSelect", HTMLSelectElement);
+const refreshPortsButton = requireElement(document, "#refreshPortsButton", HTMLButtonElement);
+const baudRateSelect = requireElement(document, "#baudRateSelect", HTMLSelectElement);
+const parserModeSelect = requireElement(document, "#parserModeSelect", HTMLSelectElement);
+const connectButton = requireElement(document, "#connectButton", HTMLButtonElement);
+const connectionStatus = requireElement(document, "#connectionStatus", HTMLElement);
+const chartElement = requireElement(document, "#chart", HTMLElement);
+const legendElement = requireElement(document, "#legend", HTMLElement);
+const clearLogButton = requireElement(document, "#clearLogButton", HTMLButtonElement);
+const rawLog = requireElement(document, "#rawLog", HTMLPreElement);
+const sendForm = requireElement(document, "#sendForm", HTMLFormElement);
+const sendInput = requireElement(document, "#sendInput", HTMLInputElement);
+const sendButton = requireElement(document, "#sendButton", HTMLButtonElement);
+const errorToast = requireElement(document, "#errorToast", HTMLElement);
 
 const baudRates = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 const rawLines: string[] = [];
@@ -176,7 +177,15 @@ function setupControls(): void {
   });
 
   parserModeSelect.addEventListener("change", () => {
-    state.parserMode = parserModeSelect.value as ParserMode;
+    const parserMode = parserModeSelect.value;
+
+    if (!isParserMode(parserMode)) {
+      showError(`Unsupported parser mode: ${parserMode}`);
+      parserModeSelect.value = state.parserMode;
+      return;
+    }
+
+    state.parserMode = parserMode;
     saveState();
     postMessage({ type: "setParserMode", parserMode: state.parserMode });
   });
@@ -467,16 +476,10 @@ function updatePlotData(): void {
 }
 
 function getPlotData(): uPlot.AlignedData {
-  const data: Array<number[] | Array<number | null>> = [timeValues];
   const values = [...channelData.values()];
+  const yValues: Array<Array<number | null>> = values.length === 0 ? [[]] : values;
 
-  if (values.length === 0) {
-    data.push([]);
-  } else {
-    data.push(...values);
-  }
-
-  return data as uPlot.AlignedData;
+  return [timeValues, ...yValues];
 }
 
 function clearPlot(): void {
@@ -606,11 +609,19 @@ function formatParserMode(parserMode: ParserMode): string {
   return parserMode.toUpperCase();
 }
 
-function requireElement<T extends Element = HTMLElement>(parent: ParentNode, selector: string): T {
-  const element = parent.querySelector<T>(selector);
+function requireElement<T extends Element>(
+  parent: ParentNode,
+  selector: string,
+  elementType: new (...args: never[]) => T,
+): T {
+  const element = parent.querySelector(selector);
 
   if (element === null) {
     throw new Error(`Missing required element: ${selector}`);
+  }
+
+  if (!(element instanceof elementType)) {
+    throw new Error(`Element ${selector} has unexpected type.`);
   }
 
   return element;

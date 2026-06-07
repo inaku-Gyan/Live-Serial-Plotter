@@ -1,4 +1,5 @@
 import { EventEmitter } from "node:events";
+import { setTimeout as sleepTimer } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import type { SerialPortLike } from "../SerialService";
 
@@ -58,12 +59,7 @@ export class ScriptedSerialPort extends EventEmitter implements SerialPortLike {
       return;
     }
 
-    void this.start()
-      .then(() => callback(null))
-      .catch((error: unknown) => {
-        this.stop();
-        callback(toError(error));
-      });
+    void this.openAsync(callback);
   }
 
   close(callback: (error: Error | null | undefined) => void): void {
@@ -72,23 +68,42 @@ export class ScriptedSerialPort extends EventEmitter implements SerialPortLike {
   }
 
   write(data: string | Buffer, callback: (error: Error | null | undefined) => void): void {
-    const onWrite = this.generatorModule?.onWrite;
+    const generatorModule = this.generatorModule;
     const context = this.context;
 
-    if (!this.openState || onWrite === undefined || context === undefined) {
+    if (!this.openState || generatorModule?.onWrite === undefined || context === undefined) {
       queueMicrotask(() => callback(null));
       return;
     }
 
     const buffer = Buffer.isBuffer(data) ? data : Buffer.from(data);
+    void this.writeAsync(generatorModule, buffer, context, callback);
+  }
 
-    void Promise.resolve(onWrite(buffer, context))
-      .then(() => callback(null))
-      .catch((error: unknown) => {
-        const formattedError = toError(error);
-        this.emit("error", formattedError);
-        callback(formattedError);
-      });
+  private async openAsync(callback: (error: Error | null | undefined) => void): Promise<void> {
+    try {
+      await this.start();
+      callback(null);
+    } catch (error) {
+      this.stop();
+      callback(toError(error));
+    }
+  }
+
+  private async writeAsync(
+    generatorModule: ScriptedGeneratorModule,
+    buffer: Buffer,
+    context: ScriptedGeneratorContext,
+    callback: (error: Error | null | undefined) => void,
+  ): Promise<void> {
+    try {
+      await generatorModule.onWrite?.(buffer, context);
+      callback(null);
+    } catch (error) {
+      const formattedError = toError(error);
+      this.emit("error", formattedError);
+      callback(formattedError);
+    }
   }
 
   private async start(): Promise<void> {
@@ -156,38 +171,43 @@ export class ScriptedSerialPort extends EventEmitter implements SerialPortLike {
 export async function loadScriptedGenerator(
   generatorPath: string,
 ): Promise<ScriptedGeneratorModule> {
-  const module = (await import(
-    pathToFileURL(generatorPath).href
-  )) as Partial<ScriptedGeneratorModule>;
+  const module: unknown = await import(pathToFileURL(generatorPath).href);
 
-  if (typeof module.generate !== "function") {
+  if (!isScriptedGeneratorModule(module)) {
     throw new Error(`Generator ${generatorPath} does not export generate().`);
   }
 
-  return {
-    generate: module.generate,
-    onWrite: module.onWrite,
-  };
+  return module;
 }
 
-function sleep(ms: number, signal: AbortSignal): Promise<void> {
+async function sleep(ms: number, signal: AbortSignal): Promise<void> {
   if (signal.aborted) {
-    return Promise.resolve();
+    return;
   }
 
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
-  });
+  try {
+    await sleepTimer(ms, undefined, { signal });
+  } catch (error) {
+    if (!isAbortError(error)) {
+      throw error;
+    }
+  }
 }
 
 function toError(error: unknown): Error {
   return error instanceof Error ? error : new Error(String(error));
+}
+
+function isScriptedGeneratorModule(value: unknown): value is ScriptedGeneratorModule {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "generate" in value &&
+    typeof value.generate === "function" &&
+    (!("onWrite" in value) || value.onWrite === undefined || typeof value.onWrite === "function")
+  );
+}
+
+function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
 }

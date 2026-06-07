@@ -341,5 +341,5 @@ export type ToProfileEditorWebviewMessage =
   | { type: "error"; message: string };
 
 export function isParserMode(value: string): value is ParserMode {
-  return parserModes.includes(value as ParserMode);
+  return parserModes.some((mode) => mode === value);
 }

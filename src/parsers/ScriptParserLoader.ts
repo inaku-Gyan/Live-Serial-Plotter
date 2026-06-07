@@ -24,7 +24,7 @@ export interface ScriptParserLoaderOptions {
 }
 
 interface ScriptParserModule {
-  createParser?(options: JsonObject | undefined): unknown;
+  createParser(options: JsonObject | undefined): unknown;
 }
 
 interface ScriptParserInstance {
@@ -53,11 +53,10 @@ export class ScriptParserLoader implements AsyncScriptParserLoader {
       throw new Error(`Script parser was not trusted: ${filePath}`);
     }
 
-    const module = (await import(
-      `${pathToFileURL(filePath).href}?sha=${hash}`
-    )) as ScriptParserModule;
+    const moduleUrl = `${pathToFileURL(filePath).href}?sha=${hash}`;
+    const module: unknown = await import(moduleUrl);
 
-    if (typeof module.createParser !== "function") {
+    if (!isScriptParserModule(module)) {
       throw new Error(`Script parser must export createParser(options): ${filePath}`);
     }
 
@@ -134,6 +133,10 @@ function normalizeParserResult(result: unknown): ParsedRecordInput[] {
 
 function isScriptParserInstance(value: unknown): value is ScriptParserInstance {
   return isRecord(value) && typeof value.parseFrame === "function";
+}
+
+function isScriptParserModule(value: unknown): value is ScriptParserModule {
+  return isRecord(value) && typeof value.createParser === "function";
 }
 
 function isSubpath(filePath: string, directory: string): boolean {

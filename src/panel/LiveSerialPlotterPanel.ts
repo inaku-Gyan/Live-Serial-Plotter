@@ -172,11 +172,15 @@ export class LiveSerialPlotterPanel {
   private getHtml(): string {
     const webview = this.panel.webview;
     const nonce = getNonce();
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.js"),
+    const scriptUri = String(
+      webview.asWebviewUri(
+        vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.js"),
+      ),
     );
-    const styleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.css"),
+    const styleUri = String(
+      webview.asWebviewUri(
+        vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.css"),
+      ),
     );
 
     return `<!DOCTYPE html>
