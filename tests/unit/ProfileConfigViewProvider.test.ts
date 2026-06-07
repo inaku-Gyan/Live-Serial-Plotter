@@ -200,11 +200,36 @@ describe("ProfileConfigViewProvider", () => {
     );
   });
 
-  test("only contributes refresh to the view title", () => {
-    const viewTitleCommands =
-      packageJson.contributes.menus["view/title"]?.map((item) => item.command) ?? [];
+  test("updates profile editor view context", async () => {
+    const { provider, webviewView, dispatch } = createProvider();
 
-    expect(viewTitleCommands).toEqual(["liveSerialPlotter.profiles.refresh"]);
+    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    await waitForAsyncWork();
+    dispatch({ type: "setProfileEditorView", view: "editor" });
+    await waitForAsyncWork();
+
+    expect(__vscodeMock.executeCommand).toHaveBeenCalledWith(
+      "setContext",
+      "liveSerialPlotter.profileEditorView",
+      "editor",
+    );
+  });
+
+  test("only contributes open jsonc to the editor view title", () => {
+    const viewTitleMenu = packageJson.contributes.menus["view/title"] ?? [];
+
+    expect(viewTitleMenu).toEqual([
+      {
+        command: "liveSerialPlotter.profiles.refresh",
+        when: "view == liveSerialPlotter.profiles",
+        group: "navigation@1",
+      },
+      {
+        command: "liveSerialPlotter.profiles.openJson",
+        when: "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorView == editor",
+        group: "navigation@2",
+      },
+    ]);
   });
 });
 

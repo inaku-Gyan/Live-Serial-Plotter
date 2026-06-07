@@ -68,6 +68,15 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      if (message.type === "setProfileEditorView") {
+        await vscode.commands.executeCommand(
+          "setContext",
+          "liveSerialPlotter.profileEditorView",
+          message.view,
+        );
+        return;
+      }
+
       if (message.type === "autoSaveProfile") {
         await this.autoSaveProfile(message.profile);
         return;

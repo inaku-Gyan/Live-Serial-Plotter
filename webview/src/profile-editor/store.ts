@@ -54,6 +54,7 @@ export function createProfileEditorStore(
     openMenuProfileKey: undefined,
     statusText: "",
   });
+  syncProfileEditorView();
 
   const isBuiltin = computed(() => state.selectedSource?.scope === "builtin");
   const isReady = computed(
@@ -82,6 +83,7 @@ export function createProfileEditorStore(
       state.selectedProfileKey = message.profileKey;
       state.openMenuProfileKey = undefined;
       persistState();
+      syncProfileEditorView();
       setStatusText(`Copied to ${message.filePath}`);
       return;
     }
@@ -100,6 +102,7 @@ export function createProfileEditorStore(
     state.view = "editor";
     state.openMenuProfileKey = undefined;
     persistState();
+    syncProfileEditorView();
 
     if (profileKey !== undefined && profileKey !== state.selectedProfileKey) {
       state.selectedProfileKey = profileKey;
@@ -111,6 +114,7 @@ export function createProfileEditorStore(
     state.view = "home";
     state.openMenuProfileKey = undefined;
     persistState();
+    syncProfileEditorView();
   }
 
   function toggleProfileMenu(profileKey: string): void {
@@ -188,6 +192,10 @@ export function createProfileEditorStore(
       selectedProfileKey: state.selectedProfileKey,
       view: state.view,
     });
+  }
+
+  function syncProfileEditorView(): void {
+    postMessage({ type: "setProfileEditorView", view: state.view });
   }
 
   function postMessage(message: ToProfileEditorMessage): void {

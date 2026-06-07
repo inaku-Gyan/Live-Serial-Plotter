@@ -19,7 +19,7 @@ describe("profileEditorStore", () => {
     store.requestProfileEditorState();
     store.handleHostMessage({ type: "profileEditorState", state: createEditorState() });
 
-    expect(vscode.messages[0]).toEqual({
+    expect(vscode.messages).toContainEqual({
       type: "requestProfileEditorState",
       profileKey: "builtin:jsonl-telemetry",
     });
@@ -40,10 +40,14 @@ describe("profileEditorStore", () => {
     store.openProfileJson("user:custom");
 
     expect(store.state.openMenuProfileKey).toBeUndefined();
-    expect(vscode.messages).toEqual([
-      { type: "copyProfileByKey", profileKey: "builtin:default" },
-      { type: "openProfileJson", profileKey: "user:custom" },
-    ]);
+    expect(vscode.messages).toContainEqual({
+      type: "copyProfileByKey",
+      profileKey: "builtin:default",
+    });
+    expect(vscode.messages).toContainEqual({
+      type: "openProfileJson",
+      profileKey: "user:custom",
+    });
   });
 
   test("opens editor after a profile is copied", () => {
@@ -59,6 +63,7 @@ describe("profileEditorStore", () => {
     expect(store.state.view).toBe("editor");
     expect(store.state.selectedProfileKey).toBe("workspace:file:///root:saved");
     expect(store.state.statusText).toContain("saved.jsonc");
+    expect(vscode.messages).toContainEqual({ type: "setProfileEditorView", view: "editor" });
   });
 
   test("autosaves editable profiles after debounce", () => {

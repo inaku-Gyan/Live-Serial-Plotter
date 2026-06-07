@@ -68,6 +68,7 @@ export const workspace = {
 
 export const commands = {
   registerCommand: vi.fn(() => createDisposable()),
+  executeCommand: vi.fn(() => Promise.resolve()),
 };
 
 export const ViewColumn = {
@@ -111,6 +112,7 @@ export const __vscodeMock = {
   showTextDocument: window.showTextDocument,
   openTextDocument: workspace.openTextDocument,
   registerCommand: commands.registerCommand,
+  executeCommand: commands.executeCommand,
   joinPath: Uri.joinPath,
   file: Uri.file,
 };
@@ -129,6 +131,7 @@ export function __resetVscodeMock(): void {
   workspace.isTrusted = true;
   workspace.workspaceFolders = undefined;
   commands.registerCommand.mockClear();
+  commands.executeCommand.mockClear();
   Uri.joinPath.mockClear();
   Uri.file.mockClear();
 }

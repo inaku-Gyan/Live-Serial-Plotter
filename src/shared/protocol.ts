@@ -329,6 +329,7 @@ export type ToWebviewMessage =
 export type ToProfileEditorMessage =
   | { type: "requestProfileEditorState"; profileKey?: string }
   | { type: "selectProfileForEdit"; profileKey: string }
+  | { type: "setProfileEditorView"; view: "home" | "editor" }
   | { type: "autoSaveProfile"; profile: ProfileConfig }
   | { type: "copyProfileByKey"; profileKey: string }
   | { type: "openProfileJson"; profileKey?: string };
