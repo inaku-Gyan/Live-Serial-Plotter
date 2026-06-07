@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { ProfileStore, type ProfileCopyTarget } from "../profiles/ProfileStore";
+import type { ProfileCopyTarget, ProfileStore } from "../profiles/ProfileStore";
 import type {
   ProfileConfig,
   ProfileEditorState,
