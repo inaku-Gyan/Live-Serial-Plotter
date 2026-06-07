@@ -15,6 +15,7 @@ interface MockUPlotInstance {
   options: {
     axes?: Array<{ label?: string; side?: number }>;
     cursor?: {
+      drag?: { dist?: number; setScale?: boolean; x?: boolean; y?: boolean };
       focus?: { prox?: number };
       hover?: { prox?: number };
       points?: { one?: boolean };
@@ -232,6 +233,7 @@ describe("MonitorOutputController", () => {
     ]);
     expect(plot.options.series.map((series) => series.show)).toEqual([undefined, true, false]);
     expect(plot.options.legend).toEqual({ show: false });
+    expect(plot.options.cursor?.drag).toEqual({ dist: 8, setScale: true, x: true, y: false });
     expect(plot.options.cursor?.points).toEqual({ one: true });
     expect(plot.options.cursor?.focus?.prox).toBe(10);
     expect(plot.options.cursor?.hover?.prox).toBe(10);

@@ -87,6 +87,7 @@ interface PinchState {
 export const defaultTimeSeriesInteractionConfig: TimeSeriesInteractionConfig = {
   cursor: {
     drag: {
+      dist: 8,
       setScale: true,
       x: true,
       y: false,
