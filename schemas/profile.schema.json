@@ -1,0 +1,722 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://inaku-Gyan.github.io/Live-Serial-Plotter/schemas/profile.schema.json",
+  "title": "Live Serial Plotter Profile",
+  "description": "Schema for Live Serial Plotter profile JSONC files.",
+  "$ref": "#/definitions/ProfileConfigFile",
+  "definitions": {
+    "ProfileConfigFile": {
+      "$ref": "#/definitions/ProfileConfig",
+      "description": "Profile JSONC file shape used as the JSON Schema generation entrypoint."
+    },
+    "ProfileConfig": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "integer",
+          "const": 2,
+          "description": "Profile schema version. Version 2 is the only supported profile format."
+        },
+        "id": {
+          "type": "string",
+          "description": "Profile id. It must be unique within its user or workspace namespace.",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable profile name shown in the profile picker and sidebar.",
+          "minLength": 1
+        },
+        "serialDefaults": {
+          "$ref": "#/definitions/SerialDefaultsConfig",
+          "description": "Optional serial defaults suggested when this profile is selected."
+        },
+        "codec": {
+          "$ref": "#/definitions/CodecConfig",
+          "description": "Codec used to decode received bytes and encode sent text."
+        },
+        "framing": {
+          "$ref": "#/definitions/FramingConfig",
+          "description": "Framing strategy applied before parsing serial data."
+        },
+        "parser": {
+          "$ref": "#/definitions/ParserConfig",
+          "description": "Parser used to convert frames into field records."
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OutputConfig"
+          },
+          "description": "Output sinks and renderers fed by parsed records.",
+          "minItems": 1
+        },
+        "export": {
+          "$ref": "#/definitions/ExportConfig",
+          "description": "Optional export defaults for future capture/export workflows."
+        }
+      },
+      "required": ["schemaVersion", "id", "name", "codec", "framing", "parser", "outputs"],
+      "additionalProperties": false,
+      "description": "Serial protocol, parser, and output configuration for one Live Serial Plotter profile."
+    },
+    "SerialDefaultsConfig": {
+      "type": "object",
+      "properties": {
+        "baudRate": {
+          "type": "number",
+          "description": "Default serial baud rate suggested when this profile is selected.",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "CodecConfig": {
+      "$ref": "#/definitions/TextCodecConfig"
+    },
+    "TextCodecConfig": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "text",
+          "description": "Text codec is the only supported codec kind."
+        },
+        "encoding": {
+          "type": "string",
+          "const": "utf8",
+          "description": "UTF-8 is the only supported text encoding."
+        },
+        "sendLineEnding": {
+          "$ref": "#/definitions/LineEnding",
+          "description": "Line ending appended when sending text from the monitor page."
+        }
+      },
+      "required": ["kind", "encoding"],
+      "additionalProperties": false
+    },
+    "LineEnding": {
+      "type": "string",
+      "enum": ["none", "lf", "crlf", "cr"]
+    },
+    "FramingConfig": {
+      "$ref": "#/definitions/LineFramingConfig"
+    },
+    "LineFramingConfig": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "line",
+          "description": "Line framing is the only supported framing kind."
+        },
+        "delimiter": {
+          "type": "string",
+          "enum": ["auto", "lf", "crlf", "cr"],
+          "description": "Delimiter used to split decoded text into frames."
+        },
+        "trim": {
+          "type": "boolean",
+          "description": "Whether to trim framed text before parsing."
+        },
+        "maxFrameBytes": {
+          "type": "number",
+          "description": "Maximum buffered frame size in bytes.",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": ["kind", "delimiter"],
+      "additionalProperties": false
+    },
+    "ParserConfig": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/BuiltinParserConfig"
+        },
+        {
+          "$ref": "#/definitions/ScriptParserConfig"
+        }
+      ]
+    },
+    "BuiltinParserConfig": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "builtin",
+          "description": "Builtin parser selected by mode."
+        },
+        "mode": {
+          "$ref": "#/definitions/ParserMode",
+          "description": "Builtin parser mode."
+        },
+        "options": {
+          "$ref": "#/definitions/JsonObject",
+          "description": "Parser-specific JSON options."
+        }
+      },
+      "required": ["kind", "mode"],
+      "additionalProperties": false
+    },
+    "ParserMode": {
+      "type": "string",
+      "enum": ["auto", "raw", "csv", "jsonl", "keyValue"]
+    },
+    "JsonObject": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/JsonValue"
+      }
+    },
+    "JsonValue": {
+      "oneOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/definitions/JsonObject"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/JsonValue"
+          }
+        }
+      ]
+    },
+    "ScriptParserConfig": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "script",
+          "description": "Workspace script parser."
+        },
+        "path": {
+          "type": "string",
+          "description": "Workspace-relative parser path under .live-serial-plotter/parsers.",
+          "minLength": 1
+        },
+        "options": {
+          "$ref": "#/definitions/JsonObject",
+          "description": "Parser-specific JSON options passed to createParser()."
+        }
+      },
+      "required": ["kind", "path"],
+      "additionalProperties": false
+    },
+    "OutputConfig": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TerminalAppendOutputConfig"
+        },
+        {
+          "$ref": "#/definitions/TerminalFrameOutputConfig"
+        },
+        {
+          "$ref": "#/definitions/TimeSeriesLineOutputConfig"
+        },
+        {
+          "$ref": "#/definitions/FramePlot2dOutputConfig"
+        }
+      ]
+    },
+    "TerminalAppendOutputConfig": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Output id unique within this profile.",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable output title."
+        },
+        "kind": {
+          "type": "string",
+          "const": "terminalAppend",
+          "description": "Appends lines to a terminal-style log."
+        },
+        "source": {
+          "type": "string",
+          "enum": ["raw", "template"],
+          "description": "Text source for appended terminal lines."
+        },
+        "template": {
+          "type": "string",
+          "description": "Template used when source is `template`."
+        },
+        "maxLines": {
+          "type": "number",
+          "description": "Maximum terminal lines retained by the Webview.",
+          "exclusiveMinimum": 0
+        },
+        "autoScroll": {
+          "type": "boolean",
+          "description": "Whether the terminal should auto-scroll to new lines."
+        },
+        "style": {
+          "$ref": "#/definitions/TerminalStyleConfig",
+          "description": "Terminal rendering style."
+        }
+      },
+      "required": ["id", "kind"],
+      "additionalProperties": false
+    },
+    "TerminalStyleConfig": {
+      "type": "object",
+      "properties": {
+        "font": {
+          "type": "string",
+          "enum": ["editor", "ui"],
+          "description": "Font family source."
+        },
+        "wrap": {
+          "type": "boolean",
+          "description": "Whether terminal text wraps."
+        },
+        "levels": {
+          "type": "object",
+          "properties": {
+            "info": {
+              "$ref": "#/definitions/TerminalLineStyle"
+            },
+            "warn": {
+              "$ref": "#/definitions/TerminalLineStyle"
+            },
+            "error": {
+              "$ref": "#/definitions/TerminalLineStyle"
+            },
+            "debug": {
+              "$ref": "#/definitions/TerminalLineStyle"
+            }
+          },
+          "additionalProperties": false,
+          "description": "Per-level line styles."
+        }
+      },
+      "additionalProperties": false
+    },
+    "TerminalLineStyle": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": "string",
+          "description": "CSS color string."
+        }
+      },
+      "additionalProperties": false
+    },
+    "TerminalFrameOutputConfig": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Output id unique within this profile.",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable output title."
+        },
+        "kind": {
+          "type": "string",
+          "const": "terminalFrame",
+          "description": "Replaces a terminal frame by frame id."
+        },
+        "template": {
+          "type": "string",
+          "description": "Template rendered for each frame."
+        },
+        "frameId": {
+          "$ref": "#/definitions/FieldReferenceConfig",
+          "description": "Field used as the frame id. Falls back to sequence number."
+        },
+        "style": {
+          "$ref": "#/definitions/TerminalStyleConfig",
+          "description": "Terminal rendering style."
+        }
+      },
+      "required": ["id", "kind", "template"],
+      "additionalProperties": false
+    },
+    "FieldReferenceConfig": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "const": "field",
+          "description": "Field references resolve against parsed fields."
+        },
+        "field": {
+          "type": "string",
+          "description": "Parsed field path.",
+          "minLength": 1
+        }
+      },
+      "required": ["source", "field"],
+      "additionalProperties": false
+    },
+    "TimeSeriesLineOutputConfig": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Output id unique within this profile.",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable output title."
+        },
+        "kind": {
+          "type": "string",
+          "const": "timeSeriesLine",
+          "description": "Streams numeric samples to a time-series line chart."
+        },
+        "time": {
+          "$ref": "#/definitions/TimeAxisConfig",
+          "description": "Time axis configuration."
+        },
+        "series": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/TimeSeriesConfig"
+          },
+          "description": "Series map. Leave empty to plot all numeric parser fields automatically."
+        },
+        "window": {
+          "$ref": "#/definitions/TimeSeriesWindowConfig",
+          "description": "Rolling chart retention window."
+        },
+        "style": {
+          "type": "object",
+          "properties": {
+            "showLegend": {
+              "type": "boolean",
+              "description": "Whether the chart legend is visible."
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["id", "kind", "series", "time"],
+      "additionalProperties": false
+    },
+    "TimeAxisConfig": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/HostReceivedTimeAxisConfig"
+        },
+        {
+          "$ref": "#/definitions/FieldTimeAxisConfig"
+        },
+        {
+          "$ref": "#/definitions/FixedIntervalTimeAxisConfig"
+        },
+        {
+          "$ref": "#/definitions/SequenceTimeAxisConfig"
+        }
+      ]
+    },
+    "HostReceivedTimeAxisConfig": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "const": "hostReceived",
+          "description": "Use the host receive timestamp as the x-axis value."
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["s", "ms"],
+          "description": "Unit used for host timestamps."
+        },
+        "zero": {
+          "type": "string",
+          "enum": ["none", "first"],
+          "description": "Whether to zero the time axis against the first sample."
+        }
+      },
+      "required": ["source"],
+      "additionalProperties": false
+    },
+    "FieldTimeAxisConfig": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "const": "field",
+          "description": "Use a parsed field as the x-axis value."
+        },
+        "field": {
+          "type": "string",
+          "description": "Parsed field path containing the time value.",
+          "minLength": 1
+        },
+        "unit": {
+          "type": "string",
+          "enum": ["s", "ms", "us"],
+          "description": "Unit used by the parsed time field."
+        },
+        "zero": {
+          "type": "string",
+          "enum": ["none", "first"],
+          "description": "Whether to zero the time axis against the first sample."
+        }
+      },
+      "required": ["source", "field", "unit"],
+      "additionalProperties": false
+    },
+    "FixedIntervalTimeAxisConfig": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "const": "fixedInterval",
+          "description": "Generate x-axis values from a fixed sample interval."
+        },
+        "intervalMs": {
+          "type": "number",
+          "description": "Interval between samples in milliseconds.",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": ["source", "intervalMs"],
+      "additionalProperties": false
+    },
+    "SequenceTimeAxisConfig": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string",
+          "const": "sequence",
+          "description": "Use the frame sequence number as the x-axis value."
+        }
+      },
+      "required": ["source"],
+      "additionalProperties": false
+    },
+    "TimeSeriesConfig": {
+      "type": "object",
+      "properties": {
+        "field": {
+          "type": "string",
+          "description": "Parsed field path used as the series value.",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string",
+          "description": "Human-readable series label."
+        },
+        "unit": {
+          "type": "string",
+          "description": "Unit displayed beside values."
+        },
+        "scale": {
+          "type": "number",
+          "description": "Numeric multiplier applied before plotting."
+        },
+        "color": {
+          "type": "string",
+          "description": "CSS color string."
+        },
+        "visible": {
+          "type": "boolean",
+          "description": "Initial series visibility."
+        },
+        "line": {
+          "type": "object",
+          "properties": {
+            "width": {
+              "type": "number",
+              "description": "Stroke width in pixels.",
+              "exclusiveMinimum": 0
+            },
+            "dash": {
+              "type": "string",
+              "enum": ["solid", "dash"]
+            }
+          },
+          "additionalProperties": false
+        },
+        "format": {
+          "type": "object",
+          "properties": {
+            "decimals": {
+              "type": "number",
+              "description": "Decimal places shown in labels.",
+              "minimum": 0
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "required": ["field"],
+      "additionalProperties": false
+    },
+    "TimeSeriesWindowConfig": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/PointsTimeSeriesWindowConfig"
+        },
+        {
+          "$ref": "#/definitions/DurationTimeSeriesWindowConfig"
+        }
+      ]
+    },
+    "PointsTimeSeriesWindowConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "points",
+          "description": "Retain a maximum number of samples."
+        },
+        "maxPoints": {
+          "type": "number",
+          "description": "Maximum samples retained in points mode.",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": ["mode"],
+      "additionalProperties": false
+    },
+    "DurationTimeSeriesWindowConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "duration",
+          "description": "Retain samples for a rolling duration."
+        },
+        "seconds": {
+          "type": "number",
+          "description": "Rolling duration retained in duration mode.",
+          "exclusiveMinimum": 0
+        }
+      },
+      "required": ["mode"],
+      "additionalProperties": false
+    },
+    "FramePlot2dOutputConfig": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Output id unique within this profile.",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "description": "Human-readable output title."
+        },
+        "kind": {
+          "type": "string",
+          "const": "framePlot2d",
+          "description": "Renders per-frame 2D point layers."
+        },
+        "frameId": {
+          "$ref": "#/definitions/FieldReferenceConfig",
+          "description": "Field used as the frame id. Falls back to sequence number."
+        },
+        "bounds": {
+          "type": "object",
+          "properties": {
+            "xMin": {
+              "type": "number"
+            },
+            "xMax": {
+              "type": "number"
+            },
+            "yMin": {
+              "type": "number"
+            },
+            "yMax": {
+              "type": "number"
+            }
+          },
+          "required": ["xMin", "xMax", "yMin", "yMax"],
+          "additionalProperties": false
+        },
+        "points": {
+          "type": "object",
+          "properties": {
+            "field": {
+              "type": "string",
+              "description": "Parsed field path containing point objects.",
+              "minLength": 1
+            },
+            "x": {
+              "type": "string",
+              "description": "Point object field path used as x coordinate.",
+              "minLength": 1
+            },
+            "y": {
+              "type": "string",
+              "description": "Point object field path used as y coordinate.",
+              "minLength": 1
+            }
+          },
+          "required": ["field", "x", "y"],
+          "additionalProperties": false
+        },
+        "styles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/Plot2dPointStyle"
+          },
+          "description": "Per-style-key point styles."
+        }
+      },
+      "required": ["id", "kind", "points"],
+      "additionalProperties": false
+    },
+    "Plot2dPointStyle": {
+      "type": "object",
+      "properties": {
+        "color": {
+          "type": "string",
+          "description": "CSS color string."
+        },
+        "size": {
+          "type": "number",
+          "description": "Point radius in pixels.",
+          "exclusiveMinimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExportConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["raw", "parsed", "packets"],
+          "description": "Data source exported by default."
+        },
+        "format": {
+          "type": "string",
+          "enum": ["txt", "csv", "jsonl"],
+          "description": "File format used by default."
+        },
+        "includeMetadata": {
+          "type": "boolean",
+          "description": "Whether export output should include metadata fields."
+        }
+      },
+      "required": ["mode", "format"],
+      "additionalProperties": false
+    }
+  }
+}

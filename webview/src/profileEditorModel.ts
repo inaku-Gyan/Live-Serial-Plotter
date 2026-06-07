@@ -125,7 +125,9 @@ export function createProfileEditorPatch(profile: ProfileConfig): ProfileEditorP
               title: output.title ?? "",
               time: createTimeAxisPatch(output.time),
               maxPoints:
-                output.window?.maxPoints === undefined ? "" : String(output.window.maxPoints),
+                output.window?.mode !== "points" || output.window.maxPoints === undefined
+                  ? ""
+                  : String(output.window.maxPoints),
               series: Object.entries(output.series).map(([key, series]) => ({
                 key,
                 field: series.field,
@@ -226,11 +228,7 @@ function applyTimeSeriesPatch(
     id: nonEmptyOr(patch.id, output.id),
     title: emptyToUndefined(patch.title),
     time: createTimeAxisConfig(patch.time, output.time),
-    window: {
-      ...output.window,
-      mode: output.window?.mode ?? "points",
-      maxPoints: parseOptionalNumber(patch.maxPoints),
-    },
+    window: createTimeSeriesWindowConfig(output.window, patch.maxPoints),
     series: Object.fromEntries(
       patch.series
         .filter((series) => series.key.trim().length > 0 && series.field.trim().length > 0)
@@ -260,6 +258,22 @@ function applyTimeSeriesPatch(
           ];
         }),
     ),
+  };
+}
+
+function createTimeSeriesWindowConfig(
+  current: TimeSeriesLineOutputConfig["window"],
+  maxPointsText: string,
+): TimeSeriesLineOutputConfig["window"] {
+  const maxPoints = parseOptionalNumber(maxPointsText);
+
+  if (maxPoints === undefined && current?.mode === "duration") {
+    return current;
+  }
+
+  return {
+    mode: "points",
+    maxPoints,
   };
 }
 

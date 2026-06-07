@@ -29,6 +29,8 @@
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
+    "schema:generate": "node scripts/generate-profile-schema.mjs",
+    "schema:check": "node scripts/generate-profile-schema.mjs --check",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev:serial:e2e": "node scripts/dev-serial/e2e-virtual-ports.mjs",
@@ -37,7 +39,7 @@
     "build:webview": "vite build",
     "build:extension-tests": "tsdown --config tsdown.extension-tests.config.ts",
     "test:extension": "pnpm build && pnpm build:extension-tests && vscode-test",
-    "check": "pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm test",
+    "check": "pnpm schema:check && pnpm fmt:check && pnpm lint && pnpm typecheck && pnpm test",
     "vscode:prepublish": "pnpm build",
     "package": "vsce package --no-dependencies --allow-missing-repository"
   },
@@ -64,6 +66,7 @@
     "oxfmt": "^0.53.0",
     "oxlint": "^1.68.0",
     "oxlint-tsgolint": "^0.23.0",
+    "ts-json-schema-generator": "^2.9.0",
     "tsdown": "^0.22.2",
     "typescript": "^6.0.3",
     "unrun": "^0.3.0",
@@ -122,7 +125,13 @@
           "group": "navigation@2"
         }
       ]
-    }
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": "**/.live-serial-plotter/profiles/*.jsonc",
+        "url": "./schemas/profile.schema.json"
+      }
+    ]
   },
   "icon": "assets/icon.png",
   "galleryBanner": {

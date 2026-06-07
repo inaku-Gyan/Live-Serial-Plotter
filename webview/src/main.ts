@@ -534,7 +534,9 @@ function getRawMaxLines(): number {
 
 function getPlotMaxPoints(): number {
   const plotOutput = getTimeSeriesOutput();
-  return plotOutput?.window?.maxPoints ?? maxPlotPoints;
+  return plotOutput?.window?.mode === "points"
+    ? (plotOutput.window.maxPoints ?? maxPlotPoints)
+    : maxPlotPoints;
 }
 
 function getTimeSeriesOutput(): TimeSeriesLineOutputConfig | undefined {
