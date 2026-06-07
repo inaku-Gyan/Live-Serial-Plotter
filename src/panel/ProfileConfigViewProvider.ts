@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { ProfileStore, type ProfileCopyTarget } from "../profiles/ProfileStore";
+import type { ProfileCopyTarget, ProfileStore } from "../profiles/ProfileStore";
 import type {
   ProfileConfig,
   ProfileEditorState,
@@ -11,18 +11,30 @@ import type {
 export interface ProfileConfigViewProviderOptions {
   readonly extensionUri: vscode.Uri;
   readonly profileStore: ProfileStore;
+  readonly openMonitorPage?: (profileKey: string) => void;
+}
+
+interface ProfileConfigWebviewView {
+  readonly webview: {
+    readonly cspSource: string;
+    html: string;
+    options: unknown;
+    asWebviewUri: (uri: vscode.Uri) => vscode.Uri;
+    onDidReceiveMessage: (listener: (message: ToProfileEditorMessage) => void) => vscode.Disposable;
+    postMessage: (message: ToProfileEditorWebviewMessage) => Thenable<boolean>;
+  };
 }
 
 export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
   static readonly viewType = "liveSerialPlotter.profiles";
 
-  private webviewView: vscode.WebviewView | undefined;
+  private webviewView: ProfileConfigWebviewView | undefined;
   private selectedProfileKey: string | undefined;
   private selectedSource: ProfileSourceMetadata | undefined;
 
   constructor(private readonly options: ProfileConfigViewProviderOptions) {}
 
-  resolveWebviewView(webviewView: vscode.WebviewView): void {
+  resolveWebviewView(webviewView: ProfileConfigWebviewView): void {
     this.webviewView = webviewView;
     webviewView.webview.options = {
       enableScripts: true,
@@ -68,6 +80,21 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
+      if (message.type === "setProfileEditorView") {
+        await vscode.commands.executeCommand(
+          "setContext",
+          "liveSerialPlotter.profileEditorView",
+          message.view,
+        );
+        return;
+      }
+
+      if (message.type === "openMonitorForProfile") {
+        await this.loadProfileByKey(message.profileKey);
+        this.options.openMonitorPage?.(message.profileKey);
+        return;
+      }
+
       if (message.type === "autoSaveProfile") {
         await this.autoSaveProfile(message.profile);
         return;
@@ -83,7 +110,7 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
         await this.openProfileJson(message.profileKey);
       }
     } catch (error) {
-      this.postMessage({ type: "error", message: formatError(error) });
+      await vscode.window.showWarningMessage(formatError(error));
     }
   }
 
@@ -192,13 +219,17 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
     void this.webviewView?.webview.postMessage(message);
   }
 
-  private getHtml(webview: vscode.Webview): string {
+  private getHtml(webview: ProfileConfigWebviewView["webview"]): string {
     const nonce = getNonce();
-    const profileStyleUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.css"),
+    const profileStyleUri = String(
+      webview.asWebviewUri(
+        vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.css"),
+      ),
     );
-    const scriptUri = webview.asWebviewUri(
-      vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.js"),
+    const scriptUri = String(
+      webview.asWebviewUri(
+        vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.js"),
+      ),
     );
 
     return `<!DOCTYPE html>

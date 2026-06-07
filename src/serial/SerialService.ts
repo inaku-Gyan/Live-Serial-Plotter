@@ -1,4 +1,4 @@
-import { EventEmitter } from "node:events";
+import type { EventEmitter } from "node:events";
 import { SerialPort } from "serialport";
 import { PipelineRunner, type AsyncScriptParserLoader } from "../pipeline/PipelineRunner";
 import { defaultProfile } from "../profiles/defaultProfile";

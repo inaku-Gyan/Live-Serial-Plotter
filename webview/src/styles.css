@@ -59,6 +59,7 @@ select {
   text-transform: uppercase;
 }
 
+.field input,
 .field select,
 .send-row input {
   width: 100%;
@@ -68,6 +69,10 @@ select {
   color: var(--vscode-input-foreground);
   background: var(--vscode-input-background);
   padding: 0 8px;
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--vscode-inputValidation-errorBorder);
 }
 
 .button {

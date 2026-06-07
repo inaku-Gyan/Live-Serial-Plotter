@@ -14,6 +14,7 @@ export async function* generate(context) {
     const rpm = rpmBase + Math.sin(t * 2.4) * 300;
 
     yield `temp=${temp.toFixed(2)} humidity=${humidity.toFixed(2)} rpm=${rpm.toFixed(2)}\n`;
+    // oxlint-disable-next-line no-await-in-loop -- The generator intentionally sleeps between samples.
     await context.sleep(intervalMs);
   }
 }

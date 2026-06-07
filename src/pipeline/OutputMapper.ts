@@ -188,8 +188,26 @@ function formatTemplate(template: string, record: ParsedRecord): string {
     }
 
     const value = getFieldValue(record.fields, path);
-    return value === undefined ? "" : String(value);
+    return value === undefined ? "" : formatTemplateValue(value);
   });
+}
+
+function formatTemplateValue(value: unknown): string {
+  if (value === null) {
+    return "";
+  }
+
+  if (
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean" ||
+    typeof value === "bigint"
+  ) {
+    return String(value);
+  }
+
+  const serialized = JSON.stringify(value);
+  return serialized ?? "";
 }
 
 function getFrameId(field: string | undefined, record: ParsedRecord): string | number {

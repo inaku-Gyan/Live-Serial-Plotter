@@ -74,6 +74,11 @@ interface ProfileNamespace {
   readonly workspaceName?: string;
 }
 
+interface DirectoryProfileLoadResult {
+  readonly profiles: LoadedProfile[];
+  readonly errors: string[];
+}
+
 export class ProfileStore {
   constructor(private readonly options: ProfileStoreOptions = {}) {}
 
@@ -81,27 +86,32 @@ export class ProfileStore {
     const profiles: LoadedProfile[] = [];
     const errors: string[] = [];
 
-    for (const directory of this.options.workspaceProfilesDirectories ?? []) {
-      await this.loadDirectoryProfiles(
-        {
-          scope: "workspace",
-          workspaceFolderUri: directory.folderUri,
-          workspaceName: directory.folderName,
-        },
-        directory.profilesDirectory,
-        profiles,
-        errors,
-      );
+    const workspaceProfileResults = await Promise.all(
+      (this.options.workspaceProfilesDirectories ?? []).map((directory) =>
+        this.loadDirectoryProfiles(
+          {
+            scope: "workspace",
+            workspaceFolderUri: directory.folderUri,
+            workspaceName: directory.folderName,
+          },
+          directory.profilesDirectory,
+        ),
+      ),
+    );
+
+    for (const result of workspaceProfileResults) {
+      profiles.push(...result.profiles);
+      errors.push(...result.errors);
     }
 
-    await this.loadDirectoryProfiles(
+    const userProfileResult = await this.loadDirectoryProfiles(
       {
         scope: "user",
       },
       this.options.userProfilesDirectory,
-      profiles,
-      errors,
     );
+    profiles.push(...userProfileResult.profiles);
+    errors.push(...userProfileResult.errors);
 
     for (const profile of builtinProfiles) {
       profiles.push(createLoadedProfile(profile, { scope: "builtin" }));
@@ -209,35 +219,53 @@ export class ProfileStore {
   private async loadDirectoryProfiles(
     namespace: ProfileNamespace,
     directory: string | undefined,
-    profiles: LoadedProfile[],
-    errors: string[],
-  ): Promise<void> {
+  ): Promise<DirectoryProfileLoadResult> {
+    const profiles: LoadedProfile[] = [];
+    const errors: string[] = [];
+
     if (directory === undefined || !existsSync(directory)) {
-      return;
+      return { profiles, errors };
     }
 
     const entries = await readdir(directory, { withFileTypes: true });
     entries.sort((left, right) => left.name.localeCompare(right.name));
 
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith(".jsonc")) {
-        continue;
+    const fileLoadResults = await Promise.all(
+      entries
+        .filter((entry) => entry.isFile() && entry.name.endsWith(".jsonc"))
+        .map(async (entry) => {
+          const filePath = path.join(directory, entry.name);
+
+          try {
+            const raw = await readFile(filePath, "utf8");
+            const config = normalizeProfileConfig(parseJsonc(raw), filePath);
+
+            return {
+              profile: createLoadedProfile(config, namespace, {
+                filePath,
+              }),
+              error: undefined,
+            };
+          } catch (error) {
+            return {
+              profile: undefined,
+              error: `${filePath}: ${formatError(error)}`,
+            };
+          }
+        }),
+    );
+
+    for (const result of fileLoadResults) {
+      if (result.profile !== undefined) {
+        profiles.push(result.profile);
       }
 
-      const filePath = path.join(directory, entry.name);
-
-      try {
-        const raw = await readFile(filePath, "utf8");
-        const config = normalizeProfileConfig(parseJsonc(raw), filePath);
-        profiles.push(
-          createLoadedProfile(config, namespace, {
-            filePath,
-          }),
-        );
-      } catch (error) {
-        errors.push(`${filePath}: ${formatError(error)}`);
+      if (result.error !== undefined) {
+        errors.push(result.error);
       }
     }
+
+    return { profiles, errors };
   }
 
   private resolveTargetDirectory(target: ProfileCopyTarget): string {
@@ -446,16 +474,36 @@ function normalizeOutputs(value: unknown, source: string): OutputConfig[] {
   }
 
   return value.map((output, index) => {
-    if (
-      !isPlainObject(output) ||
-      typeof output.id !== "string" ||
-      typeof output.kind !== "string"
-    ) {
+    if (!isOutputConfig(output)) {
       throw new Error(`${source} output at index ${index} is invalid.`);
     }
 
-    return output as unknown as OutputConfig;
+    return output;
   });
+}
+
+function isOutputConfig(value: unknown): value is OutputConfig {
+  if (!isPlainObject(value) || typeof value.id !== "string") {
+    return false;
+  }
+
+  if (value.kind === "terminalAppend") {
+    return true;
+  }
+
+  if (value.kind === "terminalFrame") {
+    return typeof value.template === "string";
+  }
+
+  if (value.kind === "timeSeriesLine") {
+    return isPlainObject(value.time) && isPlainObject(value.series);
+  }
+
+  if (value.kind === "framePlot2d") {
+    return isPlainObject(value.points);
+  }
+
+  return false;
 }
 
 function normalizeExport(value: unknown): ProfileConfig["export"] {

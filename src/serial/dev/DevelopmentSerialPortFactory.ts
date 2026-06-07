@@ -131,7 +131,8 @@ function readConfigFile(configPath: string): ConfigFile {
     return {};
   }
 
-  return JSON.parse(readFileSync(configPath, "utf8")) as ConfigFile;
+  const parsed: unknown = JSON.parse(readFileSync(configPath, "utf8"));
+  return isConfigFile(parsed) ? parsed : {};
 }
 
 function readRegistryFile(registryPath: string): E2eRegistry {
@@ -140,7 +141,8 @@ function readRegistryFile(registryPath: string): E2eRegistry {
   }
 
   try {
-    return JSON.parse(readFileSync(registryPath, "utf8")) as E2eRegistry;
+    const parsed: unknown = JSON.parse(readFileSync(registryPath, "utf8"));
+    return isE2eRegistry(parsed) ? parsed : {};
   } catch {
     return {};
   }
@@ -205,4 +207,18 @@ function resolveGeneratorPath(
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isConfigFile(value: unknown): value is ConfigFile {
+  return (
+    isPlainObject(value) &&
+    (value.ports === undefined || (Array.isArray(value.ports) && value.ports.every(isPlainObject)))
+  );
+}
+
+function isE2eRegistry(value: unknown): value is E2eRegistry {
+  return (
+    isPlainObject(value) &&
+    (value.ports === undefined || (Array.isArray(value.ports) && value.ports.every(isPlainObject)))
+  );
 }

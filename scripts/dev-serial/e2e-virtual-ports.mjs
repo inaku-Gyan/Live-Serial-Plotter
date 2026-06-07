@@ -3,6 +3,7 @@
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { setTimeout as sleepTimer } from "node:timers/promises";
 import { pathToFileURL } from "node:url";
 import { spawn, spawnSync } from "node:child_process";
 import { SerialPort } from "serialport";
@@ -78,8 +79,9 @@ async function startSocatPorts(configs, options) {
     portProcesses.push(socat);
     socat.stderr.on("data", (chunk) => process.stderr.write(`[socat:${config.path}] ${chunk}`));
 
-    await waitForPath(devicePath);
-    await waitForPath(vscodePath);
+    // oxlint-disable-next-line no-await-in-loop -- Virtual serial ports are external resources set up one pair at a time.
+    await Promise.all([waitForPath(devicePath), waitForPath(vscodePath)]);
+    // oxlint-disable-next-line no-await-in-loop -- Start the writer only after its matching port pair is ready.
     await startGeneratorWriter(config, devicePath);
 
     activePorts.push({
@@ -137,6 +139,7 @@ async function startWindowsPorts(configs, options) {
       }
     }
 
+    // oxlint-disable-next-line no-await-in-loop -- com0com pairs are external resources set up one pair at a time.
     await startGeneratorWriter(config, pair.device);
     activePorts.push({
       path: pair.vscode,
@@ -326,22 +329,22 @@ function waitForPath(targetPath) {
   });
 }
 
-function sleep(ms, signal) {
+async function sleep(ms, signal) {
   if (signal.aborted) {
-    return Promise.resolve();
+    return;
   }
 
-  return new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    signal.addEventListener(
-      "abort",
-      () => {
-        clearTimeout(timer);
-        resolve();
-      },
-      { once: true },
-    );
-  });
+  try {
+    await sleepTimer(ms, undefined, { signal });
+  } catch (error) {
+    if (!isAbortError(error)) {
+      throw error;
+    }
+  }
+}
+
+function isAbortError(error) {
+  return error instanceof Error && error.name === "AbortError";
 }
 
 async function shutdown(exitCode) {
@@ -356,9 +359,9 @@ async function shutdown(exitCode) {
     controller.abort();
   }
 
-  for (const serialPort of serialPorts) {
-    await closeSerialPort(serialPort).catch(() => undefined);
-  }
+  await Promise.all(
+    serialPorts.map((serialPort) => closeSerialPort(serialPort).catch(() => undefined)),
+  );
 
   for (const child of portProcesses) {
     child.kill();

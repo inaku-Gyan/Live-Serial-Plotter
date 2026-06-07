@@ -329,6 +329,8 @@ export type ToWebviewMessage =
 export type ToProfileEditorMessage =
   | { type: "requestProfileEditorState"; profileKey?: string }
   | { type: "selectProfileForEdit"; profileKey: string }
+  | { type: "setProfileEditorView"; view: "home" | "editor" }
+  | { type: "openMonitorForProfile"; profileKey: string }
   | { type: "autoSaveProfile"; profile: ProfileConfig }
   | { type: "copyProfileByKey"; profileKey: string }
   | { type: "openProfileJson"; profileKey?: string };
@@ -340,5 +342,5 @@ export type ToProfileEditorWebviewMessage =
   | { type: "error"; message: string };
 
 export function isParserMode(value: string): value is ParserMode {
-  return parserModes.includes(value as ParserMode);
+  return parserModes.some((mode) => mode === value);
 }

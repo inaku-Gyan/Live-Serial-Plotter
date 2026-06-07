@@ -2,7 +2,7 @@ import packageJson from "../../package.json";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ProfileConfigViewProvider } from "../../src/panel/ProfileConfigViewProvider";
 import { defaultProfile } from "../../src/profiles/defaultProfile";
@@ -23,7 +23,7 @@ describe("ProfileConfigViewProvider", () => {
   test("posts initial editor state when the view resolves", async () => {
     const { provider, webviewView } = createProvider();
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
 
     expect(webviewView.webview.postMessage).toHaveBeenCalledWith(
@@ -53,7 +53,7 @@ describe("ProfileConfigViewProvider", () => {
     });
     __vscodeMock.showInputBox.mockResolvedValue("saved-profile");
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     webviewView.webview.postMessage.mockClear();
     dispatch({ type: "copyProfileByKey", profileKey: "builtin:jsonl-telemetry" });
@@ -94,7 +94,7 @@ describe("ProfileConfigViewProvider", () => {
       workspaceProfilesDirectories: [workspaceDirectory],
     });
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     dispatch({ type: "selectProfileForEdit", profileKey });
     await waitForAsyncWork();
@@ -114,7 +114,19 @@ describe("ProfileConfigViewProvider", () => {
     );
   });
 
-  test("reports copy errors for missing profile keys", async () => {
+  test("opens monitor pages for profile keys", async () => {
+    const openMonitorPage = vi.fn<(profileKey: string) => void>();
+    const { provider, webviewView, dispatch } = createProvider({ openMonitorPage });
+
+    provider.resolveWebviewView(webviewView);
+    await waitForAsyncWork();
+    dispatch({ type: "openMonitorForProfile", profileKey: "builtin:jsonl-telemetry" });
+    await waitForAsyncWork();
+
+    expect(openMonitorPage).toHaveBeenCalledWith("builtin:jsonl-telemetry");
+  });
+
+  test("shows native warnings for missing profile keys", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-invalid-"));
     const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Invalid");
     const { provider, webviewView, dispatch } = createProvider({
@@ -128,7 +140,7 @@ describe("ProfileConfigViewProvider", () => {
     });
     __vscodeMock.showInputBox.mockResolvedValue("invalid-profile");
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     webviewView.webview.postMessage.mockClear();
     dispatch({
@@ -137,11 +149,46 @@ describe("ProfileConfigViewProvider", () => {
     });
     await waitForAsyncWork();
 
-    expect(webviewView.webview.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "error",
-        message: 'Profile "builtin:missing" was not found.',
-      }),
+    expect(__vscodeMock.showWarningMessage).toHaveBeenCalledWith(
+      'Profile "builtin:missing" was not found.',
+    );
+    expect(webviewView.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
+  });
+
+  test("shows native warnings when copied profile ids already exist", async () => {
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-duplicate-"));
+    const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "workspace");
+    const profilesDirectory = workspaceDirectory.profilesDirectory;
+    await mkdir(profilesDirectory, { recursive: true });
+    await writeFile(
+      path.join(profilesDirectory, "default.jsonc"),
+      `${JSON.stringify(defaultProfile, null, 2)}\n`,
+      "utf8",
+    );
+    const { provider, webviewView, dispatch } = createProvider({
+      workspaceProfilesDirectories: [workspaceDirectory],
+    });
+    __vscodeMock.showQuickPick.mockResolvedValue({
+      label: "Workspace: workspace",
+      scope: "workspace",
+      workspaceFolderUri: workspaceDirectory.folderUri,
+      workspaceName: workspaceDirectory.folderName,
+    });
+    __vscodeMock.showInputBox.mockResolvedValue("default");
+
+    provider.resolveWebviewView(webviewView);
+    await waitForAsyncWork();
+    webviewView.webview.postMessage.mockClear();
+    dispatch({ type: "copyProfileByKey", profileKey: "builtin:default" });
+    await waitForAsyncWork();
+
+    expect(__vscodeMock.showWarningMessage).toHaveBeenCalledWith(
+      'Profile "default" already exists in Workspace: workspace.',
+    );
+    expect(webviewView.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
     );
   });
 
@@ -165,7 +212,7 @@ describe("ProfileConfigViewProvider", () => {
       workspaceProfilesDirectories: [workspaceDirectory],
     });
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     dispatch({ type: "openProfileJson", profileKey });
     await waitForAsyncWork();
@@ -190,7 +237,7 @@ describe("ProfileConfigViewProvider", () => {
   test("asks users to copy keyed builtin profiles before opening JSONC", async () => {
     const { provider, webviewView, dispatch } = createProvider();
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     dispatch({ type: "openProfileJson", profileKey: "builtin:jsonl-telemetry" });
     await waitForAsyncWork();
@@ -200,19 +247,42 @@ describe("ProfileConfigViewProvider", () => {
     );
   });
 
-  test("does not contribute copy profile to the view title", () => {
-    const viewTitleCommands =
-      packageJson.contributes.menus["view/title"]?.map((item) => item.command) ?? [];
+  test("updates profile editor view context", async () => {
+    const { provider, webviewView, dispatch } = createProvider();
 
-    expect(viewTitleCommands).toEqual([
-      "liveSerialPlotter.profiles.refresh",
-      "liveSerialPlotter.profiles.openJson",
+    provider.resolveWebviewView(webviewView);
+    await waitForAsyncWork();
+    dispatch({ type: "setProfileEditorView", view: "editor" });
+    await waitForAsyncWork();
+
+    expect(__vscodeMock.executeCommand).toHaveBeenCalledWith(
+      "setContext",
+      "liveSerialPlotter.profileEditorView",
+      "editor",
+    );
+  });
+
+  test("contributes refresh and editor-only open jsonc to the view title", () => {
+    const viewTitleMenu = packageJson.contributes.menus["view/title"] ?? [];
+
+    expect(viewTitleMenu).toEqual([
+      {
+        command: "liveSerialPlotter.profiles.openJson",
+        when: "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorView == editor",
+        group: "navigation@1",
+      },
+      {
+        command: "liveSerialPlotter.profiles.refresh",
+        when: "view == liveSerialPlotter.profiles",
+        group: "navigation@2",
+      },
     ]);
   });
 });
 
 interface CreateProviderOptions {
   readonly workspaceProfilesDirectories?: readonly WorkspaceProfilesDirectory[];
+  readonly openMonitorPage?: (profileKey: string) => void;
 }
 
 function createProvider(options: CreateProviderOptions = {}): {
@@ -226,21 +296,20 @@ function createProvider(options: CreateProviderOptions = {}): {
       cspSource: "vscode-webview:",
       html: "",
       options: undefined,
-      asWebviewUri: vi.fn((uri: unknown) => uri),
-      postMessage: vi.fn(() => Promise.resolve(true)),
-      onDidReceiveMessage: vi.fn((nextListener: (message: ToProfileEditorMessage) => void) => {
+      asWebviewUri: vi.fn<(uri: vscode.Uri) => vscode.Uri>((uri: vscode.Uri) => uri),
+      postMessage: vi.fn<(message: unknown) => Promise<boolean>>(() => Promise.resolve(true)),
+      onDidReceiveMessage: vi.fn<
+        (nextListener: (message: ToProfileEditorMessage) => void) => { dispose(): void }
+      >((nextListener: (message: ToProfileEditorMessage) => void) => {
         listener = nextListener;
-        return { dispose: vi.fn() };
+        return { dispose: vi.fn<() => void>() };
       }),
     },
   } satisfies MockWebviewView;
   const provider = new ProfileConfigViewProvider({
-    extensionUri: {
-      fsPath: "/extension",
-      path: "/extension",
-      toString: () => "/extension",
-    } as unknown as vscode.Uri,
+    extensionUri: vscode.Uri.file("/extension"),
     profileStore: new ProfileStore(options),
+    openMonitorPage: options.openMonitorPage,
   });
 
   return {
@@ -261,9 +330,11 @@ interface MockWebviewView {
     cspSource: string;
     html: string;
     options: unknown;
-    asWebviewUri: ReturnType<typeof vi.fn>;
-    postMessage: ReturnType<typeof vi.fn>;
-    onDidReceiveMessage: ReturnType<typeof vi.fn>;
+    asWebviewUri: (uri: vscode.Uri) => vscode.Uri;
+    postMessage: ReturnType<typeof vi.fn<(message: unknown) => Promise<boolean>>>;
+    onDidReceiveMessage: (nextListener: (message: ToProfileEditorMessage) => void) => {
+      dispose(): void;
+    };
   };
 }
 

@@ -14,6 +14,14 @@ export function activate(context: vscode.ExtensionContext): void {
   const profileConfigViewProvider = new ProfileConfigViewProvider({
     extensionUri: context.extensionUri,
     profileStore,
+    openMonitorPage: (profileKey) => {
+      LiveSerialPlotterPanel.open(context.extensionUri, {
+        serialPortFactory,
+        profileStore,
+        scriptParserLoader,
+        initialProfileKey: profileKey,
+      });
+    },
   });
 
   context.subscriptions.push(
@@ -40,7 +48,9 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {}
 
-export function createSerialPortFactory(context: vscode.ExtensionContext): SerialPortFactory {
+export function createSerialPortFactory(
+  context: Pick<vscode.ExtensionContext, "extensionMode" | "extensionUri">,
+): SerialPortFactory {
   if (context.extensionMode === vscode.ExtensionMode.Production) {
     return new NodeSerialPortFactory();
   }

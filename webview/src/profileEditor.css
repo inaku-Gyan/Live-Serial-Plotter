@@ -137,27 +137,26 @@ textarea {
 }
 
 .profile-menu-trigger {
+  display: grid;
+  place-items: center;
   width: 24px;
   height: 24px;
   border: 0;
   border-radius: 4px;
   padding: 0;
-  opacity: 0;
-  color: inherit;
+  color: var(--vscode-icon-foreground, inherit);
   background: transparent;
   cursor: pointer;
-}
-
-.profile-list-item:hover .profile-menu-trigger,
-.profile-list-item:focus-within .profile-menu-trigger,
-.profile-list-item[data-menu-open="true"] .profile-menu-trigger {
-  opacity: 1;
 }
 
 .profile-menu-trigger:hover,
 .profile-menu-trigger:focus {
   outline: none;
   background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.profile-menu-trigger .codicon {
+  font-size: 16px;
 }
 
 .profile-list-menu {
@@ -171,6 +170,11 @@ textarea {
   padding: 3px;
   box-shadow: 0 2px 8px rgb(0 0 0 / 24%);
   background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+}
+
+.profile-list-menu--context {
+  position: fixed;
+  right: auto;
 }
 
 .profile-list-menu button {
@@ -270,6 +274,10 @@ textarea {
 .profile-editor-toolbar select {
   height: 28px;
   padding: 0 7px;
+}
+
+.profile-field input[aria-invalid="true"] {
+  border-color: var(--vscode-inputValidation-errorBorder);
 }
 
 .profile-field textarea {

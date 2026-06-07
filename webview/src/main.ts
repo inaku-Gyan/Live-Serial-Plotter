@@ -2,7 +2,9 @@ import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import "./styles.css";
 import appHtml from "./app.html?raw";
+import { baudRatePresets, isBaudRateInputValid, parseBaudRateInput } from "./baudRate";
 import {
+  isParserMode,
   parserModes,
   type OutputPacket,
   type ParserMode,
@@ -33,10 +35,11 @@ declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
 const vscode = acquireVsCodeApi<PersistedState>();
 const persistedState = vscode.getState();
 const defaultProfileKey = `builtin:${defaultProfile.id}`;
+const initialProfileKey = nonEmptyString(document.body.dataset.initialProfileKey);
 const initialState: PersistedState = {
   baudRate: persistedState?.baudRate ?? defaultProfile.serialDefaults?.baudRate ?? 115200,
   parserMode: persistedState?.parserMode ?? ("auto" satisfies ParserMode),
-  profileKey: persistedState?.profileKey ?? defaultProfileKey,
+  profileKey: initialProfileKey ?? persistedState?.profileKey ?? defaultProfileKey,
   selectedPath: persistedState?.selectedPath ?? "",
 };
 
@@ -45,26 +48,26 @@ const state: PersistedState & { connected: boolean } = {
   connected: false,
 };
 
-const app = requireElement(document, "#app");
+const app = requireElement(document, "#app", HTMLElement);
 app.innerHTML = appHtml;
 
-const profileSelect = requireElement<HTMLSelectElement>(document, "#profileSelect");
-const portSelect = requireElement<HTMLSelectElement>(document, "#portSelect");
-const refreshPortsButton = requireElement<HTMLButtonElement>(document, "#refreshPortsButton");
-const baudRateSelect = requireElement<HTMLSelectElement>(document, "#baudRateSelect");
-const parserModeSelect = requireElement<HTMLSelectElement>(document, "#parserModeSelect");
-const connectButton = requireElement<HTMLButtonElement>(document, "#connectButton");
-const connectionStatus = requireElement(document, "#connectionStatus");
-const chartElement = requireElement(document, "#chart");
-const legendElement = requireElement(document, "#legend");
-const clearLogButton = requireElement<HTMLButtonElement>(document, "#clearLogButton");
-const rawLog = requireElement<HTMLPreElement>(document, "#rawLog");
-const sendForm = requireElement<HTMLFormElement>(document, "#sendForm");
-const sendInput = requireElement<HTMLInputElement>(document, "#sendInput");
-const sendButton = requireElement<HTMLButtonElement>(document, "#sendButton");
-const errorToast = requireElement(document, "#errorToast");
+const profileSelect = requireElement(document, "#profileSelect", HTMLSelectElement);
+const portSelect = requireElement(document, "#portSelect", HTMLSelectElement);
+const refreshPortsButton = requireElement(document, "#refreshPortsButton", HTMLButtonElement);
+const baudRateInput = requireElement(document, "#baudRateInput", HTMLInputElement);
+const baudRateDatalist = requireElement(document, "#baudRatePresets", HTMLDataListElement);
+const parserModeSelect = requireElement(document, "#parserModeSelect", HTMLSelectElement);
+const connectButton = requireElement(document, "#connectButton", HTMLButtonElement);
+const connectionStatus = requireElement(document, "#connectionStatus", HTMLElement);
+const chartElement = requireElement(document, "#chart", HTMLElement);
+const legendElement = requireElement(document, "#legend", HTMLElement);
+const clearLogButton = requireElement(document, "#clearLogButton", HTMLButtonElement);
+const rawLog = requireElement(document, "#rawLog", HTMLPreElement);
+const sendForm = requireElement(document, "#sendForm", HTMLFormElement);
+const sendInput = requireElement(document, "#sendInput", HTMLInputElement);
+const sendButton = requireElement(document, "#sendButton", HTMLButtonElement);
+const errorToast = requireElement(document, "#errorToast", HTMLElement);
 
-const baudRates = [9600, 19200, 38400, 57600, 115200, 230400, 460800, 921600];
 const rawLines: string[] = [];
 const timeValues: number[] = [];
 const channelData = new Map<string, Array<number | null>>();
@@ -141,14 +144,14 @@ new ResizeObserver(() => {
 }).observe(chartElement);
 
 function setupControls(): void {
-  for (const baudRate of baudRates) {
+  for (const baudRate of baudRatePresets) {
     const option = document.createElement("option");
     option.value = String(baudRate);
-    option.textContent = String(baudRate);
-    baudRateSelect.append(option);
+    baudRateDatalist.append(option);
   }
 
-  baudRateSelect.value = String(state.baudRate);
+  baudRateInput.value = String(state.baudRate);
+  updateBaudRateInputValidity();
 
   for (const parserMode of parserModes) {
     const option = document.createElement("option");
@@ -169,14 +172,19 @@ function setupControls(): void {
   connectButton.addEventListener("click", () => toggleConnection());
   clearLogButton.addEventListener("click", () => clearLog());
 
-  baudRateSelect.addEventListener("change", () => {
-    state.baudRate = Number(baudRateSelect.value);
-    userChangedBaudRate = true;
-    saveState();
-  });
+  baudRateInput.addEventListener("input", handleBaudRateInput);
+  baudRateInput.addEventListener("change", handleBaudRateInput);
 
   parserModeSelect.addEventListener("change", () => {
-    state.parserMode = parserModeSelect.value as ParserMode;
+    const parserMode = parserModeSelect.value;
+
+    if (!isParserMode(parserMode)) {
+      showError(`Unsupported parser mode: ${parserMode}`);
+      parserModeSelect.value = state.parserMode;
+      return;
+    }
+
+    state.parserMode = parserMode;
     saveState();
     postMessage({ type: "setParserMode", parserMode: state.parserMode });
   });
@@ -198,6 +206,19 @@ function setupControls(): void {
     postMessage({ type: "send", text });
     sendInput.value = "";
   });
+
+  updateConnectionControls();
+}
+
+function handleBaudRateInput(): void {
+  userChangedBaudRate = true;
+
+  try {
+    state.baudRate = parseBaudRateInput(baudRateInput.value);
+    saveState();
+  } catch {
+    // Keep the last valid runtime value while the user is editing an invalid input.
+  }
 
   updateConnectionControls();
 }
@@ -229,7 +250,8 @@ function applyProfile(profile: ProfileConfig, profileKey: string): void {
 
   if (!userChangedBaudRate && profile.serialDefaults?.baudRate !== undefined) {
     state.baudRate = profile.serialDefaults.baudRate;
-    baudRateSelect.value = String(state.baudRate);
+    baudRateInput.value = String(state.baudRate);
+    updateBaudRateInputValidity();
   }
 
   if (profile.parser.kind === "builtin") {
@@ -285,14 +307,38 @@ function toggleConnection(): void {
     return;
   }
 
+  const baudRate = readBaudRateInput();
+
+  if (baudRate === undefined) {
+    showError("Enter a valid positive integer baud rate before connecting.");
+    return;
+  }
+
   postMessage({
     type: "connect",
     settings: {
       path: state.selectedPath,
-      baudRate: Number(baudRateSelect.value),
+      baudRate,
       parserMode: activeProfile.parser.kind === "builtin" ? state.parserMode : undefined,
     },
   });
+}
+
+function readBaudRateInput(): number | undefined {
+  try {
+    const baudRate = parseBaudRateInput(baudRateInput.value);
+    baudRateInput.setAttribute("aria-invalid", "false");
+    return baudRate;
+  } catch {
+    baudRateInput.setAttribute("aria-invalid", "true");
+    return undefined;
+  }
+}
+
+function updateBaudRateInputValidity(): boolean {
+  const isValid = isBaudRateInputValid(baudRateInput.value);
+  baudRateInput.setAttribute("aria-invalid", isValid ? "false" : "true");
+  return isValid;
 }
 
 function updateConnectionControls(): void {
@@ -303,10 +349,11 @@ function updateConnectionControls(): void {
     : "Disconnected";
   connectionStatus.classList.toggle("status-connected", state.connected);
   portSelect.disabled = state.connected || ports.length === 0;
-  baudRateSelect.disabled = state.connected;
+  baudRateInput.disabled = state.connected;
   profileSelect.disabled = state.connected;
   parserModeSelect.disabled = state.connected || activeProfile.parser.kind === "script";
-  connectButton.disabled = !state.connected && state.selectedPath.length === 0;
+  connectButton.disabled =
+    !state.connected && (state.selectedPath.length === 0 || !updateBaudRateInputValidity());
   sendInput.disabled = !state.connected;
   sendButton.disabled = !state.connected;
 }
@@ -467,16 +514,10 @@ function updatePlotData(): void {
 }
 
 function getPlotData(): uPlot.AlignedData {
-  const data: Array<number[] | Array<number | null>> = [timeValues];
   const values = [...channelData.values()];
+  const yValues: Array<Array<number | null>> = values.length === 0 ? [[]] : values;
 
-  if (values.length === 0) {
-    data.push([]);
-  } else {
-    data.push(...values);
-  }
-
-  return data as uPlot.AlignedData;
+  return [timeValues, ...yValues];
 }
 
 function clearPlot(): void {
@@ -606,12 +647,24 @@ function formatParserMode(parserMode: ParserMode): string {
   return parserMode.toUpperCase();
 }
 
-function requireElement<T extends Element = HTMLElement>(parent: ParentNode, selector: string): T {
-  const element = parent.querySelector<T>(selector);
+function requireElement<T extends Element>(
+  parent: ParentNode,
+  selector: string,
+  elementType: new (...args: never[]) => T,
+): T {
+  const element = parent.querySelector(selector);
 
   if (element === null) {
     throw new Error(`Missing required element: ${selector}`);
   }
 
+  if (!(element instanceof elementType)) {
+    throw new Error(`Element ${selector} has unexpected type.`);
+  }
+
   return element;
+}
+
+function nonEmptyString(value: string | undefined): string | undefined {
+  return value === undefined || value.length === 0 ? undefined : value;
 }

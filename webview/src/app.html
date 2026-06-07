@@ -11,7 +11,16 @@
     <button id="refreshPortsButton" class="button button-secondary" type="button">Refresh</button>
     <label class="field">
       <span>Baud</span>
-      <select id="baudRateSelect"></select>
+      <input
+        id="baudRateInput"
+        type="number"
+        min="1"
+        step="1"
+        inputmode="numeric"
+        list="baudRatePresets"
+        autocomplete="off"
+      />
+      <datalist id="baudRatePresets"></datalist>
     </label>
     <label class="field">
       <span>Parser</span>
