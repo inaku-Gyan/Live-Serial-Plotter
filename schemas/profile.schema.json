@@ -165,14 +165,12 @@
         }
       ]
     },
-    "outputBaseProperties": {
-      "id": {
-        "type": "string",
-        "minLength": 1
-      },
-      "title": {
-        "type": "string"
-      }
+    "outputId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "outputTitle": {
+      "type": "string"
     },
     "terminalAppendOutput": {
       "type": "object",
@@ -180,10 +178,10 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/outputBaseProperties/id"
+          "$ref": "#/definitions/outputId"
         },
         "title": {
-          "$ref": "#/definitions/outputBaseProperties/title"
+          "$ref": "#/definitions/outputTitle"
         },
         "kind": {
           "type": "string",
@@ -214,10 +212,10 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/outputBaseProperties/id"
+          "$ref": "#/definitions/outputId"
         },
         "title": {
-          "$ref": "#/definitions/outputBaseProperties/title"
+          "$ref": "#/definitions/outputTitle"
         },
         "kind": {
           "type": "string",
@@ -240,10 +238,10 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/outputBaseProperties/id"
+          "$ref": "#/definitions/outputId"
         },
         "title": {
-          "$ref": "#/definitions/outputBaseProperties/title"
+          "$ref": "#/definitions/outputTitle"
         },
         "kind": {
           "type": "string",
@@ -272,10 +270,10 @@
       "additionalProperties": false,
       "properties": {
         "id": {
-          "$ref": "#/definitions/outputBaseProperties/id"
+          "$ref": "#/definitions/outputId"
         },
         "title": {
-          "$ref": "#/definitions/outputBaseProperties/title"
+          "$ref": "#/definitions/outputTitle"
         },
         "kind": {
           "type": "string",
