@@ -64,6 +64,21 @@ pnpm package
 
 不要从 `.vscodeignore` 中排除 `dist/node_modules/**`。否则安装 VSIX 后扩展激活时可能找不到 native binding，表现为命令 `liveSerialPlotter.open` 无法执行或扩展激活失败。
 
+## 发包流程
+
+每次准备发布 `vX.Y.Z` 时按下面流程处理，不要只改版本号：
+
+1. 确认工作区状态，先运行 `git status --short`，避免把无关改动混入 release commit。
+2. 将 `package.json` 中的 `version` 改为 `X.Y.Z`。
+3. 更新 `CHANGELOG.md`，在顶部新增 `## X.Y.Z` 小节，记录本次面向用户的功能、修复、构建或测试变化。
+4. 检查 `docs/release.zh-CN.md` 的发布规则是否仍然适用，尤其是 prerelease/stable 条件和 tag 命名。
+5. 运行 `pnpm check`，必须通过格式、lint、类型检查和单元测试。
+6. 运行 `pnpm package`，确认 VSIX 能成功生成，并留意输出文件名是否包含目标版本号。
+7. 再次运行 `git status --short`，确认 release commit 只包含预期文件；通常只应包含 `package.json`、`CHANGELOG.md`，以及确实必要的发布说明或配置文件。
+8. 提交 release commit，建议格式为 `chore: release vX.Y.Z`。
+9. 创建同名 tag：`git tag vX.Y.Z`。tag 名必须和 `package.json.version` 完全对应。
+10. 推送时同时推送 commit 和 tag；如果使用 CI 发布，确认对应 workflow 已从 tag 正确触发。
+
 ## 当前约束
 
 - 首版只支持桌面版 VS Code，不支持 VS Code Web。
