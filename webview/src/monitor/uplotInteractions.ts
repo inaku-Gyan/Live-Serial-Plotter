@@ -132,7 +132,7 @@ export const defaultTimeSeriesInteractionConfig: TimeSeriesInteractionConfig = {
     ],
     zoomX: {
       deltaAxis: "y",
-      factor: 0.92,
+      factor: 0.5,
       modifiers: {
         ctrlKey: true,
       },
