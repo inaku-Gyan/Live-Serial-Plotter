@@ -228,15 +228,15 @@ class TerminalAppendView implements OutputView {
     this.applyViewLayout(viewLayout);
 
     const header = createPanelHeader(config, "Terminal", () => this.resetView());
-    const clearButton = document.createElement("button");
-    clearButton.className = "button button-secondary output-clear-button";
-    clearButton.type = "button";
-    clearButton.textContent = "Clear";
-    clearButton.addEventListener("click", () => {
-      this.clear();
-      this.postMessage({ type: "clearLog" });
-    });
-    header.append(clearButton);
+    appendPanelHeaderButton(
+      header,
+      "Clear",
+      () => {
+        this.clear();
+        this.postMessage({ type: "clearLog" });
+      },
+      "output-clear-button",
+    );
 
     this.pre = document.createElement("pre");
     this.pre.className = "output-terminal output-standby";
@@ -391,11 +391,16 @@ class TimeSeriesLineView implements OutputView {
     this.legendElement = document.createElement("div");
     this.legendElement.className = "output-legend";
 
-    parent.append(
-      createPanelHeader(config, "Time Series", () => this.resetView()),
-      this.chartElement,
-      this.legendElement,
+    const header = createPanelHeader(config, "Time Series");
+    appendPanelHeaderButton(
+      header,
+      "Follow",
+      () => this.resumeAutoFollow(),
+      "output-follow-button",
     );
+    appendPanelHeaderButton(header, "Reset", () => this.resetView(), "output-reset-button");
+
+    parent.append(header, this.chartElement, this.legendElement);
     this.initializeConfiguredSeries();
     this.rebuildPlot();
 
@@ -482,6 +487,11 @@ class TimeSeriesLineView implements OutputView {
     this.applyViewDefaults();
     this.renderLegend([...this.seriesData.keys()]);
     this.syncSeriesVisibility();
+  }
+
+  resumeAutoFollow(): void {
+    this.isAutoFollowEnabled = true;
+    this.applyAutoFollowRange();
   }
 
   captureViewLayout(): OutputLayoutConfig["view"] {
@@ -590,7 +600,7 @@ class TimeSeriesLineView implements OutputView {
       const xWindowRange = this.getXWindowRange();
 
       if (this.isAutoFollowEnabled && hasScaleRange(xWindowRange)) {
-        this.plot.setScale("x", xWindowRange);
+        this.setPlotScale("x", xWindowRange);
       } else if (!this.isAutoFollowEnabled) {
         this.plot.redraw(true, false);
       }
@@ -876,27 +886,34 @@ class TimeSeriesLineView implements OutputView {
     const zoom = this.viewLayout?.zoom;
 
     if (zoom?.x !== undefined) {
-      this.isApplyingScaleUpdate = true;
-      try {
-        this.plot.setScale("x", zoom.x);
-      } finally {
-        this.isApplyingScaleUpdate = false;
-      }
+      this.setPlotScale("x", zoom.x);
       this.isAutoFollowEnabled = false;
       return;
     }
 
     if (this.isAutoFollowEnabled) {
-      const range = this.getXWindowRange();
+      this.applyAutoFollowRange();
+    }
+  }
 
-      if (hasScaleRange(range)) {
-        this.isApplyingScaleUpdate = true;
-        try {
-          this.plot.setScale("x", range);
-        } finally {
-          this.isApplyingScaleUpdate = false;
-        }
-      }
+  private applyAutoFollowRange(): void {
+    const range = this.getXWindowRange();
+
+    if (this.plot !== undefined && hasScaleRange(range)) {
+      this.setPlotScale("x", range);
+    }
+  }
+
+  private setPlotScale(scaleKey: string, range: { min: number; max: number }): void {
+    if (this.plot === undefined) {
+      return;
+    }
+
+    this.isApplyingScaleUpdate = true;
+    try {
+      this.plot.setScale(scaleKey, range);
+    } finally {
+      this.isApplyingScaleUpdate = false;
     }
   }
 
@@ -1097,15 +1114,38 @@ function createPanelHeader(
   header.append(text);
 
   if (onReset !== undefined) {
-    const resetButton = document.createElement("button");
-    resetButton.className = "button button-secondary output-reset-button";
-    resetButton.type = "button";
-    resetButton.textContent = "Reset";
-    resetButton.addEventListener("click", onReset);
-    header.append(resetButton);
+    appendPanelHeaderButton(header, "Reset", onReset, "output-reset-button");
   }
 
   return header;
+}
+
+function appendPanelHeaderButton(
+  header: HTMLElement,
+  label: string,
+  onClick: () => void,
+  className: string,
+): void {
+  const actions = getPanelHeaderActions(header);
+  const button = document.createElement("button");
+  button.className = `button button-secondary ${className}`;
+  button.type = "button";
+  button.textContent = label;
+  button.addEventListener("click", onClick);
+  actions.append(button);
+}
+
+function getPanelHeaderActions(header: HTMLElement): HTMLElement {
+  const existingActions = header.querySelector<HTMLElement>(".output-header-actions");
+
+  if (existingActions !== null) {
+    return existingActions;
+  }
+
+  const actions = document.createElement("div");
+  actions.className = "output-header-actions";
+  header.append(actions);
+  return actions;
 }
 
 function pickConfiguredValues(

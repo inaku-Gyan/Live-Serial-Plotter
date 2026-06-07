@@ -51,6 +51,7 @@
 - 普通左键框选缩放应设置最小拖拽距离死区，避免点击或极小拖拽误触发缩放。
 - time-series 十字准线可保留 hover marker，但 marker 只应在鼠标接近某条可见曲线时显示；鼠标离开曲线或图表时不应把最近点残留在曲线上。
 - 默认状态仍自动滚动追踪最新数据；一旦用户手动缩放，应暂停自动追踪，直到图表结构重建、清空或切换 profile。
+- time-series 面板应提供恢复追踪操作，将 X 轴切回当前滚动窗口并重新启用 auto-follow；该操作不清空数据、不重置 legend 可见性。
 - `window.mode: "points"` 保留并显示最新 `maxPoints` 个采样点。
 - `window.mode: "duration"` 按最新样本时间显示最近 `seconds` 秒。
 - 横轴应显示坐标和单位；非 sequence 时间轴当前按秒绘制，显示为 `Time (s)`。

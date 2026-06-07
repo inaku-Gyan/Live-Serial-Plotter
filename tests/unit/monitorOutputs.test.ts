@@ -475,6 +475,85 @@ describe("MonitorOutputController", () => {
     expect(plot.redraw).toHaveBeenLastCalledWith(true, false);
   });
 
+  test("resumes auto-follow from the plot header without clearing data or legend state", () => {
+    const { controller, root } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    const rpmCheckbox = root.querySelector<HTMLInputElement>(
+      '[data-output-id="plot"] .legend-item:nth-child(2) input',
+    );
+    const followButton = [
+      ...root.querySelectorAll<HTMLButtonElement>('[data-output-id="plot"] button'),
+    ].find((button) => button.textContent === "Follow");
+
+    if (rpmCheckbox === null || followButton === undefined) {
+      throw new Error("Missing plot follow controls.");
+    }
+
+    rpmCheckbox.checked = true;
+    rpmCheckbox.dispatchEvent(new Event("change"));
+    plot.options.hooks?.setScale?.[0]?.(plot, "x");
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 2,
+      receivedAt: 1_100,
+      samples: [{ time: 3, values: { temp: 23, rpm: 4 } }],
+    });
+
+    expect(plot.setData).toHaveBeenLastCalledWith(
+      [
+        [1, 2, 3],
+        [21, 22, 23],
+        [2, 3, 4],
+      ],
+      false,
+    );
+
+    followButton.click();
+    expect(plot.data).toEqual([
+      [1, 2, 3],
+      [21, 22, 23],
+      [2, 3, 4],
+    ]);
+    expect(rpmCheckbox.checked).toBe(true);
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 1, max: 3 });
+
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 3,
+      receivedAt: 1_200,
+      samples: [{ time: 4, values: { temp: 24, rpm: 5 } }],
+    });
+
+    expect(plot.setData).toHaveBeenLastCalledWith(
+      [
+        [2, 3, 4],
+        [22, 23, 24],
+        [3, 4, 5],
+      ],
+      true,
+    );
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 2, max: 4 });
+  });
+
   test("zooms the x range with ctrl wheel through the uPlot interaction config", () => {
     const { controller } = createController();
     controller.renderOutputs([

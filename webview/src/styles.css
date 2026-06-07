@@ -234,6 +234,13 @@ select {
   background: var(--vscode-sideBar-background);
 }
 
+.output-header-actions {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  flex: 0 0 auto;
+}
+
 .output-title-block {
   display: grid;
   gap: 2px;
@@ -264,6 +271,7 @@ select {
   min-width: 56px;
 }
 
+.output-follow-button,
 .output-reset-button {
   height: 24px;
   min-width: 56px;
