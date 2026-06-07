@@ -111,8 +111,11 @@ select {
 }
 
 .status {
-  align-self: center;
+  display: inline-flex;
+  align-self: end;
+  align-items: center;
   min-width: 0;
+  height: 30px;
   overflow: hidden;
   color: var(--vscode-descriptionForeground);
   text-overflow: ellipsis;
