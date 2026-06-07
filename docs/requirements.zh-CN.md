@@ -56,6 +56,7 @@
 - time-series 面板应提供合并的三态追踪操作：`Follow` 表示当前暂停并可恢复 unlocked follow，`Following` 表示 unlocked 自动追踪中，`Locked Follow` 表示用户操作结束后自动恢复追踪。
 - `Locked Follow` 恢复追踪应在用户操作停止后约 350ms debounce 执行，只平移 X 轴到最新点，保持当前 X 轴跨度和所有纵轴范围。
 - 恢复追踪操作不清空数据、不重置 legend 可见性、不改变纵轴范围。
+- time-series 因自动发现新通道等结构变化而重建图表时，应保留当前 follow 状态、用户缩放/平移后的坐标范围和 legend 可见性；layout 中保存的 zoom 只在初始化或 Reset View 时应用。
 - `window.mode: "points"` 保留并显示最新 `maxPoints` 个采样点。
 - `window.mode: "points"` 的默认可视 X 轴窗口应有合理上限，避免 profile 配置较大的 `maxPoints` 导致初始视图过度压缩；数据保留上限仍按 `maxPoints` 执行。
 - `window.mode: "duration"` 按最新样本时间显示最近 `seconds` 秒。

@@ -300,6 +300,61 @@ describe("MonitorOutputController", () => {
     expect(latestPlot().data).toEqual([[1], [22.5], [1200]]);
   });
 
+  test("preserves follow state when auto-series discovery rebuilds the plot", () => {
+    const { controller, root } = createController();
+
+    controller.renderOutputs([
+      {
+        id: "auto",
+        kind: "timeSeriesLine",
+        title: "Auto Plot",
+        time: { source: "sequence" },
+        series: {},
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "auto",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [{ time: 1, values: { temp: 22.5 } }],
+    });
+
+    const firstPlot = latestPlot();
+    const followButton = root.querySelector<HTMLButtonElement>(
+      '[data-output-id="auto"] .output-follow-button',
+    );
+
+    if (followButton === null) {
+      throw new Error("Missing plot follow button.");
+    }
+
+    firstPlot.setScale("x", { min: 0, max: 0.5 });
+    expect(followButton.textContent).toBe("Follow");
+
+    followButton.click();
+    expect(followButton.textContent).toBe("Following");
+    expect(firstPlot.setScale).toHaveBeenLastCalledWith("x", { min: 0.5, max: 1 });
+
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "auto",
+      seq: 2,
+      receivedAt: 1_100,
+      samples: [{ time: 2, values: { temp: 23, rpm: 1200 } }],
+    });
+
+    const rebuiltPlot = latestPlot();
+    expect(rebuiltPlot).not.toBe(firstPlot);
+    expect(followButton.textContent).toBe("Following");
+    expect(rebuiltPlot.options.series.map((series) => series.label)).toEqual([
+      undefined,
+      "temp",
+      "rpm",
+    ]);
+    expect(rebuiltPlot.setScale).toHaveBeenLastCalledWith("x", { min: 1.5, max: 2 });
+  });
+
   test("keeps a rolling points window and tracks the latest x range", () => {
     const { controller } = createController();
     controller.renderOutputs([
@@ -582,6 +637,59 @@ describe("MonitorOutputController", () => {
     );
     expect(plot.scales.y1).toEqual({ min: 10, max: 30 });
     expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 3.5, max: 4 });
+  });
+
+  test("keeps following after resuming from a saved zoom layout", () => {
+    const { controller, root } = createController();
+    controller.renderOutputs(
+      [
+        {
+          ...createTimeSeriesOutput(),
+          window: { mode: "points", maxPoints: 3 },
+        },
+      ],
+      createLayout({
+        kind: "timeSeriesLine",
+        autoFollow: false,
+        zoom: { x: { min: 10, max: 20 } },
+      }),
+    );
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    const followButton = root.querySelector<HTMLButtonElement>(
+      '[data-output-id="plot"] .output-follow-button',
+    );
+
+    if (followButton === null) {
+      throw new Error("Missing plot follow button.");
+    }
+
+    expect(followButton.textContent).toBe("Follow");
+
+    followButton.click();
+    expect(followButton.textContent).toBe("Following");
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: -8, max: 2 });
+
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 2,
+      receivedAt: 1_100,
+      samples: [{ time: 3, values: { temp: 23, rpm: 4 } }],
+    });
+
+    expect(followButton.textContent).toBe("Following");
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: -7, max: 3 });
   });
 
   test("uses one plot header button for follow, following, and locked follow states", () => {

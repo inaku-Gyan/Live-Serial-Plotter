@@ -61,10 +61,15 @@ type PlotWindowConfig =
   | { mode: "duration"; seconds: number };
 
 type TimeSeriesFollowMode = NonNullable<TimeSeriesViewLayoutConfig["followMode"]>;
+type PlotScaleRanges = NonNullable<TimeSeriesViewLayoutConfig["zoom"]>;
 
 interface UnitGroup {
   unit: string;
   channelNames: string[];
+}
+
+interface PlotRebuildOptions {
+  applyViewDefaults: boolean;
 }
 
 export class MonitorOutputController {
@@ -459,7 +464,7 @@ class TimeSeriesLineView implements OutputView {
     this.trimPlotData();
 
     if (needsRebuild) {
-      this.rebuildPlot();
+      this.rebuildPlot({ applyViewDefaults: false });
       return;
     }
 
@@ -532,12 +537,8 @@ class TimeSeriesLineView implements OutputView {
     }
   }
 
-  private rebuildPlot(): void {
-    this.clearLockedFollowResumeTimer();
-    this.followMode = this.getDefaultFollowMode();
-    this.isAutoFollowEnabled = this.getDefaultAutoFollow();
-    this.shouldPreserveScaleWhileFollowing = false;
-    this.updateFollowButton();
+  private rebuildPlot(options: PlotRebuildOptions = { applyViewDefaults: true }): void {
+    const runtimeScaleRanges = options.applyViewDefaults ? undefined : this.captureScaleRanges();
     this.plot?.destroy();
 
     const channelNames = [...this.seriesData.keys()];
@@ -612,7 +613,12 @@ class TimeSeriesLineView implements OutputView {
     );
 
     this.renderLegend(channelNames);
-    this.applyViewDefaults();
+
+    if (options.applyViewDefaults) {
+      this.applyViewDefaults();
+    } else {
+      this.restoreRuntimeViewAfterRebuild(runtimeScaleRanges);
+    }
   }
 
   private updatePlotData(): void {
@@ -1050,6 +1056,32 @@ class TimeSeriesLineView implements OutputView {
     this.updateFollowButton();
   }
 
+  private restoreRuntimeViewAfterRebuild(ranges: PlotScaleRanges | undefined): void {
+    if (ranges !== undefined) {
+      this.applyScaleRanges(ranges);
+    }
+
+    if (this.isAutoFollowEnabled) {
+      this.applyAutoFollowRange(this.shouldPreserveScaleWhileFollowing);
+    }
+
+    this.updateFollowButton();
+  }
+
+  private applyScaleRanges(ranges: PlotScaleRanges): void {
+    if (ranges.x !== undefined) {
+      this.setPlotScale("x", ranges.x);
+    }
+
+    if (ranges.y === undefined) {
+      return;
+    }
+
+    for (const [scaleKey, range] of Object.entries(ranges.y)) {
+      this.setPlotScale(scaleKey, range);
+    }
+  }
+
   private applyAutoFollowRange(preserveCurrentSpan: boolean): void {
     const range = this.getAutoFollowRange(preserveCurrentSpan);
 
@@ -1108,13 +1140,21 @@ class TimeSeriesLineView implements OutputView {
   }
 
   private captureZoom(): TimeSeriesViewLayoutConfig["zoom"] {
-    const xScale = this.plot?.scales.x;
-
     if (this.plot === undefined || this.isAutoFollowEnabled) {
       return undefined;
     }
 
-    const zoom: NonNullable<TimeSeriesViewLayoutConfig["zoom"]> = {};
+    return this.captureScaleRanges();
+  }
+
+  private captureScaleRanges(): PlotScaleRanges | undefined {
+    const xScale = this.plot?.scales.x;
+
+    if (this.plot === undefined) {
+      return undefined;
+    }
+
+    const zoom: PlotScaleRanges = {};
 
     if (xScale !== undefined && typeof xScale.min === "number" && typeof xScale.max === "number") {
       zoom.x = {
