@@ -10,7 +10,6 @@ import {
   createProfileKey,
   getWorkspaceProfilesDirectory,
   normalizeProfileConfig,
-  profileSchemaUri,
   ProfileStore,
   type WorkspaceProfilesDirectory,
 } from "../../src/profiles/ProfileStore";
@@ -27,7 +26,7 @@ describe("ProfileStore", () => {
       path.join(profilesDirectory, "sensor.jsonc"),
       `{
         // JSONC comments are supported.
-        "$schema": "${profileSchemaUri}",
+        "$schema": "https://example.invalid/profile.schema.json",
         "schemaVersion": 2,
         "id": "sensor",
         "name": "Sensor",
@@ -99,7 +98,7 @@ describe("ProfileStore", () => {
 
   test("normalizes profiles with a JSON schema association", () => {
     const normalized = normalizeProfileConfig({
-      $schema: profileSchemaUri,
+      $schema: "https://example.invalid/profile.schema.json",
       ...defaultProfile,
       id: "schema-profile",
       name: "Schema Profile",
@@ -266,7 +265,8 @@ describe("ProfileStore", () => {
     });
 
     const savedText = await readFile(path.join(userProfilesDirectory, "saved-user.jsonc"), "utf8");
-    expect(savedText.startsWith(`{\n  "$schema": "${profileSchemaUri}",\n`)).toBe(true);
+    expect(savedText.startsWith(`{\n  "schemaVersion": 2,\n`)).toBe(true);
+    expect(savedText).not.toContain('"$schema"');
 
     const loaded = await store.loadProfiles("user:saved-user");
     expect(loaded.activeProfile.id).toBe("saved-user");
@@ -307,7 +307,8 @@ describe("ProfileStore", () => {
       path.join(profilesDirectory, "workspace-profile.jsonc"),
       "utf8",
     );
-    expect(savedText.startsWith(`{\n  "$schema": "${profileSchemaUri}",\n`)).toBe(true);
+    expect(savedText.startsWith(`{\n  "schemaVersion": 2,\n`)).toBe(true);
+    expect(savedText).not.toContain('"$schema"');
     expect(savedText).toContain('"id": "workspace-profile"');
     expect(savedText).not.toContain('"connection"');
     expect(savedText).not.toContain('"encoding": "utf8",\n    "delimiter"');
@@ -366,7 +367,12 @@ describe("profile JSON schema contribution", () => {
     );
     const schema: unknown = JSON.parse(schemaText);
 
-    expect(isRecord(schema) ? schema.$id : undefined).toBe(profileSchemaUri);
+    expect(isRecord(schema) ? schema.$schema : undefined).toBe(
+      "http://json-schema.org/draft-07/schema#",
+    );
+    expect(isRecord(schema) ? schema.$id : undefined).toBe(
+      "https://inaku-Gyan.github.io/Live-Serial-Plotter/schemas/profile.schema.json",
+    );
   });
 
   test("keeps the generated profile schema up to date", async () => {

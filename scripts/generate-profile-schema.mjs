@@ -4,7 +4,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createGenerator } from "ts-json-schema-generator";
 
-const profileSchemaUri = "vscode://schemas/live-serial-plotter/profile";
+const profileSchemaId =
+  "https://inaku-Gyan.github.io/Live-Serial-Plotter/schemas/profile.schema.json";
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const schemaPath = path.join(repoRoot, "schemas/profile.schema.json");
 
@@ -43,7 +44,7 @@ function createProfileSchema() {
 
   return {
     $schema: "http://json-schema.org/draft-07/schema#",
-    $id: profileSchemaUri,
+    $id: profileSchemaId,
     title: "Live Serial Plotter Profile",
     description: "Schema for Live Serial Plotter profile JSONC files.",
     ...generatedSchema,

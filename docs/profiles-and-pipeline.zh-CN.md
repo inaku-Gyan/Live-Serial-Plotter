@@ -19,8 +19,7 @@ serial bytes -> codec -> framing -> parser -> output mappers -> output sinks -> 
 用户全局 profile 会从 VS Code `globalStorageUri/profiles` 读取。内置 `default`
 profile 等价于当前默认行为：UTF-8 文本 codec、行分割、`auto` parser、raw terminal 和实时折线图。
 
-扩展会为工作区 `.live-serial-plotter/profiles/*.jsonc` 文件提供 JSON Schema 校验、补全和 hover 说明。通过侧边栏复制或保存的
-profile 会自动写入 `$schema: "vscode://schemas/live-serial-plotter/profile"`，因此手动打开用户全局 profile JSONC 时也能获得同样的编辑支持。
+扩展会通过 VS Code `contributes.jsonValidation` 为工作区 `.live-serial-plotter/profiles/*.jsonc` 文件提供 JSON Schema 校验、补全和 hover 说明。
 
 `schemas/profile.schema.json` 由 TypeScript 的 profile 类型生成。修改 `ProfileConfig`、parser、output 或相关配置类型后，运行
 `pnpm schema:generate` 更新 schema；`pnpm schema:check` 会检查提交的 schema 是否已经同步。
@@ -63,7 +62,6 @@ profile 后生效。
 
 ```jsonc
 {
-  "$schema": "vscode://schemas/live-serial-plotter/profile",
   "schemaVersion": 2,
   "id": "sample-telemetry",
   "name": "Sample Telemetry",

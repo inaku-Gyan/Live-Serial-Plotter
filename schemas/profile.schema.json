@@ -1,11 +1,15 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "$id": "vscode://schemas/live-serial-plotter/profile",
+  "$id": "https://inaku-Gyan.github.io/Live-Serial-Plotter/schemas/profile.schema.json",
   "title": "Live Serial Plotter Profile",
   "description": "Schema for Live Serial Plotter profile JSONC files.",
   "$ref": "#/definitions/ProfileConfigFile",
   "definitions": {
     "ProfileConfigFile": {
+      "$ref": "#/definitions/ProfileConfig",
+      "description": "Profile JSONC file shape used as the JSON Schema generation entrypoint."
+    },
+    "ProfileConfig": {
       "type": "object",
       "properties": {
         "schemaVersion": {
@@ -50,16 +54,11 @@
         "export": {
           "$ref": "#/definitions/ExportConfig",
           "description": "Optional export defaults for future capture/export workflows."
-        },
-        "$schema": {
-          "type": "string",
-          "const": "vscode://schemas/live-serial-plotter/profile",
-          "description": "VS Code JSON Schema association for Live Serial Plotter profiles."
         }
       },
+      "required": ["schemaVersion", "id", "name", "codec", "framing", "parser", "outputs"],
       "additionalProperties": false,
-      "required": ["codec", "framing", "id", "name", "outputs", "parser", "schemaVersion"],
-      "description": "Profile JSONC file shape. Runtime messages keep using `ProfileConfig`; this type exists only as the JSON Schema generation entrypoint."
+      "description": "Serial protocol, parser, and output configuration for one Live Serial Plotter profile."
     },
     "SerialDefaultsConfig": {
       "type": "object",

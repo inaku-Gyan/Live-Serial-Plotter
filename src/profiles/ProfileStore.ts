@@ -18,8 +18,6 @@ import {
   type SerialDefaultsConfig,
 } from "../shared/protocol";
 
-export const profileSchemaUri = "vscode://schemas/live-serial-plotter/profile";
-
 export interface LoadedProfile {
   summary: ProfileSummary;
   config: ProfileConfig;
@@ -549,14 +547,7 @@ function formatError(error: unknown): string {
 }
 
 async function writeProfileFile(filePath: string, config: ProfileConfig): Promise<void> {
-  await writeFile(filePath, `${JSON.stringify(withProfileSchema(config), null, 2)}\n`, "utf8");
-}
-
-function withProfileSchema(config: ProfileConfig): { $schema: string } & ProfileConfig {
-  return {
-    $schema: profileSchemaUri,
-    ...config,
-  };
+  await writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }
 
 function sanitizeProfileId(profileId: string): string {
