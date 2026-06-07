@@ -548,7 +548,7 @@ function applyPan(plot: uPlot, panState: PanState, event: PointerEvent): boolean
     const yUnitsPerPixel = (startRange.max - startRange.min) / rect.height;
     const yDeltaUnits = deltaY * yUnitsPerPixel;
     didPan =
-      setFiniteScale(plot, scaleKey, startRange.min + yDeltaUnits, startRange.max + yDeltaUnits) ||
+      setFiniteScale(plot, scaleKey, startRange.min - yDeltaUnits, startRange.max - yDeltaUnits) ||
       didPan;
   }
 
@@ -684,7 +684,7 @@ function panYScales(plot: uPlot, delta: number, height: number): boolean {
 
     const deltaUnits = ((yScale.max - yScale.min) / height) * delta;
     didPan =
-      setFiniteScale(plot, scaleKey, yScale.min + deltaUnits, yScale.max + deltaUnits) || didPan;
+      setFiniteScale(plot, scaleKey, yScale.min - deltaUnits, yScale.max - deltaUnits) || didPan;
   }
 
   return didPan;

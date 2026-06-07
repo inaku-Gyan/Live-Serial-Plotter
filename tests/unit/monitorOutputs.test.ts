@@ -943,8 +943,8 @@ describe("MonitorOutputController", () => {
       }),
     );
 
-    expect(plot.setScale).toHaveBeenCalledWith("y1", { min: 10, max: 110 });
-    expect(plot.setScale).toHaveBeenCalledWith("y2", { min: 210, max: 310 });
+    expect(plot.setScale).toHaveBeenCalledWith("y1", { min: -10, max: 90 });
+    expect(plot.setScale).toHaveBeenCalledWith("y2", { min: 190, max: 290 });
   });
 
   test("pans the x range with shift wheel through the uPlot interaction config", () => {
@@ -1018,7 +1018,7 @@ describe("MonitorOutputController", () => {
       min: 0.2,
       max: 2.2,
     });
-    expect(plot.setScale).toHaveBeenCalledWith("y1", { min: 10, max: 110 });
+    expect(plot.setScale).toHaveBeenCalledWith("y1", { min: -10, max: 90 });
   });
 
   test("pinch-zooms x and y ranges with the uPlot pointer interaction plugin", () => {
@@ -1134,8 +1134,8 @@ describe("MonitorOutputController", () => {
       max: 1.8,
     });
     expect(plot.setScale).toHaveBeenCalledWith("y1", {
-      min: 10,
-      max: 110,
+      min: -10,
+      max: 90,
     });
   });
 
