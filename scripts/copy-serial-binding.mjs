@@ -21,6 +21,7 @@ async function copyPackageWithRuntimeDependencies(packageName, resolvePaths = []
   const dependencyResolvePaths = [sourceDir, ...resolvePaths];
 
   for (const dependencyName of Object.keys(packageJson.dependencies ?? {})) {
+    // oxlint-disable-next-line no-await-in-loop -- Recursive dependency copying relies on shared de-dupe state.
     await copyPackageWithRuntimeDependencies(dependencyName, dependencyResolvePaths);
   }
 
@@ -38,6 +39,7 @@ async function findPackageRoot(packageName, resolvePaths) {
 
   while (currentDir !== dirname(currentDir)) {
     try {
+      // oxlint-disable-next-line no-await-in-loop -- Package root discovery walks parent directories in order.
       const packageJson = JSON.parse(await readFile(join(currentDir, "package.json"), "utf8"));
 
       if (packageJson.name === packageName) {

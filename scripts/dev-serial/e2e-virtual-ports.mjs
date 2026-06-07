@@ -79,8 +79,9 @@ async function startSocatPorts(configs, options) {
     portProcesses.push(socat);
     socat.stderr.on("data", (chunk) => process.stderr.write(`[socat:${config.path}] ${chunk}`));
 
-    await waitForPath(devicePath);
-    await waitForPath(vscodePath);
+    // oxlint-disable-next-line no-await-in-loop -- Virtual serial ports are external resources set up one pair at a time.
+    await Promise.all([waitForPath(devicePath), waitForPath(vscodePath)]);
+    // oxlint-disable-next-line no-await-in-loop -- Start the writer only after its matching port pair is ready.
     await startGeneratorWriter(config, devicePath);
 
     activePorts.push({
@@ -138,6 +139,7 @@ async function startWindowsPorts(configs, options) {
       }
     }
 
+    // oxlint-disable-next-line no-await-in-loop -- com0com pairs are external resources set up one pair at a time.
     await startGeneratorWriter(config, pair.device);
     activePorts.push({
       path: pair.vscode,
@@ -357,9 +359,9 @@ async function shutdown(exitCode) {
     controller.abort();
   }
 
-  for (const serialPort of serialPorts) {
-    await closeSerialPort(serialPort).catch(() => undefined);
-  }
+  await Promise.all(
+    serialPorts.map((serialPort) => closeSerialPort(serialPort).catch(() => undefined)),
+  );
 
   for (const child of portProcesses) {
     child.kill();
