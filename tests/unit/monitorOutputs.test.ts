@@ -192,6 +192,35 @@ describe("MonitorOutputController", () => {
     expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 1, max: 3 });
   });
 
+  test("uses a fixed points window range before the window fills", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 4 },
+      },
+    ]);
+
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+      ],
+    });
+
+    const plot = latestPlot();
+    expect(plot.data).toEqual([
+      [0, 1],
+      [20, 21],
+      [1, 2],
+    ]);
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: -2, max: 1 });
+  });
+
   test("keeps a rolling duration window and tracks the latest x range", () => {
     const { controller } = createController();
     controller.renderOutputs([

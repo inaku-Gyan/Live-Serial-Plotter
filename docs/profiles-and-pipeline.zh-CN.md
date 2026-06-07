@@ -126,8 +126,9 @@ profile 后生效。
 
 `timeSeriesLine.series` 为空对象时，Webview 会自动绘制 parser 输出中的所有 numeric field。
 
-`timeSeriesLine.window` 控制实时图的滚动窗口。`mode: "points"` 会保留并显示最新 `maxPoints`
-个采样点；`mode: "duration"` 会按最新采样时间显示最近 `seconds` 秒。图表会固定在当前窗口范围内滚动追踪最新数据，而不是随着历史数据不断缩放。
+`timeSeriesLine.window` 控制实时图的滚动窗口。`mode: "points"` 会保留最新 `maxPoints`
+个采样点，并按采样间隔估算固定的 x 轴窗口跨度；窗口未填满时也不会自动缩放到已有全部数据。`mode: "duration"`
+会按最新采样时间显示最近 `seconds` 秒。图表会固定在当前窗口范围内滚动追踪最新数据，而不是随着历史数据不断缩放。
 
 时间序列图会按 series 的 `unit` 分组生成纵轴：相同单位共用一个 y 轴，第一个单位显示在左侧，后续单位显示在右侧。未配置
 `unit` 的自动发现字段使用默认 `Value` 轴。`series.scale` 已在 Extension Host 输出映射阶段应用，Webview 中显示的是缩放后的 plotted value。

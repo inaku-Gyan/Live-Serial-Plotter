@@ -496,8 +496,8 @@ class TimeSeriesLineView implements OutputView {
       };
     }
 
-    const min = this.timeValues[0] ?? latestTime;
     const max = latestTime;
+    const min = latestTime - this.getPointWindowSpan(windowConfig.maxPoints);
 
     if (min === max) {
       return {
@@ -507,6 +507,37 @@ class TimeSeriesLineView implements OutputView {
     }
 
     return { min, max };
+  }
+
+  private getPointWindowSpan(maxPoints: number): number {
+    return Math.max(1, maxPoints - 1) * this.getPointWindowStep();
+  }
+
+  private getPointWindowStep(): number {
+    if (this.config.time.source === "sequence") {
+      return 1;
+    }
+
+    if (this.config.time.source === "fixedInterval") {
+      return this.config.time.intervalMs / 1000;
+    }
+
+    for (let index = this.timeValues.length - 1; index > 0; index -= 1) {
+      const current = this.timeValues[index];
+      const previous = this.timeValues[index - 1];
+
+      if (current === undefined || previous === undefined) {
+        continue;
+      }
+
+      const delta = current - previous;
+
+      if (Number.isFinite(delta) && delta > 0) {
+        return delta;
+      }
+    }
+
+    return 1;
   }
 
   private getSeriesLabel(channelName: string): string {
