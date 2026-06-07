@@ -10,7 +10,10 @@ import type {
 import { MonitorOutputController } from "../../webview/src/monitorOutputs";
 
 interface MockUPlotInstance {
-  options: { series: Array<{ label?: string; show?: boolean }> };
+  options: {
+    legend?: { show?: boolean };
+    series: Array<{ label?: string; show?: boolean }>;
+  };
   data: unknown[];
   target: HTMLElement;
   destroy: () => void;
@@ -94,6 +97,7 @@ describe("MonitorOutputController", () => {
       "RPM",
     ]);
     expect(plot.options.series.map((series) => series.show)).toEqual([undefined, true, false]);
+    expect(plot.options.legend).toEqual({ show: false });
     expect(plot.data).toEqual([[], [], []]);
   });
 

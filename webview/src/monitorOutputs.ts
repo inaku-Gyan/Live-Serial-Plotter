@@ -362,6 +362,9 @@ class TimeSeriesLineView implements OutputView {
             },
           },
         ],
+        legend: {
+          show: false,
+        },
         series,
       },
       this.getPlotData(),

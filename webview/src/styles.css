@@ -306,6 +306,10 @@ select {
   display: none;
 }
 
+.uplot .u-legend {
+  display: none;
+}
+
 .uplot .u-label,
 .uplot .u-value,
 .uplot .u-axis {
