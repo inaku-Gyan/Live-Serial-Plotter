@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { nextTick } from "vue";
 import type { ProfileConfig, ProfileSummary } from "../../../../src/shared/protocol";
 import type { ProfileEditorStore } from "../store";
 
@@ -37,6 +38,24 @@ function handleProfileMenuFocusOut(event: FocusEvent, store: ProfileEditorStore)
 
   store.closeProfileMenu();
 }
+
+function handleProfileContextMenu(
+  event: MouseEvent,
+  store: ProfileEditorStore,
+  profileKey: string,
+): void {
+  store.openProfileContextMenu(profileKey, event.clientX, event.clientY);
+  void focusOpenProfileMenu();
+}
+
+async function focusOpenProfileMenu(): Promise<void> {
+  await nextTick();
+  document
+    .querySelector<HTMLButtonElement>(
+      '.profile-list-item[data-menu-open="true"] .profile-list-menu button',
+    )
+    ?.focus();
+}
 </script>
 
 <template>
@@ -49,9 +68,7 @@ function handleProfileMenuFocusOut(event: FocusEvent, store: ProfileEditorStore)
         class="profile-list-item"
         :data-active="profile.key === store.state.selectedProfileKey ? 'true' : 'false'"
         :data-menu-open="profile.key === store.state.profileMenu?.profileKey ? 'true' : 'false'"
-        @contextmenu.prevent="
-          store.openProfileContextMenu(profile.key, $event.clientX, $event.clientY)
-        "
+        @contextmenu.prevent="handleProfileContextMenu($event, store, profile.key)"
       >
         <button class="profile-list-main" type="button" @click="store.selectProfile(profile.key)">
           <strong>{{ profile.name }}</strong>

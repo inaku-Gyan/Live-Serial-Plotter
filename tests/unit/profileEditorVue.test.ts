@@ -98,6 +98,7 @@ describe("ProfileEditorApp", () => {
     await nextTick();
 
     await wrapper.find(".profile-list-item").trigger("contextmenu", { clientX: 24, clientY: 36 });
+    await nextTick();
     const menu = wrapper.find(".profile-list-menu");
     const menuButtons = wrapper.findAll(".profile-list-menu button");
     expect(menu.classes()).toContain("profile-list-menu--context");
@@ -111,6 +112,23 @@ describe("ProfileEditorApp", () => {
       type: "copyProfileByKey",
       profileKey: "workspace:editable",
     });
+  });
+
+  test("profile item context menu closes when focus changes outside the menu root", async () => {
+    const { wrapper } = mountProfileEditor();
+    const profile = { ...defaultProfile, id: "editable", name: "Editable" };
+    dispatchEditorState(createEditorState({ selectedProfile: profile, sourceScope: "workspace" }));
+    await nextTick();
+
+    await wrapper.find(".profile-list-item").trigger("contextmenu", { clientX: 24, clientY: 36 });
+    await nextTick();
+    const firstMenuButton = requireItem(wrapper.findAll(".profile-list-menu button"), 0);
+    expect(document.activeElement).toBe(firstMenuButton.element);
+
+    wrapper.find<HTMLButtonElement>(".profile-list-main").element.focus();
+    await nextTick();
+
+    expect(wrapper.find(".profile-list-menu").exists()).toBe(false);
   });
 
   test("profile action menu closes when focus leaves the menu root", async () => {
