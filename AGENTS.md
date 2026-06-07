@@ -11,7 +11,7 @@ Live Serial Plotter 是一个 VS Code 桌面扩展，用于串口监控、串口
 - 包管理器：pnpm
 - 运行目标：VS Code desktop extension
 - Extension Host：TypeScript，打包到 `dist/extension.cjs`
-- Webview：监控页使用 Vanilla TypeScript + CSS + uPlot；Sidebar Profile UI 使用 Vue 3；Vite 打包到 `dist/webview`
+- Webview：监控页使用 Vue 3 外壳 + 命令式 uPlot/canvas renderer；Sidebar Profile UI 使用 Vue 3；Vite 打包到 `dist/webview`
 - 串口：`serialport`
 - 构建：`tsdown` + `vite`
 - 测试：`vitest`，VS Code 集成测试使用 `@vscode/test-cli`
@@ -25,18 +25,19 @@ Live Serial Plotter 是一个 VS Code 桌面扩展，用于串口监控、串口
 - `src/parsers/parseLine.ts`：`raw`、`csv`、`jsonl`、`keyValue`、`auto` 解析逻辑。
 - `src/session/`：点批处理和环形缓冲。
 - `src/shared/protocol.ts`：Extension Host 和 Webview 共享消息协议。
-- `webview/src/`：Webview UI、uPlot 图表、Vue sidebar profile editor 和样式。
+- `webview/src/`：Webview UI、监控页 Vue 外壳、命令式 uPlot/canvas renderer、Vue sidebar profile editor 和样式。
 - `tests/unit/`：解析器、缓冲、解码和串口服务单元测试。
 - `tests/extension/`：VS Code 扩展激活和命令注册测试。
 - `scripts/copy-serial-binding.mjs`：复制 `@serialport/bindings-cpp` native 运行时到 `dist/node_modules`。
 
 ## 代码规范
 
+- 需求记录优先。用户提出新的产品或工程需求时，先更新 `docs/requirements.zh-CN.md`，并检查新需求是否与该文档、`AGENTS.md`、现有实现或已提交计划冲突；如有冲突，先明确告知用户冲突点、影响范围和建议取舍，再继续实现。
 - 优先保持模块化。避免把 UI 状态、DOM 事件、VS Code 消息、串口数据处理和图表更新继续堆在同一个大文件里；新增功能时按职责拆分，例如 Webview bridge、连接控件、日志面板、uPlot 图表、图例和持久化状态。
 - 协议类型优先。Extension Host 和 Webview 之间新增消息时，先更新 `src/shared/protocol.ts` 的 discriminated union，再同步调整两端处理逻辑；不要在消息链路中使用 `any` 或未校验的自由对象。
 - 保持串口、解析、缓冲和 UI 解耦。串口读取、行解码、文本解析、点批处理和图表展示应各自独立，核心逻辑要能脱离 VS Code Webview 做单元测试。
-- Vue 3 只用于适合状态驱动的配置 UI。Sidebar profile editor 使用 typed composable store，不引入 Pinia；未来当状态跨多个页面或实体明显膨胀时再评估 Pinia。
-- uPlot 走命令式高性能路径。图表实例和大批量点数据不要放进深层响应式状态；即使监控页未来迁移到 Vue 3，也应只让框架管理 UI 状态，uPlot 实例和数据数组使用非响应式引用管理。
+- Vue 3 用于适合状态驱动的 UI 外壳。监控页和 Sidebar profile editor 都使用 typed composable store，不引入 Pinia；未来当状态跨多个页面或实体明显膨胀时再评估 Pinia。
+- uPlot 走命令式高性能路径。图表实例和大批量点数据不要放进深层响应式状态；监控页只让 Vue 管理低频 UI 状态，uPlot 实例和数据数组使用非响应式引用管理。
 - 高频数据更新必须批处理。不要每收到一个点就重建图表或触发 DOM 列表渲染；优先通过 `PointBatcher`、环形缓冲和数组原地更新控制刷新频率。
 - 只在必要时重建 uPlot。新增/删除通道或图表结构性配置变化时可以重建；普通数据追加使用 `setData()`，通道显示切换使用 `setSeries()`，尺寸变化使用 `setSize()`。
 - 控制内存和分配。持续运行场景必须保留最大点数和最大日志行数限制；热路径中减少临时对象、重复排序和整表重算，避免长时间串口输出导致 Webview 卡顿。
@@ -84,7 +85,7 @@ pnpm package
 - 首版只支持桌面版 VS Code，不支持 VS Code Web。
 - Webview 只加载本地打包资源，使用严格 CSP，不执行用户脚本。
 - 不配置 Git hooks。
-- 不引入 React。监控页继续使用 Vanilla TypeScript；sidebar profile editor 使用 Vue 3。
+- 不引入 React。监控页使用 Vue 3 外壳，但 uPlot/canvas 等高频渲染保持命令式非响应式路径；sidebar profile editor 使用 Vue 3。
 - 没有真实串口设备时，测试应使用 mock 或单元测试覆盖核心链路。
 
 ## 开发建议
