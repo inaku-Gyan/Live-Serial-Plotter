@@ -2,7 +2,7 @@ import packageJson from "../../package.json";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { ProfileConfigViewProvider } from "../../src/panel/ProfileConfigViewProvider";
 import { defaultProfile } from "../../src/profiles/defaultProfile";
@@ -23,7 +23,7 @@ describe("ProfileConfigViewProvider", () => {
   test("posts initial editor state when the view resolves", async () => {
     const { provider, webviewView } = createProvider();
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
 
     expect(webviewView.webview.postMessage).toHaveBeenCalledWith(
@@ -53,7 +53,7 @@ describe("ProfileConfigViewProvider", () => {
     });
     __vscodeMock.showInputBox.mockResolvedValue("saved-profile");
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     webviewView.webview.postMessage.mockClear();
     dispatch({ type: "copyProfileByKey", profileKey: "builtin:jsonl-telemetry" });
@@ -94,7 +94,7 @@ describe("ProfileConfigViewProvider", () => {
       workspaceProfilesDirectories: [workspaceDirectory],
     });
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     dispatch({ type: "selectProfileForEdit", profileKey });
     await waitForAsyncWork();
@@ -128,7 +128,7 @@ describe("ProfileConfigViewProvider", () => {
     });
     __vscodeMock.showInputBox.mockResolvedValue("invalid-profile");
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     webviewView.webview.postMessage.mockClear();
     dispatch({
@@ -165,7 +165,7 @@ describe("ProfileConfigViewProvider", () => {
       workspaceProfilesDirectories: [workspaceDirectory],
     });
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     dispatch({ type: "openProfileJson", profileKey });
     await waitForAsyncWork();
@@ -190,7 +190,7 @@ describe("ProfileConfigViewProvider", () => {
   test("asks users to copy keyed builtin profiles before opening JSONC", async () => {
     const { provider, webviewView, dispatch } = createProvider();
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     dispatch({ type: "openProfileJson", profileKey: "builtin:jsonl-telemetry" });
     await waitForAsyncWork();
@@ -203,7 +203,7 @@ describe("ProfileConfigViewProvider", () => {
   test("updates profile editor view context", async () => {
     const { provider, webviewView, dispatch } = createProvider();
 
-    provider.resolveWebviewView(webviewView as unknown as vscode.WebviewView);
+    provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
     dispatch({ type: "setProfileEditorView", view: "editor" });
     await waitForAsyncWork();
@@ -248,20 +248,18 @@ function createProvider(options: CreateProviderOptions = {}): {
       cspSource: "vscode-webview:",
       html: "",
       options: undefined,
-      asWebviewUri: vi.fn((uri: unknown) => uri),
-      postMessage: vi.fn(() => Promise.resolve(true)),
-      onDidReceiveMessage: vi.fn((nextListener: (message: ToProfileEditorMessage) => void) => {
+      asWebviewUri: vi.fn<(uri: vscode.Uri) => vscode.Uri>((uri: vscode.Uri) => uri),
+      postMessage: vi.fn<(message: unknown) => Promise<boolean>>(() => Promise.resolve(true)),
+      onDidReceiveMessage: vi.fn<
+        (nextListener: (message: ToProfileEditorMessage) => void) => { dispose(): void }
+      >((nextListener: (message: ToProfileEditorMessage) => void) => {
         listener = nextListener;
-        return { dispose: vi.fn() };
+        return { dispose: vi.fn<() => void>() };
       }),
     },
   } satisfies MockWebviewView;
   const provider = new ProfileConfigViewProvider({
-    extensionUri: {
-      fsPath: "/extension",
-      path: "/extension",
-      toString: () => "/extension",
-    } as unknown as vscode.Uri,
+    extensionUri: vscode.Uri.file("/extension"),
     profileStore: new ProfileStore(options),
   });
 
@@ -283,9 +281,11 @@ interface MockWebviewView {
     cspSource: string;
     html: string;
     options: unknown;
-    asWebviewUri: ReturnType<typeof vi.fn>;
-    postMessage: ReturnType<typeof vi.fn>;
-    onDidReceiveMessage: ReturnType<typeof vi.fn>;
+    asWebviewUri: (uri: vscode.Uri) => vscode.Uri;
+    postMessage: ReturnType<typeof vi.fn<(message: unknown) => Promise<boolean>>>;
+    onDidReceiveMessage: (nextListener: (message: ToProfileEditorMessage) => void) => {
+      dispose(): void;
+    };
   };
 }
 

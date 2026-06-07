@@ -1,7 +1,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import { describe, expect, test } from "vitest";
 import { createSerialPortFactory } from "../../src/extension";
 import { DevelopmentSerialPortFactory } from "../../src/serial/dev/DevelopmentSerialPortFactory";
@@ -107,14 +107,14 @@ describe("DevelopmentSerialPortFactory", () => {
   });
 
   test("uses the real factory in production mode and dev factory otherwise", () => {
-    const context = {
-      extensionUri: { fsPath: "/extension" },
+    const context: Parameters<typeof createSerialPortFactory>[0] = {
+      extensionUri: vscode.Uri.file("/extension"),
       extensionMode: 1,
-    } as unknown as vscode.ExtensionContext;
-    const developmentContext = {
-      extensionUri: { fsPath: "/extension" },
+    };
+    const developmentContext: Parameters<typeof createSerialPortFactory>[0] = {
+      extensionUri: vscode.Uri.file("/extension"),
       extensionMode: 2,
-    } as unknown as vscode.ExtensionContext;
+    };
 
     expect(createSerialPortFactory(context)).toBeInstanceOf(NodeSerialPortFactory);
     expect(createSerialPortFactory(developmentContext)).toBeInstanceOf(

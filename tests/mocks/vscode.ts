@@ -37,7 +37,9 @@ const registeredWebviewViewProviders: Array<{
 }> = [];
 
 export const window = {
-  createWebviewPanel: vi.fn(
+  createWebviewPanel: vi.fn<
+    (viewType: string, title: string, showOptions: unknown, options: unknown) => MockWebviewPanel
+  >(
     (
       _viewType: string,
       title: string,
@@ -49,26 +51,30 @@ export const window = {
       return panel;
     },
   ),
-  registerWebviewViewProvider: vi.fn((viewType: string, provider: unknown, options?: unknown) => {
+  registerWebviewViewProvider: vi.fn<
+    (viewType: string, provider: unknown, options?: unknown) => DisposableLike
+  >((viewType: string, provider: unknown, options?: unknown) => {
     registeredWebviewViewProviders.push({ viewType, provider, options });
     return createDisposable();
   }),
-  showQuickPick: vi.fn(),
-  showInputBox: vi.fn(),
-  showInformationMessage: vi.fn(),
-  showWarningMessage: vi.fn(),
-  showTextDocument: vi.fn(() => Promise.resolve()),
+  showQuickPick: vi.fn<(...items: unknown[]) => unknown>(),
+  showInputBox: vi.fn<(...items: unknown[]) => unknown>(),
+  showInformationMessage: vi.fn<(...items: unknown[]) => unknown>(),
+  showWarningMessage: vi.fn<(...items: unknown[]) => unknown>(),
+  showTextDocument: vi.fn<() => Promise<void>>(() => Promise.resolve()),
 };
 
 export const workspace = {
   isTrusted: true,
   workspaceFolders: undefined as Array<{ uri: MockUri; name?: string }> | undefined,
-  openTextDocument: vi.fn((uri: MockUri) => Promise.resolve({ uri })),
+  openTextDocument: vi.fn<(uri: MockUri) => Promise<{ uri: MockUri }>>((uri: MockUri) =>
+    Promise.resolve({ uri }),
+  ),
 };
 
 export const commands = {
-  registerCommand: vi.fn(() => createDisposable()),
-  executeCommand: vi.fn(() => Promise.resolve()),
+  registerCommand: vi.fn<() => DisposableLike>(() => createDisposable()),
+  executeCommand: vi.fn<() => Promise<void>>(() => Promise.resolve()),
 };
 
 export const ViewColumn = {
@@ -82,22 +88,24 @@ export const ExtensionMode = {
 };
 
 export const Uri = {
-  file: vi.fn((filePath: string): MockUri => {
+  file: vi.fn<(filePath: string) => MockUri>((filePath: string): MockUri => {
     return {
       fsPath: filePath,
       path: filePath,
       toString: () => filePath,
     };
   }),
-  joinPath: vi.fn((base: MockUri, ...parts: string[]): MockUri => {
-    const path = [formatUri(base), ...parts].join("/");
+  joinPath: vi.fn<(base: MockUri, ...parts: string[]) => MockUri>(
+    (base: MockUri, ...parts: string[]): MockUri => {
+      const path = [formatUri(base), ...parts].join("/");
 
-    return {
-      fsPath: path,
-      path,
-      toString: () => path,
-    };
-  }),
+      return {
+        fsPath: path,
+        path,
+        toString: () => path,
+      };
+    },
+  ),
 };
 
 export const __vscodeMock = {
@@ -142,8 +150,14 @@ function createMockWebviewPanel(title: string): MockWebviewPanel {
     webview: {
       cspSource: "vscode-webview:",
       html: "",
-      asWebviewUri: vi.fn((uri: MockUri) => uri),
-      onDidReceiveMessage: vi.fn(
+      asWebviewUri: vi.fn<(uri: MockUri) => MockUri>((uri: MockUri) => uri),
+      onDidReceiveMessage: vi.fn<
+        (
+          listener: (message: unknown) => void,
+          thisArg?: unknown,
+          disposables?: DisposableLike[],
+        ) => DisposableLike
+      >(
         (
           _listener: (message: unknown) => void,
           _thisArg?: unknown,
@@ -154,22 +168,22 @@ function createMockWebviewPanel(title: string): MockWebviewPanel {
           return disposable;
         },
       ),
-      postMessage: vi.fn(() => Promise.resolve(true)),
+      postMessage: vi.fn<() => Promise<boolean>>(() => Promise.resolve(true)),
     },
-    onDidDispose: vi.fn(
-      (_listener: () => void, _thisArg?: unknown, disposables?: DisposableLike[]) => {
-        const disposable = createDisposable();
-        disposables?.push(disposable);
-        return disposable;
-      },
-    ),
-    reveal: vi.fn(),
+    onDidDispose: vi.fn<
+      (listener: () => void, thisArg?: unknown, disposables?: DisposableLike[]) => DisposableLike
+    >((_listener: () => void, _thisArg?: unknown, disposables?: DisposableLike[]) => {
+      const disposable = createDisposable();
+      disposables?.push(disposable);
+      return disposable;
+    }),
+    reveal: vi.fn<() => void>(),
   };
 }
 
 function createDisposable(): DisposableLike {
   return {
-    dispose: vi.fn(),
+    dispose: vi.fn<() => void>(),
   };
 }
 

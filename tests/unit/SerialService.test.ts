@@ -18,14 +18,16 @@ interface MockSerialPort extends SerialPortLike {
   port?: MockPortBinding;
 }
 
-const mockSerialPort = SerialPortMock as unknown as {
+interface MockSerialPortConstructor {
   new (options: { path: string; baudRate: number; autoOpen: boolean }): MockSerialPort;
   list(): Promise<SerialPortSummary[]>;
   binding: {
     createPort(path: string, options?: { echo?: boolean; record?: boolean }): void;
     reset(): void;
   };
-};
+}
+
+const mockSerialPort = getMockSerialPortConstructor(SerialPortMock);
 
 class MockSerialPortFactory implements SerialPortFactory {
   lastPort: MockSerialPort | undefined;
@@ -224,4 +226,33 @@ describe("SerialService", () => {
 
 async function waitForMicrotask(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function getMockSerialPortConstructor(value: unknown): MockSerialPortConstructor {
+  if (isMockSerialPortConstructor(value)) {
+    return value;
+  }
+
+  throw new Error("SerialPortMock does not match the expected test shape.");
+}
+
+function isMockSerialPortConstructor(value: unknown): value is MockSerialPortConstructor {
+  return (
+    typeof value === "function" &&
+    "list" in value &&
+    typeof value.list === "function" &&
+    "binding" in value &&
+    isMockBinding(value.binding)
+  );
+}
+
+function isMockBinding(value: unknown): value is MockSerialPortConstructor["binding"] {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "createPort" in value &&
+    typeof value.createPort === "function" &&
+    "reset" in value &&
+    typeof value.reset === "function"
+  );
 }

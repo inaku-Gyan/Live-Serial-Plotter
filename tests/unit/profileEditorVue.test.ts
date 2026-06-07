@@ -27,7 +27,7 @@ describe("ProfileEditorApp", () => {
     dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
     await nextTick();
 
-    await wrapper.findAll(".profile-list-main")[1]!.trigger("click");
+    await requireItem(wrapper.findAll(".profile-list-main"), 1).trigger("click");
     expect(vscode.messages).toContainEqual({
       type: "selectProfileForEdit",
       profileKey: "builtin:jsonl-telemetry",
@@ -63,7 +63,7 @@ describe("ProfileEditorApp", () => {
     await wrapper.find(".profile-menu-trigger").trigger("click");
     const menuButtons = wrapper.findAll(".profile-list-menu button");
     expect(menuButtons.map((button) => button.text())).toEqual(["Copy"]);
-    await menuButtons[0]!.trigger("click");
+    await requireItem(menuButtons, 0).trigger("click");
 
     expect(vscode.messages).toContainEqual({
       type: "copyProfileByKey",
@@ -83,7 +83,7 @@ describe("ProfileEditorApp", () => {
     await wrapper.find(".profile-menu-trigger").trigger("click");
     const menuButtons = wrapper.findAll(".profile-list-menu button");
     expect(menuButtons.map((button) => button.text())).toEqual(["Edit", "Copy", "Open JSONC"]);
-    await menuButtons[2]!.trigger("click");
+    await requireItem(menuButtons, 2).trigger("click");
 
     expect(vscode.messages).toContainEqual({
       type: "openProfileJson",
@@ -123,7 +123,7 @@ describe("ProfileEditorApp", () => {
     await nextTick();
 
     await wrapper.find(".profile-menu-trigger").trigger("click");
-    await wrapper.findAll(".profile-list-menu button")[0]!.trigger("click");
+    await requireItem(wrapper.findAll(".profile-list-menu button"), 0).trigger("click");
     await nextTick();
     await wrapper.find<HTMLInputElement>('input[name="profile.name"]').setValue("Edited");
     vi.advanceTimersByTime(350);
@@ -143,7 +143,7 @@ describe("ProfileEditorApp", () => {
     await nextTick();
 
     await wrapper.find(".profile-menu-trigger").trigger("click");
-    await wrapper.findAll(".profile-list-menu button")[0]!.trigger("click");
+    await requireItem(wrapper.findAll(".profile-list-menu button"), 0).trigger("click");
     await nextTick();
     await wrapper.find<HTMLTextAreaElement>('textarea[name="parser.options"]').setValue("{");
     vi.advanceTimersByTime(350);
@@ -190,13 +190,23 @@ function createVscodeApi(): {
       setState: (nextState) => {
         persistedState = nextState;
       },
-      postMessage: (message) => messages.push(structuredClone(message) as ToProfileEditorMessage),
+      postMessage: (message) => messages.push(structuredClone(message)),
     },
     messages,
     get persistedState() {
       return persistedState;
     },
   };
+}
+
+function requireItem<T>(items: readonly T[], index: number): T {
+  const item = items[index];
+
+  if (item === undefined) {
+    throw new Error(`Missing item at index ${index}.`);
+  }
+
+  return item;
 }
 
 function createEditorState(options: {

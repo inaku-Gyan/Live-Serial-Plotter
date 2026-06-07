@@ -1,13 +1,9 @@
-import type * as vscode from "vscode";
+import * as vscode from "vscode";
 import { beforeEach, describe, expect, test } from "vitest";
 import { LiveSerialPlotterPanel } from "../../src/panel/LiveSerialPlotterPanel";
 import { __resetVscodeMock, __vscodeMock } from "../mocks/vscode";
 
-const extensionUri = {
-  fsPath: "/extension",
-  path: "/extension",
-  toString: () => "/extension",
-};
+const extensionUri = vscode.Uri.file("/extension");
 
 describe("LiveSerialPlotterPanel", () => {
   beforeEach(() => {
@@ -15,8 +11,8 @@ describe("LiveSerialPlotterPanel", () => {
   });
 
   test("opens a new webview panel for each command invocation", () => {
-    LiveSerialPlotterPanel.open(extensionUri as unknown as vscode.Uri);
-    LiveSerialPlotterPanel.open(extensionUri as unknown as vscode.Uri);
+    LiveSerialPlotterPanel.open(extensionUri);
+    LiveSerialPlotterPanel.open(extensionUri);
 
     expect(__vscodeMock.createWebviewPanel).toHaveBeenCalledTimes(2);
     expect(__vscodeMock.createdPanels).toHaveLength(2);

@@ -144,7 +144,7 @@ function createVscodeApi(initialState?: ProfileEditorPersistedState): {
       setState: (nextState) => {
         persistedState = nextState;
       },
-      postMessage: (message) => messages.push(structuredClone(message) as ToProfileEditorMessage),
+      postMessage: (message) => messages.push(structuredClone(message)),
     },
     messages,
     get persistedState() {
