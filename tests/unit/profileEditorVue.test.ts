@@ -55,41 +55,64 @@ describe("ProfileEditorApp", () => {
     expect(wrapper.find(".profile-list-menu").exists()).toBe(false);
   });
 
-  test("profile action menu sends keyed copy and open messages", async () => {
+  test("builtin profile action menu only shows copy", async () => {
     const { wrapper, vscode } = mountProfileEditor();
     dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
     await nextTick();
 
     await wrapper.find(".profile-menu-trigger").trigger("click");
     const menuButtons = wrapper.findAll(".profile-list-menu button");
-    await menuButtons[1]!.trigger("click");
-
-    await wrapper.find(".profile-menu-trigger").trigger("click");
-    await wrapper.findAll(".profile-list-menu button")[2]!.trigger("click");
+    expect(menuButtons.map((button) => button.text())).toEqual(["Copy"]);
+    await menuButtons[0]!.trigger("click");
 
     expect(vscode.messages).toContainEqual({
       type: "copyProfileByKey",
       profileKey: "builtin:default",
     });
-    expect(vscode.messages).toContainEqual({
-      type: "openProfileJson",
-      profileKey: "builtin:default",
-    });
+    expect(vscode.messages).not.toContainEqual(
+      expect.objectContaining({ type: "openProfileJson" }),
+    );
   });
 
-  test("builtin profile editor is read-only", async () => {
-    const { wrapper } = mountProfileEditor();
-    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
+  test("workspace profile action menu shows edit copy and open jsonc", async () => {
+    const { wrapper, vscode } = mountProfileEditor();
+    const profile = { ...defaultProfile, id: "editable", name: "Editable" };
+    dispatchEditorState(createEditorState({ selectedProfile: profile, sourceScope: "workspace" }));
     await nextTick();
 
     await wrapper.find(".profile-menu-trigger").trigger("click");
-    await wrapper.findAll(".profile-list-menu button")[0]!.trigger("click");
+    const menuButtons = wrapper.findAll(".profile-list-menu button");
+    expect(menuButtons.map((button) => button.text())).toEqual(["Edit", "Copy", "Open JSONC"]);
+    await menuButtons[2]!.trigger("click");
+
+    expect(vscode.messages).toContainEqual({
+      type: "openProfileJson",
+      profileKey: "workspace:editable",
+    });
+  });
+
+  test("copy success moves to the copied profile editor", async () => {
+    const { wrapper } = mountProfileEditor();
+    const copiedProfile = { ...defaultProfile, id: "copied", name: "Copied" };
+    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
+    await nextTick();
+
+    window.dispatchEvent(
+      new MessageEvent("message", {
+        data: {
+          type: "profileCopied",
+          profileKey: "workspace:file:///workspace:copied",
+          filePath: "/workspace/.live-serial-plotter/profiles/copied.jsonc",
+        },
+      }),
+    );
+    dispatchEditorState(
+      createEditorState({ selectedProfile: copiedProfile, sourceScope: "workspace" }),
+    );
     await nextTick();
 
     expect(wrapper.find("main").classes()).toContain("profile-editor");
-    expect(wrapper.find<HTMLInputElement>('input[name="profile.name"]').element.disabled).toBe(
-      true,
-    );
+    expect(wrapper.find(".profile-editor-title").text()).toContain("Copied");
   });
 
   test("editable profile autosaves valid changes after debounce", async () => {
@@ -130,30 +153,6 @@ describe("ProfileEditorApp", () => {
       expect.objectContaining({ type: "autoSaveProfile" }),
     );
     expect(wrapper.text()).toContain("Expected");
-  });
-
-  test("copy success moves to the copied profile editor", async () => {
-    const { wrapper } = mountProfileEditor();
-    const copiedProfile = { ...defaultProfile, id: "copied", name: "Copied" };
-    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
-    await nextTick();
-
-    window.dispatchEvent(
-      new MessageEvent("message", {
-        data: {
-          type: "profileCopied",
-          profileKey: "workspace:file:///workspace:copied",
-          filePath: "/workspace/.live-serial-plotter/profiles/copied.jsonc",
-        },
-      }),
-    );
-    dispatchEditorState(
-      createEditorState({ selectedProfile: copiedProfile, sourceScope: "workspace" }),
-    );
-    await nextTick();
-
-    expect(wrapper.find("main").classes()).toContain("profile-editor");
-    expect(wrapper.find(".profile-editor-title").text()).toContain("Copied");
   });
 });
 
@@ -206,15 +205,26 @@ function createEditorState(options: {
 }): ProfileEditorState {
   const sourceScope = options.sourceScope ?? "builtin";
   const selectedKey = `${sourceScope}:${options.selectedProfile.id}`;
+  const selectedSummary = {
+    key: selectedKey,
+    ref: { scope: sourceScope, id: options.selectedProfile.id },
+    id: options.selectedProfile.id,
+    name: options.selectedProfile.name,
+    scope: sourceScope,
+    workspaceName: sourceScope === "workspace" ? "workspace" : undefined,
+  };
 
   return {
-    profiles: builtinProfiles.map((profile) => ({
-      key: `builtin:${profile.id}`,
-      ref: { scope: "builtin", id: profile.id },
-      id: profile.id,
-      name: profile.name,
-      scope: "builtin",
-    })),
+    profiles:
+      sourceScope === "builtin"
+        ? builtinProfiles.map((profile) => ({
+            key: `builtin:${profile.id}`,
+            ref: { scope: "builtin", id: profile.id },
+            id: profile.id,
+            name: profile.name,
+            scope: "builtin",
+          }))
+        : [selectedSummary],
     selectedProfile: options.selectedProfile,
     selectedProfileKey: selectedKey,
     selectedSource: {

@@ -56,13 +56,23 @@ function formatOutputs(profile: ProfileConfig): string {
             class="profile-list-menu"
             role="menu"
           >
-            <button type="button" role="menuitem" @click.stop="store.openEditor(profile.key)">
+            <button
+              v-if="profile.scope !== 'builtin'"
+              type="button"
+              role="menuitem"
+              @click.stop="store.openEditor(profile.key)"
+            >
               Edit
             </button>
             <button type="button" role="menuitem" @click.stop="store.copyProfile(profile.key)">
               Copy
             </button>
-            <button type="button" role="menuitem" @click.stop="store.openProfileJson(profile.key)">
+            <button
+              v-if="profile.scope !== 'builtin'"
+              type="button"
+              role="menuitem"
+              @click.stop="store.openProfileJson(profile.key)"
+            >
               Open JSONC
             </button>
           </div>
