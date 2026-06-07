@@ -39,7 +39,7 @@ describe("profileEditorStore", () => {
     store.copyProfile("builtin:default");
     store.openProfileJson("user:custom");
 
-    expect(store.state.openMenuProfileKey).toBeUndefined();
+    expect(store.state.profileMenu).toBeUndefined();
     expect(vscode.messages).toContainEqual({
       type: "copyProfileByKey",
       profileKey: "builtin:default",

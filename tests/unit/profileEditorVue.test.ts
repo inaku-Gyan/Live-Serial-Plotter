@@ -91,6 +91,43 @@ describe("ProfileEditorApp", () => {
     });
   });
 
+  test("profile item context menu uses the same profile actions", async () => {
+    const { wrapper, vscode } = mountProfileEditor();
+    const profile = { ...defaultProfile, id: "editable", name: "Editable" };
+    dispatchEditorState(createEditorState({ selectedProfile: profile, sourceScope: "workspace" }));
+    await nextTick();
+
+    await wrapper.find(".profile-list-item").trigger("contextmenu", { clientX: 24, clientY: 36 });
+    const menu = wrapper.find(".profile-list-menu");
+    const menuButtons = wrapper.findAll(".profile-list-menu button");
+    expect(menu.classes()).toContain("profile-list-menu--context");
+    expect(menu.attributes("style")).toContain("left: 24px");
+    expect(menu.attributes("style")).toContain("top: 36px");
+    expect(menuButtons.map((button) => button.text())).toEqual(["Edit", "Copy", "Open JSONC"]);
+
+    await requireItem(menuButtons, 1).trigger("click");
+
+    expect(vscode.messages).toContainEqual({
+      type: "copyProfileByKey",
+      profileKey: "workspace:editable",
+    });
+  });
+
+  test("profile action menu closes when focus leaves the menu root", async () => {
+    const { wrapper } = mountProfileEditor();
+    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
+    await nextTick();
+
+    await wrapper.find(".profile-menu-trigger").trigger("click");
+    expect(wrapper.find(".profile-list-menu").exists()).toBe(true);
+
+    await wrapper
+      .find(".profile-list-menu-root")
+      .trigger("focusout", { relatedTarget: document.body });
+
+    expect(wrapper.find(".profile-list-menu").exists()).toBe(false);
+  });
+
   test("copy success moves to the copied profile editor", async () => {
     const { wrapper } = mountProfileEditor();
     const copiedProfile = { ...defaultProfile, id: "copied", name: "Copied" };

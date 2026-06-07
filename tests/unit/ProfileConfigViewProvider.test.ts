@@ -215,18 +215,18 @@ describe("ProfileConfigViewProvider", () => {
     );
   });
 
-  test("only contributes open jsonc to the editor view title", () => {
+  test("contributes refresh and editor-only open jsonc to the view title", () => {
     const viewTitleMenu = packageJson.contributes.menus["view/title"] ?? [];
 
     expect(viewTitleMenu).toEqual([
       {
-        command: "liveSerialPlotter.profiles.refresh",
-        when: "view == liveSerialPlotter.profiles",
+        command: "liveSerialPlotter.profiles.openJson",
+        when: "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorView == editor",
         group: "navigation@1",
       },
       {
-        command: "liveSerialPlotter.profiles.openJson",
-        when: "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorView == editor",
+        command: "liveSerialPlotter.profiles.refresh",
+        when: "view == liveSerialPlotter.profiles",
         group: "navigation@2",
       },
     ]);

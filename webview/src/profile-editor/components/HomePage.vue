@@ -25,6 +25,18 @@ function formatParser(profile: ProfileConfig): string {
 function formatOutputs(profile: ProfileConfig): string {
   return profile.outputs.map((output) => `${output.kind}:${output.id}`).join(", ");
 }
+
+function handleProfileMenuFocusOut(event: FocusEvent, store: ProfileEditorStore): void {
+  const relatedTarget = event.relatedTarget;
+
+  if (relatedTarget instanceof Node && event.currentTarget instanceof Node) {
+    if (event.currentTarget.contains(relatedTarget)) {
+      return;
+    }
+  }
+
+  store.closeProfileMenu();
+}
 </script>
 
 <template>
@@ -36,13 +48,16 @@ function formatOutputs(profile: ProfileConfig): string {
         :key="profile.key"
         class="profile-list-item"
         :data-active="profile.key === store.state.selectedProfileKey ? 'true' : 'false'"
-        :data-menu-open="profile.key === store.state.openMenuProfileKey ? 'true' : 'false'"
+        :data-menu-open="profile.key === store.state.profileMenu?.profileKey ? 'true' : 'false'"
+        @contextmenu.prevent="
+          store.openProfileContextMenu(profile.key, $event.clientX, $event.clientY)
+        "
       >
         <button class="profile-list-main" type="button" @click="store.selectProfile(profile.key)">
           <strong>{{ profile.name }}</strong>
           <span>{{ formatProfileLocation(profile) }}</span>
         </button>
-        <div class="profile-list-menu-root">
+        <div class="profile-list-menu-root" @focusout="handleProfileMenuFocusOut($event, store)">
           <button
             class="profile-menu-trigger"
             type="button"
@@ -52,8 +67,17 @@ function formatOutputs(profile: ProfileConfig): string {
             ...
           </button>
           <div
-            v-if="store.state.openMenuProfileKey === profile.key"
+            v-if="store.state.profileMenu?.profileKey === profile.key"
             class="profile-list-menu"
+            :class="{ 'profile-list-menu--context': store.state.profileMenu.x !== undefined }"
+            :style="
+              store.state.profileMenu.x === undefined
+                ? undefined
+                : {
+                    left: `${store.state.profileMenu.x}px`,
+                    top: `${store.state.profileMenu.y}px`,
+                  }
+            "
             role="menu"
           >
             <button

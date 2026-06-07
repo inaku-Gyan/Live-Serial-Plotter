@@ -19,6 +19,12 @@ export interface ProfileEditorPersistedState {
   view?: ProfileEditorView;
 }
 
+export interface ProfileMenu {
+  profileKey: string;
+  x?: number;
+  y?: number;
+}
+
 export interface VsCodeApi<State> {
   getState(): State | undefined;
   setState(state: State): void;
@@ -32,7 +38,7 @@ interface ProfileEditorUiState {
   selectedSource: ProfileSourceMetadata | undefined;
   draft: ProfileEditorPatch | undefined;
   view: ProfileEditorView;
-  openMenuProfileKey: string | undefined;
+  profileMenu: ProfileMenu | undefined;
   statusText: string;
 }
 
@@ -53,7 +59,7 @@ export function createProfileEditorStore(
     selectedSource: undefined,
     draft: undefined,
     view: persistedState?.view ?? "home",
-    openMenuProfileKey: undefined,
+    profileMenu: undefined,
     statusText: "",
   });
   syncProfileEditorView();
@@ -95,7 +101,7 @@ export function createProfileEditorStore(
     if (message.type === "profileCopied") {
       state.view = "editor";
       state.selectedProfileKey = message.profileKey;
-      state.openMenuProfileKey = undefined;
+      state.profileMenu = undefined;
       persistState();
       syncProfileEditorView();
       setStatusText(`Copied to ${message.filePath}`);
@@ -106,7 +112,7 @@ export function createProfileEditorStore(
   }
 
   function selectProfile(profileKey: string): void {
-    state.openMenuProfileKey = undefined;
+    state.profileMenu = undefined;
     state.selectedProfileKey = profileKey;
     persistState();
     postMessage({ type: "selectProfileForEdit", profileKey });
@@ -114,7 +120,7 @@ export function createProfileEditorStore(
 
   function openEditor(profileKey = state.selectedProfileKey): void {
     state.view = "editor";
-    state.openMenuProfileKey = undefined;
+    state.profileMenu = undefined;
     persistState();
     syncProfileEditorView();
 
@@ -126,26 +132,30 @@ export function createProfileEditorStore(
 
   function backToHome(): void {
     state.view = "home";
-    state.openMenuProfileKey = undefined;
+    state.profileMenu = undefined;
     persistState();
     syncProfileEditorView();
   }
 
   function toggleProfileMenu(profileKey: string): void {
-    state.openMenuProfileKey = state.openMenuProfileKey === profileKey ? undefined : profileKey;
+    state.profileMenu = state.profileMenu?.profileKey === profileKey ? undefined : { profileKey };
+  }
+
+  function openProfileContextMenu(profileKey: string, x: number, y: number): void {
+    state.profileMenu = { profileKey, x, y };
   }
 
   function closeProfileMenu(): void {
-    state.openMenuProfileKey = undefined;
+    state.profileMenu = undefined;
   }
 
   function copyProfile(profileKey: string): void {
-    state.openMenuProfileKey = undefined;
+    state.profileMenu = undefined;
     postMessage({ type: "copyProfileByKey", profileKey });
   }
 
   function openProfileJson(profileKey?: string): void {
-    state.openMenuProfileKey = undefined;
+    state.profileMenu = undefined;
     postMessage({ type: "openProfileJson", profileKey });
   }
 
@@ -237,6 +247,7 @@ export function createProfileEditorStore(
     openEditor,
     backToHome,
     toggleProfileMenu,
+    openProfileContextMenu,
     closeProfileMenu,
     copyProfile,
     openProfileJson,
