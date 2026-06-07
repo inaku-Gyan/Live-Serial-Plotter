@@ -86,7 +86,7 @@
         "command": "liveSerialPlotter.profiles.openJson",
         "title": "Live Serial Plotter: Open Profile JSONC",
         "category": "Live Serial Plotter",
-        "icon": "$(json)"
+        "icon": "$(go-to-file)"
       }
     ],
     "viewsContainers": {
