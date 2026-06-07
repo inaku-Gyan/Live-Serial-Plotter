@@ -63,6 +63,7 @@ describe("LayoutStore", () => {
             kind: "timeSeriesLine",
             showLegend: false,
             autoFollow: false,
+            followMode: "locked",
             zoom: { x: { min: 10, max: 20 } },
           },
         },
@@ -75,6 +76,7 @@ describe("LayoutStore", () => {
         kind: "timeSeriesLine",
         showLegend: false,
         autoFollow: false,
+        followMode: "locked",
         zoom: { x: { min: 10, max: 20 }, y: undefined },
       },
     });

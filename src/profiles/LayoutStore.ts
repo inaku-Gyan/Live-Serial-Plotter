@@ -404,6 +404,10 @@ function normalizeTimeSeriesViewLayout(value: Record<string, unknown>): TimeSeri
     kind: "timeSeriesLine",
     showLegend: typeof value.showLegend === "boolean" ? value.showLegend : undefined,
     autoFollow: typeof value.autoFollow === "boolean" ? value.autoFollow : undefined,
+    followMode:
+      value.followMode === "locked" || value.followMode === "unlocked"
+        ? value.followMode
+        : undefined,
     zoom: normalizeAxisRange(value.zoom),
   };
 }
