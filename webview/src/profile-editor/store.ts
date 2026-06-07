@@ -174,7 +174,7 @@ export function createProfileEditorStore(
     }
 
     try {
-      const nextProfile = applyProfileEditorPatch(state.selectedProfile, state.draft);
+      const nextProfile = cloneProfile(applyProfileEditorPatch(state.selectedProfile, state.draft));
       state.selectedProfile = cloneProfile(nextProfile);
       setStatusText("Saving...");
       postMessage({ type: "autoSaveProfile", profile: nextProfile });
