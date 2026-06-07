@@ -47,6 +47,12 @@ const defaultMaxPlotPoints = 3000;
 const defaultDurationSeconds = 30;
 const defaultValueUnit = "Value";
 const uPlotPathCacheKey = "_paths";
+const minXAxisTickSpace = 22;
+const maxXAxisTickSpace = 72;
+const targetXAxisTickDivisions = 6;
+const minYAxisTickSpace = 18;
+const maxYAxisTickSpace = 44;
+const targetYAxisTickDivisions = 8;
 const colors = ["#4cc9f0", "#f72585", "#ffd166", "#06d6a0", "#c77dff", "#f77f00", "#90be6d"];
 
 type PlotWindowConfig =
@@ -509,6 +515,7 @@ class TimeSeriesLineView implements OutputView {
     const axes: uPlot.Axis[] = [
       {
         label: this.getTimeAxisLabel(),
+        space: getXAxisTickSpace,
         stroke: "var(--vscode-foreground)",
         grid: {
           stroke: "var(--vscode-panel-border)",
@@ -522,6 +529,7 @@ class TimeSeriesLineView implements OutputView {
       axes.push({
         label: this.getYAxisLabel(unitGroup),
         side: index === 0 ? 3 : 1,
+        space: getYAxisTickSpace,
         stroke: "var(--vscode-foreground)",
         grid:
           index === 0
@@ -1174,6 +1182,49 @@ function cssEscape(value: string): string {
 
 function getUnitScaleKey(unitIndex: number): string {
   return `y${unitIndex + 1}`;
+}
+
+function getXAxisTickSpace(
+  _plot: uPlot,
+  _axisIndex: number,
+  _scaleMin: number,
+  _scaleMax: number,
+  plotDimension: number,
+): number {
+  return getDynamicAxisTickSpace(
+    plotDimension,
+    minXAxisTickSpace,
+    maxXAxisTickSpace,
+    targetXAxisTickDivisions,
+  );
+}
+
+function getYAxisTickSpace(
+  _plot: uPlot,
+  _axisIndex: number,
+  _scaleMin: number,
+  _scaleMax: number,
+  plotDimension: number,
+): number {
+  return getDynamicAxisTickSpace(
+    plotDimension,
+    minYAxisTickSpace,
+    maxYAxisTickSpace,
+    targetYAxisTickDivisions,
+  );
+}
+
+function getDynamicAxisTickSpace(
+  plotDimension: number,
+  minSpace: number,
+  maxSpace: number,
+  targetDivisions: number,
+): number {
+  if (!Number.isFinite(plotDimension) || plotDimension <= 0) {
+    return minSpace;
+  }
+
+  return Math.min(maxSpace, Math.max(minSpace, plotDimension / targetDivisions));
 }
 
 function positiveNumberOrDefault(value: number | undefined, defaultValue: number): number {

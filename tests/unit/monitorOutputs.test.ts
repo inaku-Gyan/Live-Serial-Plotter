@@ -13,7 +13,7 @@ const uPlotPathCacheKey = "_paths";
 
 interface MockUPlotInstance {
   options: {
-    axes?: Array<{ label?: string; side?: number }>;
+    axes?: MockUPlotAxis[];
     cursor?: {
       drag?: { dist?: number; setScale?: boolean; x?: boolean; y?: boolean };
       focus?: { prox?: number };
@@ -47,6 +47,18 @@ interface MockUPlotInstance {
   >;
   setSeries: ReturnType<typeof vi.fn<(index: number, options: { show: boolean }) => void>>;
   setSize: ReturnType<typeof vi.fn<(size: { width: number; height: number }) => void>>;
+}
+
+interface MockUPlotAxis {
+  label?: string;
+  side?: number;
+  space?: (
+    plot: MockUPlotInstance,
+    axisIndex: number,
+    scaleMin: number,
+    scaleMax: number,
+    plotDimension: number,
+  ) => number;
 }
 
 interface MockUPlotSeries {
@@ -231,6 +243,10 @@ describe("MonitorOutputController", () => {
       "Temperature (degC)",
       "Value",
     ]);
+    expect(plot.options.axes?.[0]?.space?.(plot, 0, 0, 10, 90)).toBe(22);
+    expect(plot.options.axes?.[0]?.space?.(plot, 0, 0, 10, 360)).toBe(60);
+    expect(plot.options.axes?.[1]?.space?.(plot, 1, 0, 100, 100)).toBe(18);
+    expect(plot.options.axes?.[1]?.space?.(plot, 1, 0, 100, 320)).toBe(40);
     expect(plot.options.series.map((series) => series.show)).toEqual([undefined, true, false]);
     expect(plot.options.legend).toEqual({ show: false });
     expect(plot.options.cursor?.drag).toEqual({ dist: 8, setScale: true, x: true, y: false });

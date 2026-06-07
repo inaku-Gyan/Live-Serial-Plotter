@@ -54,6 +54,7 @@
 - `window.mode: "points"` 保留并显示最新 `maxPoints` 个采样点。
 - `window.mode: "duration"` 按最新样本时间显示最近 `seconds` 秒。
 - 横轴应显示坐标和单位；非 sequence 时间轴当前按秒绘制，显示为 `Time (s)`。
+- 图表缩小时仍应显示坐标轴数字；坐标轴刻度密度应随图表尺寸动态调整，而不是直接隐藏全部数字。
 - 多个不同 `series.unit` 共存时，按单位拆分 y scale 和 y axis。
 - 相同单位共用一个 y 轴；第一个单位放左轴，后续单位放右轴。
 - 未配置 `unit` 的自动发现字段使用默认 `Value` 轴。
