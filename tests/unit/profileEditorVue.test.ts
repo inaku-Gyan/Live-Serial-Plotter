@@ -149,6 +149,25 @@ describe("ProfileEditorApp", () => {
     expect(wrapper.find(".profile-list-menu").exists()).toBe(false);
   });
 
+  test("profile action menu closes when focus moves to another profile menu trigger", async () => {
+    const { wrapper } = mountProfileEditor();
+    dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
+    await nextTick();
+
+    const triggers = wrapper.findAll(".profile-menu-trigger");
+    await requireItem(triggers, 0).trigger("click");
+    expect(wrapper.find(".profile-list-menu").exists()).toBe(true);
+
+    const nextTrigger = requireItem(triggers, 1).element;
+    if (!(nextTrigger instanceof HTMLButtonElement)) {
+      throw new Error("Profile menu trigger is not a button.");
+    }
+    nextTrigger.focus();
+    await nextTick();
+
+    expect(wrapper.find(".profile-list-menu").exists()).toBe(false);
+  });
+
   test("copy success moves to the copied profile editor", async () => {
     const { wrapper } = mountProfileEditor();
     const copiedProfile = { ...defaultProfile, id: "copied", name: "Copied" };

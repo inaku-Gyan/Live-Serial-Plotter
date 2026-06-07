@@ -19,7 +19,7 @@ function handleHostMessage(event: MessageEvent<ToProfileEditorWebviewMessage>): 
 function handlePointerDown(event: PointerEvent): void {
   const target = event.target;
 
-  if (target instanceof Element && target.closest(".profile-list-menu-root") !== null) {
+  if (target instanceof Element && isInsideOpenProfileMenuRoot(target)) {
     return;
   }
 
@@ -29,11 +29,22 @@ function handlePointerDown(event: PointerEvent): void {
 function handleFocusIn(event: FocusEvent): void {
   const target = event.target;
 
-  if (target instanceof Element && target.closest(".profile-list-menu-root") !== null) {
+  if (target instanceof Element && isInsideOpenProfileMenuRoot(target)) {
     return;
   }
 
   props.store.closeProfileMenu();
+}
+
+function isInsideOpenProfileMenuRoot(target: Element): boolean {
+  const openProfileKey = props.store.state.profileMenu?.profileKey;
+
+  if (openProfileKey === undefined) {
+    return false;
+  }
+
+  const menuRoot = target.closest<HTMLElement>(".profile-list-menu-root");
+  return menuRoot?.dataset.profileKey === openProfileKey;
 }
 
 function handleKeyDown(event: KeyboardEvent): void {

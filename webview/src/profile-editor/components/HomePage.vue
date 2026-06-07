@@ -66,7 +66,7 @@ async function focusOpenProfileMenu(): Promise<void> {
           <strong>{{ profile.name }}</strong>
           <span>{{ formatProfileLocation(profile) }}</span>
         </button>
-        <div class="profile-list-menu-root">
+        <div class="profile-list-menu-root" :data-profile-key="profile.key">
           <button
             class="profile-menu-trigger"
             type="button"
