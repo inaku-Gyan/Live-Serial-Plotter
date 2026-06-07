@@ -619,6 +619,10 @@ describe("MonitorOutputController", () => {
     expect(followButton.textContent).toBe("Locked Follow");
     expect(followButton.getAttribute("aria-pressed")).toBe("true");
 
+    plot.setScale("x", { min: 1.5, max: 2 });
+    expect(followButton.textContent).toBe("Locked Follow");
+    expect(followButton.getAttribute("aria-pressed")).toBe("true");
+
     followButton.click();
     expect(followButton.textContent).toBe("Following");
     expect(followButton.getAttribute("aria-pressed")).toBe("false");
@@ -672,7 +676,7 @@ describe("MonitorOutputController", () => {
       plot.scales.y1 = { min: 10, max: 30 };
       plot.setScale("x", { min: 1.25, max: 2 });
       plot.setScale("y1", { min: 15, max: 35 });
-      expect(followButton.textContent).toBe("Follow");
+      expect(followButton.textContent).toBe("Locked Follow");
 
       controller.appendPacket({
         kind: "timeSeriesAppend",
@@ -693,7 +697,7 @@ describe("MonitorOutputController", () => {
       expect(plot.scales.y1).toEqual({ min: 15, max: 35 });
 
       vi.advanceTimersByTime(349);
-      expect(followButton.textContent).toBe("Follow");
+      expect(followButton.textContent).toBe("Locked Follow");
 
       vi.advanceTimersByTime(1);
       expect(followButton.textContent).toBe("Locked Follow");

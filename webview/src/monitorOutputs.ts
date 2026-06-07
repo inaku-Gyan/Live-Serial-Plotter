@@ -939,7 +939,7 @@ class TimeSeriesLineView implements OutputView {
   private toggleFollowMode(): void {
     this.clearLockedFollowResumeTimer();
 
-    if (!this.isAutoFollowEnabled) {
+    if (this.followMode === "locked") {
       this.followMode = "unlocked";
       this.isAutoFollowEnabled = true;
       this.shouldPreserveScaleWhileFollowing = true;
@@ -948,9 +948,10 @@ class TimeSeriesLineView implements OutputView {
       return;
     }
 
-    if (this.followMode === "locked") {
-      this.followMode = "unlocked";
+    if (!this.isAutoFollowEnabled) {
       this.isAutoFollowEnabled = true;
+      this.shouldPreserveScaleWhileFollowing = true;
+      this.applyAutoFollowRange(true);
       this.updateFollowButton();
       return;
     }
@@ -992,17 +993,17 @@ class TimeSeriesLineView implements OutputView {
       return;
     }
 
-    if (!this.isAutoFollowEnabled) {
-      this.followButton.textContent = "Follow";
-      this.followButton.title = "Resume following latest data";
-      this.followButton.setAttribute("aria-pressed", "false");
-      return;
-    }
-
     if (this.followMode === "locked") {
       this.followButton.textContent = "Locked Follow";
       this.followButton.title = "Keep following latest data after interactions";
       this.followButton.setAttribute("aria-pressed", "true");
+      return;
+    }
+
+    if (!this.isAutoFollowEnabled) {
+      this.followButton.textContent = "Follow";
+      this.followButton.title = "Resume following latest data";
+      this.followButton.setAttribute("aria-pressed", "false");
       return;
     }
 
