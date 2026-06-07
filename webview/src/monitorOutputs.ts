@@ -576,6 +576,8 @@ class TimeSeriesLineView implements OutputView {
 
       if (this.isAutoFollowEnabled && hasScaleRange(xWindowRange)) {
         this.plot.setScale("x", xWindowRange);
+      } else if (!this.isAutoFollowEnabled) {
+        this.plot.redraw(true, false);
       }
     } finally {
       this.isApplyingScaleUpdate = false;

@@ -31,6 +31,7 @@ interface MockUPlotInstance {
   target: HTMLElement;
   destroy: ReturnType<typeof vi.fn<() => void>>;
   posToVal: ReturnType<typeof vi.fn<(leftTop: number, scaleKey: string) => number>>;
+  redraw: ReturnType<typeof vi.fn<(rebuildPaths?: boolean, recalcAxes?: boolean) => void>>;
   setData: ReturnType<typeof vi.fn<(nextData: unknown[], resetScales?: boolean) => void>>;
   setScale: ReturnType<
     typeof vi.fn<(scaleKey: string, range: { min?: number; max?: number }) => void>
@@ -111,6 +112,7 @@ vi.mock("uplot", () => {
 
         return scale.min + (leftTop / 400) * (scale.max - scale.min);
       });
+      this.redraw = vi.fn<(rebuildPaths?: boolean, recalcAxes?: boolean) => void>();
       this.setData = vi.fn<(nextData: unknown[], resetScales?: boolean) => void>((nextData) => {
         this.data = nextData;
       });
@@ -392,6 +394,7 @@ describe("MonitorOutputController", () => {
       ],
       false,
     );
+    expect(plot.redraw).toHaveBeenLastCalledWith(true, false);
   });
 
   test("zooms the x range with the uPlot wheel interaction plugin", () => {
@@ -447,6 +450,7 @@ describe("MonitorOutputController", () => {
       ],
       false,
     );
+    expect(plot.redraw).toHaveBeenLastCalledWith(true, false);
   });
 
   test("pans the x range with the uPlot pointer interaction plugin", () => {
