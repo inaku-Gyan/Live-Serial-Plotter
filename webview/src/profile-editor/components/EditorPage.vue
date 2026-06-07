@@ -6,6 +6,7 @@ import {
   type TerminalAppendOutputConfig,
   type TimeSeriesLineOutputConfig,
 } from "../../../../src/shared/protocol";
+import { baudRatePresets, isBaudRateInputValid } from "../../baudRate";
 import type {
   TerminalAppendOutputPatch,
   TimeSeriesOutputPatch,
@@ -27,6 +28,10 @@ const sourceLabel = computed(
     props.store.state.selectedSource?.scope ??
     "builtin",
 );
+
+function isBaudRateValid(value: string): boolean {
+  return isBaudRateInputValid(value);
+}
 
 function terminalPatch(output: TerminalAppendOutputConfig): TerminalAppendOutputPatch {
   const patch = draft.value?.terminalAppendOutputs.find(
@@ -119,8 +124,21 @@ function outputTitle(output: OutputConfig): string {
           <input
             v-model="draft.serialDefaults.baudRate"
             name="serialDefaults.baudRate"
+            type="number"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            list="profileBaudRatePresets"
+            :aria-invalid="isBaudRateValid(draft.serialDefaults.baudRate) ? 'false' : 'true'"
             :disabled="isReadonly"
           />
+          <datalist id="profileBaudRatePresets">
+            <option
+              v-for="baudRate in baudRatePresets"
+              :key="baudRate"
+              :value="String(baudRate)"
+            ></option>
+          </datalist>
         </label>
         <label class="profile-field">
           <span>Encoding</span>

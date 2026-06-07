@@ -7,6 +7,7 @@ import type {
   TimeAxisConfig,
   TimeSeriesLineOutputConfig,
 } from "../../src/shared/protocol";
+import { parseBaudRateInput } from "./baudRate";
 
 export interface ProfileEditorPatch {
   id: string;
@@ -207,9 +208,7 @@ function applyTerminalAppendPatch(
 }
 
 function createSerialDefaults(patch: ProfileEditorPatch): ProfileConfig["serialDefaults"] {
-  const baudRate = parseOptionalNumber(patch.serialDefaults.baudRate);
-
-  return baudRate === undefined ? undefined : { baudRate };
+  return { baudRate: parseBaudRateInput(patch.serialDefaults.baudRate) };
 }
 
 function applyTimeSeriesPatch(

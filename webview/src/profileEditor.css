@@ -276,6 +276,10 @@ textarea {
   padding: 0 7px;
 }
 
+.profile-field input[aria-invalid="true"] {
+  border-color: var(--vscode-inputValidation-errorBorder);
+}
+
 .profile-field textarea {
   min-height: 74px;
   resize: vertical;

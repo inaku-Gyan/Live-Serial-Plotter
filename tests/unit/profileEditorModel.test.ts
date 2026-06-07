@@ -130,6 +130,24 @@ describe("profileEditorModel", () => {
     });
   });
 
+  test("patches custom positive integer baud rates", () => {
+    const patched = applyProfileEditorPatch(createProfile(), {
+      ...createPatch(),
+      serialDefaults: { baudRate: "250000" },
+    });
+
+    expect(patched.serialDefaults).toEqual({ baudRate: 250000 });
+  });
+
+  test("rejects invalid baud rates", () => {
+    expect(() =>
+      applyProfileEditorPatch(createProfile(), {
+        ...createPatch(),
+        serialDefaults: { baudRate: "0" },
+      }),
+    ).toThrow("Baud rate must be a positive integer.");
+  });
+
   test("preserves unsupported outputs and script parser configuration", () => {
     const profile: ProfileConfig = {
       ...createProfile(),

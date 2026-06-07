@@ -193,6 +193,48 @@ describe("ProfileEditorApp", () => {
     });
   });
 
+  test("editable profile autosaves custom baud rate after debounce", async () => {
+    vi.useFakeTimers();
+    const { wrapper, vscode } = mountProfileEditor();
+    const profile = { ...defaultProfile, id: "editable", name: "Editable" };
+    dispatchEditorState(createEditorState({ selectedProfile: profile, sourceScope: "workspace" }));
+    await nextTick();
+
+    await wrapper.find(".profile-menu-trigger").trigger("click");
+    await requireItem(wrapper.findAll(".profile-list-menu button"), 0).trigger("click");
+    await nextTick();
+    await wrapper
+      .find<HTMLInputElement>('input[name="serialDefaults.baudRate"]')
+      .setValue("250000");
+    vi.advanceTimersByTime(350);
+    await nextTick();
+
+    expect(vscode.messages).toContainEqual({
+      type: "autoSaveProfile",
+      profile: expect.objectContaining({ serialDefaults: { baudRate: 250000 } }),
+    });
+  });
+
+  test("invalid profile baud rate does not autosave", async () => {
+    vi.useFakeTimers();
+    const { wrapper, vscode } = mountProfileEditor();
+    const profile = { ...defaultProfile, id: "editable", name: "Editable" };
+    dispatchEditorState(createEditorState({ selectedProfile: profile, sourceScope: "workspace" }));
+    await nextTick();
+
+    await wrapper.find(".profile-menu-trigger").trigger("click");
+    await requireItem(wrapper.findAll(".profile-list-menu button"), 0).trigger("click");
+    await nextTick();
+    await wrapper.find<HTMLInputElement>('input[name="serialDefaults.baudRate"]').setValue("0");
+    vi.advanceTimersByTime(350);
+    await nextTick();
+
+    expect(vscode.messages).not.toContainEqual(
+      expect.objectContaining({ type: "autoSaveProfile" }),
+    );
+    expect(wrapper.text()).toContain("Baud rate must be a positive integer.");
+  });
+
   test("invalid parser options do not autosave", async () => {
     vi.useFakeTimers();
     const { wrapper, vscode } = mountProfileEditor();
