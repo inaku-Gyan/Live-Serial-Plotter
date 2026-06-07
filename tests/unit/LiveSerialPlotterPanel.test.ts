@@ -28,4 +28,14 @@ describe("LiveSerialPlotterPanel", () => {
       expect(panel.reveal).not.toHaveBeenCalled();
     }
   });
+
+  test("passes the initial profile key to the webview", () => {
+    LiveSerialPlotterPanel.open(extensionUri, {
+      initialProfileKey: "workspace:file:///workspace:telemetry",
+    });
+
+    expect(__vscodeMock.createdPanels[0]?.webview.html).toContain(
+      'data-initial-profile-key="workspace:file:///workspace:telemetry"',
+    );
+  });
 });

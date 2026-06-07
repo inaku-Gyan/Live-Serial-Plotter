@@ -34,10 +34,11 @@ declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
 const vscode = acquireVsCodeApi<PersistedState>();
 const persistedState = vscode.getState();
 const defaultProfileKey = `builtin:${defaultProfile.id}`;
+const initialProfileKey = nonEmptyString(document.body.dataset.initialProfileKey);
 const initialState: PersistedState = {
   baudRate: persistedState?.baudRate ?? defaultProfile.serialDefaults?.baudRate ?? 115200,
   parserMode: persistedState?.parserMode ?? ("auto" satisfies ParserMode),
-  profileKey: persistedState?.profileKey ?? defaultProfileKey,
+  profileKey: initialProfileKey ?? persistedState?.profileKey ?? defaultProfileKey,
   selectedPath: persistedState?.selectedPath ?? "",
 };
 
@@ -625,4 +626,8 @@ function requireElement<T extends Element>(
   }
 
   return element;
+}
+
+function nonEmptyString(value: string | undefined): string | undefined {
+  return value === undefined || value.length === 0 ? undefined : value;
 }

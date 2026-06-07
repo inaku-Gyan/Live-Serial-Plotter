@@ -36,10 +36,19 @@ describe("profileEditorStore", () => {
     const store = createProfileEditorStore(vscode.api);
 
     store.toggleProfileMenu("builtin:default");
+    store.openMonitorProfile("builtin:default");
     store.copyProfile("builtin:default");
     store.openProfileJson("user:custom");
 
     expect(store.state.profileMenu).toBeUndefined();
+    expect(vscode.messages).toContainEqual({
+      type: "selectProfileForEdit",
+      profileKey: "builtin:default",
+    });
+    expect(vscode.messages).toContainEqual({
+      type: "openMonitorForProfile",
+      profileKey: "builtin:default",
+    });
     expect(vscode.messages).toContainEqual({
       type: "copyProfileByKey",
       profileKey: "builtin:default",

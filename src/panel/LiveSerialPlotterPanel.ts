@@ -11,6 +11,7 @@ export interface LiveSerialPlotterPanelOptions {
   readonly serialPortFactory?: SerialPortFactory;
   readonly profileStore?: ProfileStore;
   readonly scriptParserLoader?: AsyncScriptParserLoader;
+  readonly initialProfileKey?: string;
 }
 
 export class LiveSerialPlotterPanel {
@@ -46,6 +47,7 @@ export class LiveSerialPlotterPanel {
     options: LiveSerialPlotterPanelOptions,
   ) {
     this.profileStore = options.profileStore ?? new ProfileStore();
+    this.activeProfileKey = options.initialProfileKey;
     this.serialService = new SerialService(
       {
         onConnectionState: (state) => {
@@ -183,6 +185,8 @@ export class LiveSerialPlotterPanel {
       ),
     );
 
+    const initialProfileKey = escapeHtmlAttribute(this.activeProfileKey ?? "");
+
     return `<!DOCTYPE html>
 <html lang="en">
   <head>
@@ -192,7 +196,7 @@ export class LiveSerialPlotterPanel {
     <link nonce="${nonce}" href="${styleUri}" rel="stylesheet">
     <title>Live Serial Plotter</title>
   </head>
-  <body>
+  <body data-initial-profile-key="${initialProfileKey}">
     <div id="app"></div>
     <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
   </body>
@@ -223,4 +227,13 @@ function getNonce(): string {
 
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 }

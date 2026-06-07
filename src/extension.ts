@@ -14,6 +14,14 @@ export function activate(context: vscode.ExtensionContext): void {
   const profileConfigViewProvider = new ProfileConfigViewProvider({
     extensionUri: context.extensionUri,
     profileStore,
+    openMonitorPage: (profileKey) => {
+      LiveSerialPlotterPanel.open(context.extensionUri, {
+        serialPortFactory,
+        profileStore,
+        scriptParserLoader,
+        initialProfileKey: profileKey,
+      });
+    },
   });
 
   context.subscriptions.push(

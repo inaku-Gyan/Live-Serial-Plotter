@@ -58,7 +58,11 @@ async function focusOpenProfileMenu(): Promise<void> {
         :data-menu-open="profile.key === store.state.profileMenu?.profileKey ? 'true' : 'false'"
         @contextmenu.prevent="handleProfileContextMenu($event, store, profile.key)"
       >
-        <button class="profile-list-main" type="button" @click="store.selectProfile(profile.key)">
+        <button
+          class="profile-list-main"
+          type="button"
+          @click="store.openMonitorProfile(profile.key)"
+        >
           <strong>{{ profile.name }}</strong>
           <span>{{ formatProfileLocation(profile) }}</span>
         </button>

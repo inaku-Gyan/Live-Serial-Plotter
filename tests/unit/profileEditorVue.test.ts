@@ -21,7 +21,7 @@ describe("ProfileEditorApp", () => {
     vi.useRealTimers();
   });
 
-  test("profile item click selects preview without entering editor", async () => {
+  test("profile item click opens a monitor page without entering editor", async () => {
     const { wrapper, vscode } = mountProfileEditor();
     const jsonlProfile = requireBuiltinProfile("jsonl-telemetry");
     dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
@@ -30,6 +30,10 @@ describe("ProfileEditorApp", () => {
     await requireItem(wrapper.findAll(".profile-list-main"), 1).trigger("click");
     expect(vscode.messages).toContainEqual({
       type: "selectProfileForEdit",
+      profileKey: "builtin:jsonl-telemetry",
+    });
+    expect(vscode.messages).toContainEqual({
+      type: "openMonitorForProfile",
       profileKey: "builtin:jsonl-telemetry",
     });
     expect(wrapper.find("main").classes()).toContain("profile-home");

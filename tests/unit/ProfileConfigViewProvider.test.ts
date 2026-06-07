@@ -114,6 +114,18 @@ describe("ProfileConfigViewProvider", () => {
     );
   });
 
+  test("opens monitor pages for profile keys", async () => {
+    const openMonitorPage = vi.fn<(profileKey: string) => void>();
+    const { provider, webviewView, dispatch } = createProvider({ openMonitorPage });
+
+    provider.resolveWebviewView(webviewView);
+    await waitForAsyncWork();
+    dispatch({ type: "openMonitorForProfile", profileKey: "builtin:jsonl-telemetry" });
+    await waitForAsyncWork();
+
+    expect(openMonitorPage).toHaveBeenCalledWith("builtin:jsonl-telemetry");
+  });
+
   test("shows native warnings for missing profile keys", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-invalid-"));
     const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Invalid");
@@ -270,6 +282,7 @@ describe("ProfileConfigViewProvider", () => {
 
 interface CreateProviderOptions {
   readonly workspaceProfilesDirectories?: readonly WorkspaceProfilesDirectory[];
+  readonly openMonitorPage?: (profileKey: string) => void;
 }
 
 function createProvider(options: CreateProviderOptions = {}): {
@@ -296,6 +309,7 @@ function createProvider(options: CreateProviderOptions = {}): {
   const provider = new ProfileConfigViewProvider({
     extensionUri: vscode.Uri.file("/extension"),
     profileStore: new ProfileStore(options),
+    openMonitorPage: options.openMonitorPage,
   });
 
   return {

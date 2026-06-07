@@ -118,6 +118,11 @@ export function createProfileEditorStore(
     postMessage({ type: "selectProfileForEdit", profileKey });
   }
 
+  function openMonitorProfile(profileKey: string): void {
+    selectProfile(profileKey);
+    postMessage({ type: "openMonitorForProfile", profileKey });
+  }
+
   function openEditor(profileKey = state.selectedProfileKey): void {
     state.view = "editor";
     state.profileMenu = undefined;
@@ -244,6 +249,7 @@ export function createProfileEditorStore(
     requestProfileEditorState,
     handleHostMessage,
     selectProfile,
+    openMonitorProfile,
     openEditor,
     backToHome,
     toggleProfileMenu,

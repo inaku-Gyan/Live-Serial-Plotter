@@ -11,6 +11,7 @@ import type {
 export interface ProfileConfigViewProviderOptions {
   readonly extensionUri: vscode.Uri;
   readonly profileStore: ProfileStore;
+  readonly openMonitorPage?: (profileKey: string) => void;
 }
 
 interface ProfileConfigWebviewView {
@@ -85,6 +86,12 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
           "liveSerialPlotter.profileEditorView",
           message.view,
         );
+        return;
+      }
+
+      if (message.type === "openMonitorForProfile") {
+        await this.loadProfileByKey(message.profileKey);
+        this.options.openMonitorPage?.(message.profileKey);
         return;
       }
 
