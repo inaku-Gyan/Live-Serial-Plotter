@@ -200,14 +200,11 @@ describe("ProfileConfigViewProvider", () => {
     );
   });
 
-  test("does not contribute copy profile to the view title", () => {
+  test("only contributes refresh to the view title", () => {
     const viewTitleCommands =
       packageJson.contributes.menus["view/title"]?.map((item) => item.command) ?? [];
 
-    expect(viewTitleCommands).toEqual([
-      "liveSerialPlotter.profiles.refresh",
-      "liveSerialPlotter.profiles.openJson",
-    ]);
+    expect(viewTitleCommands).toEqual(["liveSerialPlotter.profiles.refresh"]);
   });
 });
 
