@@ -1,4 +1,5 @@
 import { createApp } from "vue";
+import "@vscode/codicons/dist/codicon.css";
 import "./profileEditor.css";
 import ProfileEditorApp from "./profile-editor/ProfileEditorApp.vue";
 import {

@@ -73,7 +73,7 @@ async function focusOpenProfileMenu(): Promise<void> {
             :aria-label="`Actions for ${profile.name}`"
             @click.stop="store.toggleProfileMenu(profile.key)"
           >
-            ...
+            <span class="codicon codicon-kebab-vertical" aria-hidden="true"></span>
           </button>
           <div
             v-if="store.state.profileMenu?.profileKey === profile.key"
