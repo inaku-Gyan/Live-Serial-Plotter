@@ -10,6 +10,7 @@ import type {
   TerminalFramePacket,
   TimeSeriesLineOutputConfig,
   TimeSeriesSample,
+  TimeSeriesWindowConfig,
   ToExtensionMessage,
 } from "../../src/shared/protocol";
 
@@ -30,7 +31,18 @@ interface OutputView {
 
 const defaultMaxRawLines = 500;
 const defaultMaxPlotPoints = 3000;
+const defaultDurationSeconds = 30;
+const defaultValueUnit = "Value";
 const colors = ["#4cc9f0", "#f72585", "#ffd166", "#06d6a0", "#c77dff", "#f77f00", "#90be6d"];
+
+type PlotWindowConfig =
+  | { mode: "points"; maxPoints: number }
+  | { mode: "duration"; seconds: number };
+
+interface UnitGroup {
+  unit: string;
+  channelNames: string[];
+}
 
 export class MonitorOutputController {
   private readonly views = new Map<string, OutputView>();
@@ -328,6 +340,41 @@ class TimeSeriesLineView implements OutputView {
     this.plot?.destroy();
 
     const channelNames = [...this.seriesData.keys()];
+    const unitGroups = this.getUnitGroups(channelNames);
+    const scales: uPlot.Options["scales"] = {
+      x: {
+        time: false,
+        ...this.getXWindowRange(),
+      },
+    };
+    const axes: uPlot.Axis[] = [
+      {
+        label: this.getTimeAxisLabel(),
+        stroke: "var(--vscode-foreground)",
+        grid: {
+          stroke: "var(--vscode-panel-border)",
+        },
+      },
+    ];
+
+    for (const [index, unitGroup] of unitGroups.entries()) {
+      const scaleKey = getUnitScaleKey(index);
+      scales[scaleKey] = {};
+      axes.push({
+        label: this.getYAxisLabel(unitGroup),
+        side: index === 0 ? 3 : 1,
+        stroke: "var(--vscode-foreground)",
+        grid:
+          index === 0
+            ? {
+                stroke: "var(--vscode-panel-border)",
+              }
+            : {
+                show: false,
+              },
+      });
+    }
+
     const series: uPlot.Series[] = [
       {},
       ...channelNames.map((channelName, index) => ({
@@ -335,33 +382,15 @@ class TimeSeriesLineView implements OutputView {
         stroke: this.getSeriesColor(channelName, index),
         width: this.getSeriesWidth(channelName),
         show: this.seriesVisibility.get(channelName) ?? this.getSeriesVisible(channelName),
+        scale: getUnitScaleKey(this.getUnitGroupIndex(unitGroups, channelName)),
       })),
     ];
 
     this.plot = new uPlot(
       {
         ...this.getChartSize(),
-        scales: {
-          x: {
-            time: false,
-          },
-        },
-        axes: [
-          {
-            label: this.getTimeAxisLabel(),
-            stroke: "var(--vscode-foreground)",
-            grid: {
-              stroke: "var(--vscode-panel-border)",
-            },
-          },
-          {
-            label: "Value",
-            stroke: "var(--vscode-foreground)",
-            grid: {
-              stroke: "var(--vscode-panel-border)",
-            },
-          },
-        ],
+        scales,
+        axes,
         legend: {
           show: false,
         },
@@ -375,7 +404,17 @@ class TimeSeriesLineView implements OutputView {
   }
 
   private updatePlotData(): void {
-    this.plot?.setData(this.getPlotData());
+    if (this.plot === undefined) {
+      return;
+    }
+
+    this.plot.setData(this.getPlotData());
+
+    const xWindowRange = this.getXWindowRange();
+
+    if (hasScaleRange(xWindowRange)) {
+      this.plot.setScale("x", xWindowRange);
+    }
   }
 
   private getPlotData(): uPlot.AlignedData {
@@ -383,13 +422,41 @@ class TimeSeriesLineView implements OutputView {
   }
 
   private trimPlotData(): void {
-    const maxPoints = this.getPlotMaxPoints();
+    const windowConfig = this.getWindowConfig();
 
+    if (windowConfig.mode === "points") {
+      this.trimPlotDataByPoints(windowConfig.maxPoints);
+    } else {
+      this.trimPlotDataByDuration(windowConfig.seconds);
+    }
+  }
+
+  private trimPlotDataByPoints(maxPoints: number): void {
     if (this.timeValues.length <= maxPoints) {
       return;
     }
 
-    const removeCount = this.timeValues.length - maxPoints;
+    this.removeLeadingPlotPoints(this.timeValues.length - maxPoints);
+  }
+
+  private trimPlotDataByDuration(seconds: number): void {
+    const latestTime = this.timeValues.at(-1);
+
+    if (latestTime === undefined) {
+      return;
+    }
+
+    const minTime = latestTime - seconds;
+    const removeCount = this.timeValues.findIndex((time) => time >= minTime);
+
+    if (removeCount <= 0) {
+      return;
+    }
+
+    this.removeLeadingPlotPoints(removeCount);
+  }
+
+  private removeLeadingPlotPoints(removeCount: number): void {
     this.timeValues.splice(0, removeCount);
 
     for (const values of this.seriesData.values()) {
@@ -397,10 +464,49 @@ class TimeSeriesLineView implements OutputView {
     }
   }
 
-  private getPlotMaxPoints(): number {
-    return this.config.window?.mode === "points"
-      ? (this.config.window.maxPoints ?? defaultMaxPlotPoints)
-      : defaultMaxPlotPoints;
+  private getWindowConfig(): PlotWindowConfig {
+    const windowConfig: TimeSeriesWindowConfig | undefined = this.config.window;
+
+    if (windowConfig?.mode === "duration") {
+      return {
+        mode: "duration",
+        seconds: positiveNumberOrDefault(windowConfig.seconds, defaultDurationSeconds),
+      };
+    }
+
+    return {
+      mode: "points",
+      maxPoints: positiveNumberOrDefault(windowConfig?.maxPoints, defaultMaxPlotPoints),
+    };
+  }
+
+  private getXWindowRange(): { min?: number; max?: number } {
+    const latestTime = this.timeValues.at(-1);
+
+    if (latestTime === undefined) {
+      return {};
+    }
+
+    const windowConfig = this.getWindowConfig();
+
+    if (windowConfig.mode === "duration") {
+      return {
+        min: latestTime - windowConfig.seconds,
+        max: latestTime,
+      };
+    }
+
+    const min = this.timeValues[0] ?? latestTime;
+    const max = latestTime;
+
+    if (min === max) {
+      return {
+        min: min - 0.5,
+        max: max + 0.5,
+      };
+    }
+
+    return { min, max };
   }
 
   private getSeriesLabel(channelName: string): string {
@@ -422,16 +528,57 @@ class TimeSeriesLineView implements OutputView {
     return this.config.series[channelName]?.visible ?? true;
   }
 
+  private getSeriesUnit(channelName: string): string {
+    return this.config.series[channelName]?.unit ?? defaultValueUnit;
+  }
+
+  private getUnitGroups(channelNames: readonly string[]): UnitGroup[] {
+    const unitGroups: UnitGroup[] = [];
+
+    for (const channelName of channelNames) {
+      const unit = this.getSeriesUnit(channelName);
+      const unitGroup = unitGroups.find((group) => group.unit === unit);
+
+      if (unitGroup === undefined) {
+        unitGroups.push({ unit, channelNames: [channelName] });
+      } else {
+        unitGroup.channelNames.push(channelName);
+      }
+    }
+
+    return unitGroups.length === 0 ? [{ unit: defaultValueUnit, channelNames: [] }] : unitGroups;
+  }
+
+  private getUnitGroupIndex(unitGroups: readonly UnitGroup[], channelName: string): number {
+    return Math.max(
+      0,
+      unitGroups.findIndex((group) => group.unit === this.getSeriesUnit(channelName)),
+    );
+  }
+
   private getTimeAxisLabel(): string {
     if (this.config.time.source === "sequence") {
       return "Sequence";
     }
 
-    if (this.config.time.source === "fixedInterval") {
-      return "Seconds";
+    return "Time (s)";
+  }
+
+  private getYAxisLabel(unitGroup: UnitGroup): string {
+    if (unitGroup.unit === defaultValueUnit) {
+      return defaultValueUnit;
     }
 
-    return this.config.time.unit === "ms" ? "Milliseconds" : "Seconds";
+    if (unitGroup.channelNames.length === 1) {
+      const channelName = unitGroup.channelNames[0];
+      const label =
+        channelName === undefined
+          ? unitGroup.unit
+          : (this.config.series[channelName]?.label ?? channelName);
+      return `${label} (${unitGroup.unit})`;
+    }
+
+    return unitGroup.unit;
   }
 
   private renderLegend(channelNames: string[]): void {
@@ -625,6 +772,21 @@ function pickConfiguredValues(
   }
 
   return nextValues;
+}
+
+function getUnitScaleKey(unitIndex: number): string {
+  return `y${unitIndex + 1}`;
+}
+
+function positiveNumberOrDefault(value: number | undefined, defaultValue: number): number {
+  return typeof value === "number" && value > 0 ? value : defaultValue;
+}
+
+function hasScaleRange(range: {
+  min?: number;
+  max?: number;
+}): range is { min: number; max: number } {
+  return typeof range.min === "number" && typeof range.max === "number";
 }
 
 function getCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | undefined {

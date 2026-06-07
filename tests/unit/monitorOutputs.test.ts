@@ -11,13 +11,16 @@ import { MonitorOutputController } from "../../webview/src/monitorOutputs";
 
 interface MockUPlotInstance {
   options: {
+    axes?: Array<{ label?: string; side?: number }>;
     legend?: { show?: boolean };
-    series: Array<{ label?: string; show?: boolean }>;
+    scales?: Record<string, { min?: number; max?: number; time?: boolean }>;
+    series: Array<{ label?: string; scale?: string; show?: boolean }>;
   };
   data: unknown[];
   target: HTMLElement;
   destroy: () => void;
   setData: (nextData: unknown[]) => void;
+  setScale: (scaleKey: string, range: { min?: number; max?: number }) => void;
   setSeries: (index: number, options: { show: boolean }) => void;
   setSize: (size: { width: number; height: number }) => void;
 }
@@ -48,6 +51,15 @@ vi.mock("uplot", () => {
       this.setData = vi.fn<(nextData: unknown[]) => void>((nextData) => {
         this.data = nextData;
       });
+      this.setScale = vi.fn<(scaleKey: string, range: { min?: number; max?: number }) => void>(
+        (scaleKey, range) => {
+          this.options.scales ??= {};
+          this.options.scales[scaleKey] = {
+            ...this.options.scales[scaleKey],
+            ...range,
+          };
+        },
+      );
       this.setSeries = vi.fn<(index: number, options: { show: boolean }) => void>();
       this.setSize = vi.fn<(size: { width: number; height: number }) => void>();
       mockUPlot.instances.push(this);
@@ -96,6 +108,12 @@ describe("MonitorOutputController", () => {
       "Temperature (degC)",
       "RPM",
     ]);
+    expect(plot.options.series.map((series) => series.scale)).toEqual([undefined, "y1", "y2"]);
+    expect(plot.options.axes?.map((axis) => axis.label)).toEqual([
+      "Sequence",
+      "Temperature (degC)",
+      "Value",
+    ]);
     expect(plot.options.series.map((series) => series.show)).toEqual([undefined, true, false]);
     expect(plot.options.legend).toEqual({ show: false });
     expect(plot.data).toEqual([[], [], []]);
@@ -134,7 +152,75 @@ describe("MonitorOutputController", () => {
       "temp",
       "rpm",
     ]);
+    expect(latestPlot().options.series.map((series) => series.scale)).toEqual([
+      undefined,
+      "y1",
+      "y1",
+    ]);
+    expect(latestPlot().options.axes?.map((axis) => axis.label)).toEqual(["Sequence", "Value"]);
     expect(latestPlot().data).toEqual([[1], [22.5], [1200]]);
+  });
+
+  test("keeps a rolling points window and tracks the latest x range", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+        { time: 3, values: { temp: 23, rpm: 4 } },
+      ],
+    });
+
+    const plot = latestPlot();
+    expect(plot.data).toEqual([
+      [1, 2, 3],
+      [21, 22, 23],
+      [2, 3, 4],
+    ]);
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 1, max: 3 });
+  });
+
+  test("keeps a rolling duration window and tracks the latest x range", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "duration", seconds: 2 },
+      },
+    ]);
+
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 3, values: { temp: 23, rpm: 4 } },
+        { time: 4, values: { temp: 24, rpm: 5 } },
+      ],
+    });
+
+    const plot = latestPlot();
+    expect(plot.data).toEqual([
+      [3, 4],
+      [23, 24],
+      [4, 5],
+    ]);
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 2, max: 4 });
   });
 
   test("routes output packets by outputId", () => {
