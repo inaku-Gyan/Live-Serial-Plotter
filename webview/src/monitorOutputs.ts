@@ -46,6 +46,7 @@ const defaultMaxRawLines = 500;
 const defaultMaxPlotPoints = 3000;
 const defaultDurationSeconds = 30;
 const defaultValueUnit = "Value";
+const uPlotPathCacheKey = "_paths";
 const colors = ["#4cc9f0", "#f72585", "#ffd166", "#06d6a0", "#c77dff", "#f77f00", "#90be6d"];
 
 type PlotWindowConfig =
@@ -575,6 +576,7 @@ class TimeSeriesLineView implements OutputView {
 
     this.isApplyingScaleUpdate = true;
     try {
+      invalidatePlotPaths(this.plot);
       this.plot.setData(this.getPlotData(), this.isAutoFollowEnabled);
 
       const xWindowRange = this.getXWindowRange();
@@ -908,6 +910,23 @@ class TimeSeriesLineView implements OutputView {
         max: xScale.max,
       },
     };
+  }
+}
+
+interface PathCachedSeries extends uPlot.Series {
+  [uPlotPathCacheKey]?: unknown;
+  points?: uPlot.Series.Points & {
+    [uPlotPathCacheKey]?: unknown;
+  };
+}
+
+function invalidatePlotPaths(plot: uPlot): void {
+  for (const series of plot.series.slice(1) as PathCachedSeries[]) {
+    series[uPlotPathCacheKey] = null;
+
+    if (series.points !== undefined) {
+      series.points[uPlotPathCacheKey] = null;
+    }
   }
 }
 

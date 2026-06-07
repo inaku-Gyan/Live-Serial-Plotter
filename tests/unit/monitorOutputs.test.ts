@@ -9,6 +9,8 @@ import type {
 } from "../../src/shared/protocol";
 import { MonitorOutputController } from "../../webview/src/monitorOutputs";
 
+const uPlotPathCacheKey = "_paths";
+
 interface MockUPlotInstance {
   options: {
     axes?: Array<{ label?: string; side?: number }>;
@@ -25,13 +27,14 @@ interface MockUPlotInstance {
     legend?: { show?: boolean };
     scales?: Record<string, { min?: number; max?: number; time?: boolean }>;
     plugins?: MockUPlotPlugin[];
-    series: Array<{ label?: string; scale?: string; show?: boolean }>;
+    series: MockUPlotSeries[];
   };
   hooks: {
     destroy: Array<() => void>;
   };
   over: HTMLDivElement;
   scales: Record<string, { min?: number; max?: number; time?: boolean }>;
+  series: MockUPlotSeries[];
   data: unknown[];
   target: HTMLElement;
   destroy: ReturnType<typeof vi.fn<() => void>>;
@@ -43,6 +46,16 @@ interface MockUPlotInstance {
   >;
   setSeries: ReturnType<typeof vi.fn<(index: number, options: { show: boolean }) => void>>;
   setSize: ReturnType<typeof vi.fn<(size: { width: number; height: number }) => void>>;
+}
+
+interface MockUPlotSeries {
+  [uPlotPathCacheKey]?: unknown;
+  label?: string;
+  points?: {
+    [uPlotPathCacheKey]?: unknown;
+  };
+  scale?: string;
+  show?: boolean;
 }
 
 interface MockUPlotPlugin {
@@ -78,6 +91,7 @@ vi.mock("uplot", () => {
       this.options.hooks ??= {};
       mergePluginHooks(this.options);
       this.data = data;
+      this.series = options.series;
       this.target = target;
       this.over = document.createElement("div");
       this.over.className = "u-over";
@@ -294,6 +308,44 @@ describe("MonitorOutputController", () => {
       [21, 22, 23],
       [2, 3, 4],
     ]);
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 1, max: 3 });
+  });
+
+  test("invalidates cached uPlot paths when appending data in auto-follow mode", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    plot.series[1][uPlotPathCacheKey] = { stale: true };
+    plot.series[1].points = { [uPlotPathCacheKey]: { stale: true } };
+    plot.series[2][uPlotPathCacheKey] = { stale: true };
+
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 2,
+      receivedAt: 1_100,
+      samples: [{ time: 3, values: { temp: 23, rpm: 4 } }],
+    });
+
+    expect(plot.series[1][uPlotPathCacheKey]).toBeNull();
+    expect(plot.series[1].points?.[uPlotPathCacheKey]).toBeNull();
+    expect(plot.series[2][uPlotPathCacheKey]).toBeNull();
     expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 1, max: 3 });
   });
 
