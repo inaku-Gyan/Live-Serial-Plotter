@@ -912,6 +912,50 @@ describe("MonitorOutputController", () => {
     expect(plot.redraw).toHaveBeenLastCalledWith(true, false);
   });
 
+  test("zooms inferred y ranges when uPlot keeps y scales auto-ranged", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+
+    expect(plot.scales.y1).toEqual({});
+
+    plot.over.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        clientX: 200,
+        clientY: 130,
+        ctrlKey: true,
+        deltaY: -100,
+      }),
+    );
+
+    expect(plot.setScale).toHaveBeenCalledWith("x", {
+      min: 0.5,
+      max: 1.5,
+    });
+    expect(plot.setScale).toHaveBeenCalledWith("y1", {
+      min: 20.5,
+      max: 21.5,
+    });
+  });
+
   test("pans y scales with ordinary wheel through the uPlot interaction config", () => {
     const { controller } = createController();
     controller.renderOutputs([
@@ -945,6 +989,43 @@ describe("MonitorOutputController", () => {
 
     expect(plot.setScale).toHaveBeenCalledWith("y1", { min: -10, max: 90 });
     expect(plot.setScale).toHaveBeenCalledWith("y2", { min: 190, max: 290 });
+  });
+
+  test("pans inferred y ranges when uPlot keeps y scales auto-ranged", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+
+    expect(plot.scales.y1).toEqual({});
+
+    plot.over.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaY: 26,
+      }),
+    );
+
+    expect(plot.setScale).toHaveBeenCalledWith("y1", {
+      min: 19.8,
+      max: 21.8,
+    });
   });
 
   test("pans the x range with shift wheel through the uPlot interaction config", () => {
@@ -1136,6 +1217,59 @@ describe("MonitorOutputController", () => {
     expect(plot.setScale).toHaveBeenCalledWith("y1", {
       min: -10,
       max: 90,
+    });
+  });
+
+  test("pans inferred y ranges with the uPlot pointer interaction plugin", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+
+    expect(plot.scales.y1).toEqual({});
+
+    plot.over.dispatchEvent(
+      new PointerEvent("pointerdown", {
+        bubbles: true,
+        button: 1,
+        clientX: 200,
+        clientY: 100,
+        pointerId: 1,
+        pointerType: "mouse",
+      }),
+    );
+    plot.over.dispatchEvent(
+      new PointerEvent("pointermove", {
+        bubbles: true,
+        clientX: 240,
+        clientY: 126,
+        pointerId: 1,
+        pointerType: "mouse",
+      }),
+    );
+
+    expect(plot.setScale).toHaveBeenCalledWith("x", {
+      min: -0.2,
+      max: 1.8,
+    });
+    expect(plot.setScale).toHaveBeenCalledWith("y1", {
+      min: 19.8,
+      max: 21.8,
     });
   });
 

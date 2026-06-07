@@ -239,8 +239,9 @@ function installGestureHandlers(
 
     const panXDelta = getWheelPanDelta(event, config.wheel.panX, rect);
     const panYDelta = getWheelPanDelta(event, config.wheel.panY, rect);
+    const yRanges = getYScaleRanges(plot);
     const didPanX = panXDelta !== 0 && panXScales(plot, panXDelta, rect.width);
-    const didPanY = panYDelta !== 0 && panYScales(plot, panYDelta, rect.height);
+    const didPanY = panYDelta !== 0 && panYScales(plot, panYDelta, rect.height, yRanges);
 
     if (didPanX || didPanY) {
       notifyUserInteraction();
@@ -406,13 +407,13 @@ function createPinchState(
   const yStartRanges = new Map<string, number>();
 
   for (const scaleKey of getYScaleKeys(plot)) {
-    const yScale = getFiniteScale(plot, scaleKey);
+    const yScale = getYScaleRange(plot, scaleKey);
 
     if (yScale === undefined) {
       continue;
     }
 
-    yAnchorValues.set(scaleKey, plot.posToVal(centerTop, scaleKey));
+    yAnchorValues.set(scaleKey, getYValueAtPosition(yScale, centerTop, rect.height));
     yStartRanges.set(scaleKey, yScale.max - yScale.min);
   }
 
@@ -501,7 +502,7 @@ function createPanState(plot: uPlot, event: PointerEvent): PanState | undefined 
   const yRanges = new Map<string, ScaleRange>();
 
   for (const scaleKey of getYScaleKeys(plot)) {
-    const yRange = getFiniteScale(plot, scaleKey);
+    const yRange = getYScaleRange(plot, scaleKey);
 
     if (yRange !== undefined) {
       yRanges.set(scaleKey, yRange);
@@ -571,6 +572,7 @@ function zoomScalesAroundPosition(
 
   let didZoom = false;
   const xScale = getFiniteScale(plot, "x");
+  const yScales = getYScaleRanges(plot);
 
   if (xScale !== undefined) {
     didZoom =
@@ -584,18 +586,12 @@ function zoomScalesAroundPosition(
       ) || didZoom;
   }
 
-  for (const scaleKey of getYScaleKeys(plot)) {
-    const yScale = getFiniteScale(plot, scaleKey);
-
-    if (yScale === undefined) {
-      continue;
-    }
-
+  for (const [scaleKey, yScale] of yScales.entries()) {
     didZoom =
       setRangeAroundAnchor(
         plot,
         scaleKey,
-        plot.posToVal(top, scaleKey),
+        getYValueAtPosition(yScale, top, rect.height),
         getYAnchorRatio(top, rect.height),
         (yScale.max - yScale.min) * rangeMultiplier,
         minYRange,
@@ -625,6 +621,10 @@ function setRangeAroundAnchor(
 
 function getYAnchorRatio(top: number, height: number): number {
   return 1 - top / height;
+}
+
+function getYValueAtPosition(range: ScaleRange, top: number, height: number): number {
+  return range.min + getYAnchorRatio(top, height) * (range.max - range.min);
 }
 
 function getWheelPanDelta(
@@ -668,20 +668,19 @@ function panXScales(plot: uPlot, delta: number, width: number): boolean {
   return setFiniteScale(plot, "x", xScale.min + deltaUnits, xScale.max + deltaUnits);
 }
 
-function panYScales(plot: uPlot, delta: number, height: number): boolean {
+function panYScales(
+  plot: uPlot,
+  delta: number,
+  height: number,
+  yRanges = getYScaleRanges(plot),
+): boolean {
   if (height <= 0) {
     return false;
   }
 
   let didPan = false;
 
-  for (const scaleKey of getYScaleKeys(plot)) {
-    const yScale = getFiniteScale(plot, scaleKey);
-
-    if (yScale === undefined) {
-      continue;
-    }
-
+  for (const [scaleKey, yScale] of yRanges.entries()) {
     const deltaUnits = ((yScale.max - yScale.min) / height) * delta;
     didPan =
       setFiniteScale(plot, scaleKey, yScale.min - deltaUnits, yScale.max - deltaUnits) || didPan;
@@ -692,6 +691,79 @@ function panYScales(plot: uPlot, delta: number, height: number): boolean {
 
 function getYScaleKeys(plot: uPlot): string[] {
   return Object.keys(plot.scales).filter((scaleKey) => scaleKey !== "x");
+}
+
+function getYScaleRange(plot: uPlot, scaleKey: string): ScaleRange | undefined {
+  return getFiniteScale(plot, scaleKey) ?? inferYScaleRangeFromData(plot, scaleKey);
+}
+
+function getYScaleRanges(plot: uPlot): Map<string, ScaleRange> {
+  const ranges = new Map<string, ScaleRange>();
+
+  for (const scaleKey of getYScaleKeys(plot)) {
+    const range = getYScaleRange(plot, scaleKey);
+
+    if (range !== undefined) {
+      ranges.set(scaleKey, range);
+    }
+  }
+
+  return ranges;
+}
+
+function inferYScaleRangeFromData(plot: uPlot, scaleKey: string): ScaleRange | undefined {
+  const xValues = plot.data[0] as ArrayLike<number | null | undefined> | undefined;
+  const xScale = getFiniteScale(plot, "x");
+  let min = Number.POSITIVE_INFINITY;
+  let max = Number.NEGATIVE_INFINITY;
+
+  for (let seriesIndex = 1; seriesIndex < plot.series.length; seriesIndex += 1) {
+    const series = plot.series[seriesIndex];
+
+    if (series?.scale !== scaleKey || series.show === false) {
+      continue;
+    }
+
+    const values = plot.data[seriesIndex] as ArrayLike<number | null | undefined> | undefined;
+
+    if (values === undefined) {
+      continue;
+    }
+
+    for (let index = 0; index < values.length; index += 1) {
+      const xValue = xValues?.[index];
+
+      if (xScale !== undefined) {
+        if (
+          typeof xValue !== "number" ||
+          !Number.isFinite(xValue) ||
+          xValue < xScale.min ||
+          xValue > xScale.max
+        ) {
+          continue;
+        }
+      }
+
+      const value = values[index];
+
+      if (typeof value !== "number" || !Number.isFinite(value)) {
+        continue;
+      }
+
+      min = Math.min(min, value);
+      max = Math.max(max, value);
+    }
+  }
+
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return undefined;
+  }
+
+  if (max <= min) {
+    return { min: min - 0.5, max: max + 0.5 };
+  }
+
+  return { min, max };
 }
 
 function matchesWheelBinding(event: WheelEvent, binding: WheelBinding): boolean {
