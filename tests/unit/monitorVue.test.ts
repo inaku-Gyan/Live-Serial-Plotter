@@ -30,6 +30,7 @@ describe("MonitorApp", () => {
     expect(wrapper.find(".toolbar").exists()).toBe(true);
     expect(wrapper.find(".workspace").exists()).toBe(true);
     expect(wrapper.find(".send-row").exists()).toBe(true);
+    expect(wrapper.find(".layout-controls").exists()).toBe(true);
     expect(wrapper.find(".status").text()).toBe("Disconnected");
     expect(adapter.renderOutputs).toHaveBeenCalledWith(defaultProfile.outputs, defaultLayout);
     expect(vscode.messages).toContainEqual({
@@ -176,6 +177,35 @@ describe("MonitorApp", () => {
     expect(toast.classes()).toContain("error-toast-visible");
     expect(toast.text()).toBe("Port failed");
   });
+
+  test("layout controls reset save and save as through the store", async () => {
+    const { wrapper, vscode, adapter } = mountMonitor();
+    dispatchProfiles(defaultProfile);
+    await nextTick();
+
+    const prompt = vi.spyOn(window, "prompt").mockReturnValue("saved-layout");
+    const buttons = wrapper.findAll(".layout-controls button");
+
+    await buttons[0]?.trigger("click");
+    await buttons[1]?.trigger("click");
+    await buttons[2]?.trigger("click");
+
+    expect(adapter.resetPageLayout).toHaveBeenCalled();
+    expect(vscode.messages).toContainEqual({
+      type: "saveLayout",
+      request: { layout: defaultLayout, layoutKey: "builtin:default" },
+    });
+    expect(vscode.messages).toContainEqual({
+      type: "saveLayoutAs",
+      request: {
+        layout: defaultLayout,
+        layoutId: "saved-layout",
+        target: { label: "User", scope: "user" },
+        profileKey: "builtin:default",
+      },
+    });
+    expect(prompt).toHaveBeenCalled();
+  });
 });
 
 function mountMonitor(): {
@@ -212,7 +242,7 @@ function dispatchProfiles(activeProfile: ProfileConfig): void {
     activeLayout: defaultLayout,
     activeLayoutKey: "builtin:default",
     layouts: [createLayoutSummary()],
-    layoutTargets: [],
+    layoutTargets: [{ label: "User", scope: "user" }],
   });
 }
 

@@ -464,8 +464,13 @@ class TimeSeriesLineView implements OutputView {
 
   resetView(): void {
     this.applyViewLayout(this.viewLayout);
+    for (const channelName of this.seriesData.keys()) {
+      const visible = this.getSeriesVisible(channelName);
+      this.seriesVisibility.set(channelName, visible);
+    }
     this.applyViewDefaults();
     this.renderLegend([...this.seriesData.keys()]);
+    this.syncSeriesVisibility();
   }
 
   captureViewLayout(): OutputLayoutConfig["view"] {
@@ -817,6 +822,18 @@ class TimeSeriesLineView implements OutputView {
 
       label.append(checkbox, swatch, text);
       this.legendElement.append(label);
+    }
+  }
+
+  private syncSeriesVisibility(): void {
+    if (this.plot === undefined) {
+      return;
+    }
+
+    for (const [index, channelName] of [...this.seriesData.keys()].entries()) {
+      this.plot.setSeries(index + 1, {
+        show: this.seriesVisibility.get(channelName) ?? this.getSeriesVisible(channelName),
+      });
     }
   }
 

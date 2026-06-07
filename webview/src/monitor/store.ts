@@ -318,7 +318,7 @@ export function createMonitorStore(
       request: {
         layout,
         layoutId,
-        target,
+        target: { ...target },
         profileKey: state.profileKey,
       },
     });
@@ -398,6 +398,7 @@ export function createMonitorStore(
     resetPageLayout,
     saveLayout,
     saveLayoutAs,
+    showError,
     dispose,
   };
 }

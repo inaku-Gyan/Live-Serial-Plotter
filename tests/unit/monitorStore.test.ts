@@ -171,6 +171,33 @@ describe("monitor store", () => {
     expect(adapter.appendLegacySeries).toHaveBeenCalledWith([{ t: 1, values: { temp: 24 } }]);
   });
 
+  test("sends layout reset and save actions through the adapter and host protocol", () => {
+    const vscode = createVscodeApi();
+    const { store, adapter } = createStore(vscode.api);
+    store.mountOutputs(document.createElement("section"));
+
+    store.resetOutputView("plot");
+    store.resetPageLayout();
+    store.saveLayout();
+    store.saveLayoutAs("saved-layout", { label: "User", scope: "user" });
+
+    expect(adapter.resetOutputView).toHaveBeenCalledWith("plot");
+    expect(adapter.resetPageLayout).toHaveBeenCalled();
+    expect(vscode.messages).toContainEqual({
+      type: "saveLayout",
+      request: { layout: defaultLayout, layoutKey: "builtin:default" },
+    });
+    expect(vscode.messages).toContainEqual({
+      type: "saveLayoutAs",
+      request: {
+        layout: defaultLayout,
+        layoutId: "saved-layout",
+        target: { label: "User", scope: "user" },
+        profileKey: "builtin:default",
+      },
+    });
+  });
+
   test("disables parser mode for script profiles", () => {
     const vscode = createVscodeApi();
     const { store } = createStore(vscode.api);

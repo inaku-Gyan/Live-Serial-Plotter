@@ -3,6 +3,7 @@ import { onBeforeUnmount, onMounted } from "vue";
 import type { ToWebviewMessage } from "../../../src/shared/protocol";
 import type { MonitorStore } from "./store";
 import ErrorToast from "./components/ErrorToast.vue";
+import LayoutControls from "./components/LayoutControls.vue";
 import MonitorToolbar from "./components/MonitorToolbar.vue";
 import OutputWorkspace from "./components/OutputWorkspace.vue";
 import SendRow from "./components/SendRow.vue";
@@ -30,6 +31,7 @@ onBeforeUnmount(() => {
 <template>
   <main class="shell">
     <MonitorToolbar :store="store" />
+    <LayoutControls :store="store" />
     <OutputWorkspace :store="store" />
     <SendRow :store="store" />
     <ErrorToast :store="store" />

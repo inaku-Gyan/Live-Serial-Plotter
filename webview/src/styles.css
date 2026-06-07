@@ -133,6 +133,47 @@ select {
   background: #06d6a0;
 }
 
+.layout-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
+}
+
+.layout-controls-summary {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.layout-controls-summary strong,
+.layout-controls-summary span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.layout-controls-summary strong {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.layout-controls-summary span {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.layout-controls-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: end;
+}
+
 .workspace {
   display: grid;
   grid-auto-rows: minmax(220px, auto);
@@ -141,6 +182,24 @@ select {
   min-height: 0;
   overflow: auto;
   padding: 12px;
+}
+
+.workspace[data-layout-columns="single"] {
+  grid-template-columns: 1fr;
+}
+
+.workspace[data-layout-columns="two"] {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.workspace[data-layout-density="compact"] {
+  gap: 8px;
+  padding: 8px;
+}
+
+.workspace[data-layout-density="comfortable"] {
+  gap: 16px;
+  padding: 16px;
 }
 
 .output-panel {
@@ -198,6 +257,11 @@ select {
 }
 
 .output-clear-button {
+  height: 24px;
+  min-width: 56px;
+}
+
+.output-reset-button {
   height: 24px;
   min-width: 56px;
 }
@@ -328,5 +392,13 @@ select {
 
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .layout-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .layout-controls-actions {
+    justify-content: start;
   }
 }

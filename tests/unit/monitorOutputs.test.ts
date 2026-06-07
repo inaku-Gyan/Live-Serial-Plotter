@@ -304,6 +304,49 @@ describe("MonitorOutputController", () => {
     );
   });
 
+  test("resets plot view without clearing data", () => {
+    const { controller, root } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    const rpmCheckbox = root.querySelector<HTMLInputElement>(
+      '[data-output-id="plot"] .legend-item:nth-child(2) input',
+    );
+
+    if (rpmCheckbox === null) {
+      throw new Error("Missing RPM checkbox.");
+    }
+
+    rpmCheckbox.checked = true;
+    rpmCheckbox.dispatchEvent(new Event("change"));
+    plot.options.hooks?.setScale?.[0]?.(plot, "x");
+
+    controller.resetOutputView("plot");
+
+    expect(plot.data).toEqual([
+      [0, 1, 2],
+      [20, 21, 22],
+      [1, 2, 3],
+    ]);
+    expect(plot.setSeries).toHaveBeenLastCalledWith(2, { show: false });
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 0, max: 2 });
+  });
+
   test("routes output packets by outputId", () => {
     const { controller, root } = createController();
     controller.renderOutputs(createOutputs());
