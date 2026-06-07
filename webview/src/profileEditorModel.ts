@@ -71,6 +71,79 @@ export interface TimeSeriesPatch {
   decimals: string;
 }
 
+export function createProfileEditorPatch(profile: ProfileConfig): ProfileEditorPatch {
+  return {
+    id: profile.id,
+    name: profile.name,
+    serialDefaults: {
+      baudRate:
+        profile.serialDefaults?.baudRate === undefined
+          ? ""
+          : String(profile.serialDefaults.baudRate),
+    },
+    codec: {
+      sendLineEnding: profile.codec.sendLineEnding ?? "none",
+    },
+    framing: {
+      delimiter: profile.framing.delimiter,
+      trim: profile.framing.trim === true,
+      maxFrameBytes:
+        profile.framing.maxFrameBytes === undefined ? "" : String(profile.framing.maxFrameBytes),
+    },
+    builtinParser:
+      profile.parser.kind === "builtin"
+        ? {
+            mode: profile.parser.mode,
+            optionsJson:
+              profile.parser.options === undefined
+                ? ""
+                : JSON.stringify(profile.parser.options, null, 2),
+          }
+        : undefined,
+    terminalAppendOutputs: profile.outputs.flatMap((output) =>
+      output.kind === "terminalAppend"
+        ? [
+            {
+              originalId: output.id,
+              id: output.id,
+              title: output.title ?? "",
+              source: output.source ?? "raw",
+              template: output.template ?? "",
+              maxLines: output.maxLines === undefined ? "" : String(output.maxLines),
+              autoScroll: output.autoScroll !== false,
+            },
+          ]
+        : [],
+    ),
+    timeSeriesOutputs: profile.outputs.flatMap((output) =>
+      output.kind === "timeSeriesLine"
+        ? [
+            {
+              originalId: output.id,
+              id: output.id,
+              title: output.title ?? "",
+              time: createTimeAxisPatch(output.time),
+              maxPoints:
+                output.window?.maxPoints === undefined ? "" : String(output.window.maxPoints),
+              series: Object.entries(output.series).map(([key, series]) => ({
+                key,
+                field: series.field,
+                label: series.label ?? "",
+                unit: series.unit ?? "",
+                color: series.color ?? "",
+                visible: series.visible !== false,
+                scale: series.scale === undefined ? "" : String(series.scale),
+                lineWidth: series.line?.width === undefined ? "" : String(series.line.width),
+                decimals:
+                  series.format?.decimals === undefined ? "" : String(series.format.decimals),
+              })),
+            },
+          ]
+        : [],
+    ),
+  };
+}
+
 export function applyProfileEditorPatch(
   profile: ProfileConfig,
   patch: ProfileEditorPatch,
@@ -220,6 +293,46 @@ function createTimeAxisConfig(patch: TimeAxisPatch, fallback: TimeAxisConfig): T
   }
 
   return { source: "sequence" };
+}
+
+function createTimeAxisPatch(time: TimeAxisConfig): TimeAxisPatch {
+  if (time.source === "hostReceived") {
+    return {
+      source: "hostReceived",
+      field: "",
+      unit: time.unit ?? "s",
+      zero: time.zero ?? "first",
+      intervalMs: "",
+    };
+  }
+
+  if (time.source === "field") {
+    return {
+      source: "field",
+      field: time.field,
+      unit: time.unit,
+      zero: time.zero ?? "first",
+      intervalMs: "",
+    };
+  }
+
+  if (time.source === "fixedInterval") {
+    return {
+      source: "fixedInterval",
+      field: "",
+      unit: "ms",
+      zero: "none",
+      intervalMs: String(time.intervalMs),
+    };
+  }
+
+  return {
+    source: "sequence",
+    field: "",
+    unit: "ms",
+    zero: "none",
+    intervalMs: "",
+  };
 }
 
 function parseJsonObjectOrUndefined(text: string): JsonObject | undefined {

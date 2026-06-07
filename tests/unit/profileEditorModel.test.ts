@@ -1,11 +1,99 @@
 import { describe, expect, test } from "vitest";
 import {
   applyProfileEditorPatch,
+  createProfileEditorPatch,
   type ProfileEditorPatch,
 } from "../../webview/src/profileEditorModel";
 import type { ProfileConfig } from "../../src/shared/protocol";
 
 describe("profileEditorModel", () => {
+  test("creates an editable patch from a profile", () => {
+    const patch = createProfileEditorPatch(createProfile());
+
+    expect(patch).toEqual({
+      id: "base",
+      name: "Base",
+      serialDefaults: { baudRate: "115200" },
+      codec: { sendLineEnding: "none" },
+      framing: { delimiter: "auto", trim: false, maxFrameBytes: "" },
+      builtinParser: { mode: "auto", optionsJson: "" },
+      terminalAppendOutputs: [
+        {
+          originalId: "raw",
+          id: "raw",
+          title: "Raw",
+          source: "raw",
+          template: "",
+          maxLines: "500",
+          autoScroll: true,
+        },
+      ],
+      timeSeriesOutputs: [
+        {
+          originalId: "plot",
+          id: "plot",
+          title: "Plot",
+          time: {
+            source: "hostReceived",
+            field: "",
+            unit: "s",
+            zero: "first",
+            intervalMs: "",
+          },
+          maxPoints: "3000",
+          series: [
+            {
+              key: "temp",
+              field: "temp",
+              label: "Temp",
+              unit: "C",
+              color: "#111111",
+              visible: false,
+              scale: "",
+              lineWidth: "2",
+              decimals: "2",
+            },
+          ],
+        },
+      ],
+    });
+  });
+
+  test("round-trips a generated patch without losing advanced fields", () => {
+    const profile: ProfileConfig = {
+      ...createProfile(),
+      outputs: [
+        ...createProfile().outputs,
+        {
+          id: "status",
+          kind: "terminalFrame",
+          title: "Status",
+          template: "{state}",
+        },
+      ],
+    };
+
+    const patched = applyProfileEditorPatch(profile, createProfileEditorPatch(profile));
+
+    expect(patched.outputs.at(-1)).toEqual({
+      id: "status",
+      kind: "terminalFrame",
+      title: "Status",
+      template: "{state}",
+    });
+    expect(patched.outputs[1]).toEqual(
+      expect.objectContaining({
+        kind: "timeSeriesLine",
+        series: expect.objectContaining({
+          temp: expect.objectContaining({
+            line: { dash: "dash", width: 2 },
+            format: { decimals: 2 },
+          }),
+        }),
+      }),
+    );
+  });
+
   test("patches basic profile fields and supported outputs", () => {
     const profile = createProfile();
     const patched = applyProfileEditorPatch(profile, createPatch());
