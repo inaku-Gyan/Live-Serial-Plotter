@@ -3,7 +3,7 @@ name: release
 on:
   push:
     tags:
-      - "*"
+      - "v*.*.*"
 
 permissions:
   contents: write
@@ -97,7 +97,7 @@ jobs:
 
       - uses: pnpm/action-setup@v6
         with:
-          version: 10.33.1
+          version: 11.5.2
           run_install: false
 
       - uses: actions/setup-node@v6
@@ -212,7 +212,7 @@ jobs:
         shell: bash
         run: |
           corepack enable
-          corepack prepare pnpm@10.33.1 --activate
+          corepack prepare pnpm@11.5.2 --activate
 
       - name: Check Marketplace token
         id: token
