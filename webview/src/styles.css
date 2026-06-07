@@ -28,7 +28,7 @@ select {
 
 .shell {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr) auto;
   height: 100%;
   min-width: 360px;
 }
@@ -135,29 +135,87 @@ select {
 
 .workspace {
   display: grid;
-  grid-template-rows: minmax(280px, 1fr) minmax(180px, 0.48fr);
+  grid-auto-rows: minmax(220px, auto);
+  grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
+  gap: 12px;
   min-height: 0;
-}
-
-.plot-area {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  min-height: 0;
+  overflow: auto;
   padding: 12px;
 }
 
-.chart {
+.output-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
+  border: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-editor-background);
+}
+
+.output-panel-timeSeriesLine,
+.output-panel-framePlot2d {
+  min-height: 320px;
+}
+
+.output-panel-terminalAppend,
+.output-panel-terminalFrame {
+  min-height: 220px;
+}
+
+.output-header {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background: var(--vscode-sideBar-background);
+}
+
+.output-title-block {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.output-title-block strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--vscode-foreground);
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.output-title-block span {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.output-clear-button {
+  height: 24px;
+  min-width: 56px;
+}
+
+.output-chart {
   min-height: 260px;
   min-width: 0;
 }
 
-.legend {
+.output-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 8px 14px;
   min-height: 30px;
   align-items: center;
   padding-top: 8px;
+  padding-inline: 10px;
+  border-top: 1px solid var(--vscode-panel-border);
 }
 
 .legend-item {
@@ -179,36 +237,34 @@ select {
   font-size: 12px;
 }
 
-.terminal-area {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 0;
-  border-top: 1px solid var(--vscode-panel-border);
-  background: var(--vscode-terminal-background, var(--vscode-editor-background));
-}
-
-.terminal-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 8px 12px;
-}
-
-.terminal-header .button {
-  height: 24px;
-  min-width: 56px;
-}
-
-.raw-log {
+.output-terminal {
   min-height: 0;
   margin: 0;
   overflow: auto;
-  padding: 8px 12px;
+  padding: 10px;
+  background: var(--vscode-terminal-background, var(--vscode-editor-background));
   color: var(--vscode-terminal-foreground, var(--vscode-foreground));
   font-family: var(--vscode-editor-font-family);
   font-size: var(--vscode-editor-font-size);
   line-height: 1.45;
   white-space: pre-wrap;
+}
+
+.output-frame-terminal {
+  white-space: pre;
+}
+
+.output-standby {
+  color: var(--vscode-descriptionForeground);
+}
+
+.output-frame-canvas {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  min-height: 260px;
+  background: var(--vscode-editor-background);
 }
 
 .send-row {
@@ -250,6 +306,10 @@ select {
   display: none;
 }
 
+.uplot .u-legend {
+  display: none;
+}
+
 .uplot .u-label,
 .uplot .u-value,
 .uplot .u-axis {
@@ -267,6 +327,6 @@ select {
   }
 
   .workspace {
-    grid-template-rows: minmax(260px, 1fr) minmax(180px, 0.55fr);
+    grid-template-columns: 1fr;
   }
 }
