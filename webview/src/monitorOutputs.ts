@@ -1,0 +1,708 @@
+import uPlot from "uplot";
+import type {
+  FramePlot2dOutputConfig,
+  FramePlot2dPacket,
+  OutputConfig,
+  OutputPacket,
+  TerminalAppendOutputConfig,
+  TerminalAppendPacket,
+  TerminalFrameOutputConfig,
+  TerminalFramePacket,
+  TimeSeriesLineOutputConfig,
+  TimeSeriesSample,
+  ToExtensionMessage,
+} from "../../src/shared/protocol";
+
+type PostMessage = (message: ToExtensionMessage) => void;
+
+interface MonitorOutputControllerOptions {
+  root: HTMLElement;
+  postMessage: PostMessage;
+}
+
+interface OutputView {
+  readonly outputId: string;
+  readonly kind: OutputConfig["kind"];
+  appendPacket(packet: OutputPacket): void;
+  clear(): void;
+  dispose(): void;
+}
+
+const defaultMaxRawLines = 500;
+const defaultMaxPlotPoints = 3000;
+const colors = ["#4cc9f0", "#f72585", "#ffd166", "#06d6a0", "#c77dff", "#f77f00", "#90be6d"];
+
+export class MonitorOutputController {
+  private readonly views = new Map<string, OutputView>();
+  private readonly postMessage: PostMessage;
+
+  constructor(private readonly options: MonitorOutputControllerOptions) {
+    this.postMessage = options.postMessage;
+  }
+
+  renderOutputs(outputs: readonly OutputConfig[]): void {
+    this.disposeViews();
+    this.options.root.replaceChildren();
+
+    for (const output of outputs) {
+      const view = this.createOutputView(output);
+      this.views.set(output.id, view);
+    }
+  }
+
+  appendPacket(packet: OutputPacket): void {
+    this.views.get(packet.outputId)?.appendPacket(packet);
+  }
+
+  appendLegacyRawLine(line: string, timestamp: number): void {
+    const view = this.findFirstView("terminalAppend");
+
+    if (view instanceof TerminalAppendView) {
+      view.appendLines([{ text: line }], timestamp);
+    }
+  }
+
+  appendLegacySeries(samples: readonly { t: number; values: Record<string, number> }[]): void {
+    const view = this.findFirstView("timeSeriesLine");
+
+    if (view instanceof TimeSeriesLineView) {
+      view.appendSamples(samples.map((sample) => ({ time: sample.t, values: sample.values })));
+    }
+  }
+
+  clearAll(): void {
+    for (const view of this.views.values()) {
+      view.clear();
+    }
+  }
+
+  dispose(): void {
+    this.disposeViews();
+  }
+
+  private createOutputView(output: OutputConfig): OutputView {
+    const section = document.createElement("section");
+    section.className = `output-panel output-panel-${output.kind}`;
+    section.dataset.outputId = output.id;
+    section.dataset.outputKind = output.kind;
+    this.options.root.append(section);
+
+    if (output.kind === "terminalAppend") {
+      return new TerminalAppendView(section, output, this.postMessage);
+    }
+
+    if (output.kind === "terminalFrame") {
+      return new TerminalFrameView(section, output);
+    }
+
+    if (output.kind === "timeSeriesLine") {
+      return new TimeSeriesLineView(section, output);
+    }
+
+    return new FramePlot2dView(section, output);
+  }
+
+  private findFirstView(kind: OutputConfig["kind"]): OutputView | undefined {
+    return [...this.views.values()].find((view) => view.kind === kind);
+  }
+
+  private disposeViews(): void {
+    for (const view of this.views.values()) {
+      view.dispose();
+    }
+
+    this.views.clear();
+  }
+}
+
+class TerminalAppendView implements OutputView {
+  readonly outputId: string;
+  readonly kind = "terminalAppend" as const;
+
+  private readonly lines: string[] = [];
+  private readonly pre: HTMLPreElement;
+
+  constructor(
+    parent: HTMLElement,
+    private readonly config: TerminalAppendOutputConfig,
+    private readonly postMessage: PostMessage,
+  ) {
+    this.outputId = config.id;
+
+    const header = createPanelHeader(config, "Terminal");
+    const clearButton = document.createElement("button");
+    clearButton.className = "button button-secondary output-clear-button";
+    clearButton.type = "button";
+    clearButton.textContent = "Clear";
+    clearButton.addEventListener("click", () => {
+      this.clear();
+      this.postMessage({ type: "clearLog" });
+    });
+    header.append(clearButton);
+
+    this.pre = document.createElement("pre");
+    this.pre.className = "output-terminal output-standby";
+    this.pre.textContent = "Waiting for serial text";
+
+    parent.append(header, this.pre);
+  }
+
+  appendPacket(packet: OutputPacket): void {
+    if (packet.kind !== "terminalAppend") {
+      return;
+    }
+
+    this.appendLines(packet.lines, packet.receivedAt);
+  }
+
+  appendLines(lines: TerminalAppendPacket["lines"], timestamp: number): void {
+    const time = new Date(timestamp).toLocaleTimeString();
+    this.lines.push(...lines.map((line) => `[${time}] ${line.text}`));
+
+    const maxLines = this.config.maxLines ?? defaultMaxRawLines;
+
+    if (this.lines.length > maxLines) {
+      this.lines.splice(0, this.lines.length - maxLines);
+    }
+
+    this.pre.classList.remove("output-standby");
+    this.pre.textContent = this.lines.join("\n");
+
+    if (this.config.autoScroll !== false) {
+      this.pre.scrollTop = this.pre.scrollHeight;
+    }
+  }
+
+  clear(): void {
+    this.lines.length = 0;
+    this.pre.classList.add("output-standby");
+    this.pre.textContent = "Waiting for serial text";
+  }
+
+  dispose(): void {}
+}
+
+class TerminalFrameView implements OutputView {
+  readonly outputId: string;
+  readonly kind = "terminalFrame" as const;
+
+  private readonly frames = new Map<string | number, string>();
+  private readonly pre: HTMLPreElement;
+
+  constructor(parent: HTMLElement, config: TerminalFrameOutputConfig) {
+    this.outputId = config.id;
+    this.pre = document.createElement("pre");
+    this.pre.className = "output-terminal output-frame-terminal output-standby";
+    this.pre.textContent = "Waiting for frame data";
+
+    parent.append(createPanelHeader(config, "Frame Terminal"), this.pre);
+  }
+
+  appendPacket(packet: OutputPacket): void {
+    if (packet.kind !== "terminalFrame") {
+      return;
+    }
+
+    this.appendFrame(packet);
+  }
+
+  appendFrame(packet: TerminalFramePacket): void {
+    this.frames.set(packet.frameId, packet.text);
+    this.pre.classList.remove("output-standby");
+    this.pre.textContent = [...this.frames.entries()]
+      .map(([frameId, text]) => `#${String(frameId)}\n${text}`)
+      .join("\n\n");
+  }
+
+  clear(): void {
+    this.frames.clear();
+    this.pre.classList.add("output-standby");
+    this.pre.textContent = "Waiting for frame data";
+  }
+
+  dispose(): void {}
+}
+
+class TimeSeriesLineView implements OutputView {
+  readonly outputId: string;
+  readonly kind = "timeSeriesLine" as const;
+
+  private readonly timeValues: number[] = [];
+  private readonly seriesData = new Map<string, Array<number | null>>();
+  private readonly seriesVisibility = new Map<string, boolean>();
+  private readonly chartElement: HTMLElement;
+  private readonly legendElement: HTMLElement;
+  private readonly resizeObserver: ResizeObserver | undefined;
+  private plot: uPlot | undefined;
+
+  constructor(
+    parent: HTMLElement,
+    private readonly config: TimeSeriesLineOutputConfig,
+  ) {
+    this.outputId = config.id;
+    this.chartElement = document.createElement("div");
+    this.chartElement.className = "output-chart";
+    this.legendElement = document.createElement("div");
+    this.legendElement.className = "output-legend";
+
+    parent.append(createPanelHeader(config, "Time Series"), this.chartElement, this.legendElement);
+    this.initializeConfiguredSeries();
+    this.rebuildPlot();
+
+    if (typeof ResizeObserver !== "undefined") {
+      this.resizeObserver = new ResizeObserver(() => {
+        this.plot?.setSize(this.getChartSize());
+      });
+      this.resizeObserver.observe(this.chartElement);
+    }
+  }
+
+  appendPacket(packet: OutputPacket): void {
+    if (packet.kind !== "timeSeriesAppend") {
+      return;
+    }
+
+    this.appendSamples(packet.samples);
+  }
+
+  appendSamples(samples: readonly TimeSeriesSample[]): void {
+    const isAutoSeries = Object.keys(this.config.series).length === 0;
+    let needsRebuild = false;
+
+    for (const sample of samples) {
+      const sampleValues = isAutoSeries
+        ? sample.values
+        : pickConfiguredValues(sample.values, this.config);
+
+      for (const channelName of Object.keys(sampleValues)) {
+        if (!this.seriesData.has(channelName)) {
+          this.seriesData.set(
+            channelName,
+            Array.from({ length: this.timeValues.length }, () => null),
+          );
+          this.seriesVisibility.set(channelName, this.getSeriesVisible(channelName));
+          needsRebuild = true;
+        }
+      }
+
+      this.timeValues.push(sample.time);
+
+      for (const [channelName, values] of this.seriesData.entries()) {
+        const value = sampleValues[channelName];
+        values.push(typeof value === "number" && Number.isFinite(value) ? value : null);
+      }
+    }
+
+    this.trimPlotData();
+
+    if (needsRebuild) {
+      this.rebuildPlot();
+      return;
+    }
+
+    this.updatePlotData();
+  }
+
+  clear(): void {
+    this.timeValues.length = 0;
+    this.seriesData.clear();
+    this.seriesVisibility.clear();
+    this.initializeConfiguredSeries();
+    this.rebuildPlot();
+  }
+
+  dispose(): void {
+    this.resizeObserver?.disconnect();
+    this.plot?.destroy();
+    this.plot = undefined;
+  }
+
+  private initializeConfiguredSeries(): void {
+    for (const channelName of Object.keys(this.config.series)) {
+      this.seriesData.set(channelName, []);
+      this.seriesVisibility.set(channelName, this.getSeriesVisible(channelName));
+    }
+  }
+
+  private rebuildPlot(): void {
+    this.plot?.destroy();
+
+    const channelNames = [...this.seriesData.keys()];
+    const series: uPlot.Series[] = [
+      {},
+      ...channelNames.map((channelName, index) => ({
+        label: this.getSeriesLabel(channelName),
+        stroke: this.getSeriesColor(channelName, index),
+        width: this.getSeriesWidth(channelName),
+        show: this.seriesVisibility.get(channelName) ?? this.getSeriesVisible(channelName),
+      })),
+    ];
+
+    this.plot = new uPlot(
+      {
+        ...this.getChartSize(),
+        scales: {
+          x: {
+            time: false,
+          },
+        },
+        axes: [
+          {
+            label: this.getTimeAxisLabel(),
+            stroke: "var(--vscode-foreground)",
+            grid: {
+              stroke: "var(--vscode-panel-border)",
+            },
+          },
+          {
+            label: "Value",
+            stroke: "var(--vscode-foreground)",
+            grid: {
+              stroke: "var(--vscode-panel-border)",
+            },
+          },
+        ],
+        series,
+      },
+      this.getPlotData(),
+      this.chartElement,
+    );
+
+    this.renderLegend(channelNames);
+  }
+
+  private updatePlotData(): void {
+    this.plot?.setData(this.getPlotData());
+  }
+
+  private getPlotData(): uPlot.AlignedData {
+    return [this.timeValues, ...this.seriesData.values()];
+  }
+
+  private trimPlotData(): void {
+    const maxPoints = this.getPlotMaxPoints();
+
+    if (this.timeValues.length <= maxPoints) {
+      return;
+    }
+
+    const removeCount = this.timeValues.length - maxPoints;
+    this.timeValues.splice(0, removeCount);
+
+    for (const values of this.seriesData.values()) {
+      values.splice(0, removeCount);
+    }
+  }
+
+  private getPlotMaxPoints(): number {
+    return this.config.window?.mode === "points"
+      ? (this.config.window.maxPoints ?? defaultMaxPlotPoints)
+      : defaultMaxPlotPoints;
+  }
+
+  private getSeriesLabel(channelName: string): string {
+    const series = this.config.series[channelName];
+    const unit = series?.unit;
+    const label = series?.label ?? channelName;
+    return unit === undefined ? label : `${label} (${unit})`;
+  }
+
+  private getSeriesColor(channelName: string, index: number): string {
+    return this.config.series[channelName]?.color ?? colors[index % colors.length] ?? colors[0];
+  }
+
+  private getSeriesWidth(channelName: string): number {
+    return this.config.series[channelName]?.line?.width ?? 2;
+  }
+
+  private getSeriesVisible(channelName: string): boolean {
+    return this.config.series[channelName]?.visible ?? true;
+  }
+
+  private getTimeAxisLabel(): string {
+    if (this.config.time.source === "sequence") {
+      return "Sequence";
+    }
+
+    if (this.config.time.source === "fixedInterval") {
+      return "Seconds";
+    }
+
+    return this.config.time.unit === "ms" ? "Milliseconds" : "Seconds";
+  }
+
+  private renderLegend(channelNames: string[]): void {
+    this.legendElement.replaceChildren();
+    this.legendElement.hidden = this.config.style?.showLegend === false;
+
+    if (channelNames.length === 0) {
+      const empty = document.createElement("span");
+      empty.className = "legend-empty";
+      empty.textContent = "Waiting for numeric data";
+      this.legendElement.append(empty);
+      return;
+    }
+
+    for (const [index, channelName] of channelNames.entries()) {
+      const label = document.createElement("label");
+      label.className = "legend-item";
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = this.seriesVisibility.get(channelName) ?? true;
+      checkbox.addEventListener("change", () => {
+        this.seriesVisibility.set(channelName, checkbox.checked);
+        this.plot?.setSeries(index + 1, { show: checkbox.checked });
+      });
+
+      const swatch = document.createElement("span");
+      swatch.className = "legend-swatch";
+      swatch.style.backgroundColor = this.getSeriesColor(channelName, index);
+
+      const text = document.createElement("span");
+      text.textContent = this.getSeriesLabel(channelName);
+
+      label.append(checkbox, swatch, text);
+      this.legendElement.append(label);
+    }
+  }
+
+  private getChartSize(): { width: number; height: number } {
+    const rect = this.chartElement.getBoundingClientRect();
+    return {
+      width: Math.max(320, Math.floor(rect.width)),
+      height: Math.max(260, Math.floor(rect.height)),
+    };
+  }
+}
+
+class FramePlot2dView implements OutputView {
+  readonly outputId: string;
+  readonly kind = "framePlot2d" as const;
+
+  private readonly canvas: HTMLCanvasElement;
+  private readonly resizeObserver: ResizeObserver | undefined;
+  private latestPacket: FramePlot2dPacket | undefined;
+
+  constructor(
+    parent: HTMLElement,
+    private readonly config: FramePlot2dOutputConfig,
+  ) {
+    this.outputId = config.id;
+    this.canvas = document.createElement("canvas");
+    this.canvas.className = "output-frame-canvas";
+    this.canvas.setAttribute("aria-label", "Frame plot");
+
+    parent.append(createPanelHeader(config, "Frame Plot"), this.canvas);
+    this.draw();
+
+    if (typeof ResizeObserver !== "undefined") {
+      this.resizeObserver = new ResizeObserver(() => this.draw());
+      this.resizeObserver.observe(this.canvas);
+    }
+  }
+
+  appendPacket(packet: OutputPacket): void {
+    if (packet.kind !== "framePlot2d") {
+      return;
+    }
+
+    this.latestPacket = packet;
+    this.draw();
+  }
+
+  clear(): void {
+    this.latestPacket = undefined;
+    this.draw();
+  }
+
+  dispose(): void {
+    this.resizeObserver?.disconnect();
+  }
+
+  private draw(): void {
+    const context = getCanvasContext(this.canvas);
+
+    if (context === undefined) {
+      return;
+    }
+
+    const size = getCanvasSize(this.canvas);
+    const ratio = window.devicePixelRatio || 1;
+    this.canvas.width = Math.max(1, Math.floor(size.width * ratio));
+    this.canvas.height = Math.max(1, Math.floor(size.height * ratio));
+    context.setTransform(ratio, 0, 0, ratio, 0, 0);
+    context.clearRect(0, 0, size.width, size.height);
+
+    const style = getComputedStyle(this.canvas);
+    const foreground = readCssColor(style, "--vscode-foreground", "#cccccc");
+    const muted = readCssColor(style, "--vscode-descriptionForeground", "#8f8f8f");
+    const grid = readCssColor(style, "--vscode-panel-border", "#3c3c3c");
+    const bounds =
+      this.latestPacket?.bounds ?? this.config.bounds ?? inferBounds(this.latestPacket);
+    const plotBounds = bounds ?? { xMin: -1, xMax: 1, yMin: -1, yMax: 1 };
+    const area = {
+      left: 42,
+      top: 16,
+      right: size.width - 14,
+      bottom: size.height - 28,
+    };
+
+    context.strokeStyle = grid;
+    context.lineWidth = 1;
+    context.strokeRect(area.left, area.top, area.right - area.left, area.bottom - area.top);
+    drawCenterAxes(context, plotBounds, area, grid);
+
+    context.fillStyle = muted;
+    context.font = "11px sans-serif";
+    context.fillText(String(plotBounds.yMax), 6, area.top + 4);
+    context.fillText(String(plotBounds.yMin), 6, area.bottom);
+    context.fillText(String(plotBounds.xMin), area.left, size.height - 8);
+    context.fillText(
+      String(plotBounds.xMax),
+      Math.max(area.left, area.right - 42),
+      size.height - 8,
+    );
+
+    const layers = this.latestPacket?.layers ?? [];
+
+    if (layers.length === 0) {
+      context.fillStyle = muted;
+      context.textAlign = "center";
+      context.fillText("Waiting for frame points", size.width / 2, size.height / 2);
+      context.textAlign = "start";
+      return;
+    }
+
+    for (const layer of layers) {
+      for (const point of layer.points) {
+        const x = scaleLinear(point.x, plotBounds.xMin, plotBounds.xMax, area.left, area.right);
+        const y = scaleLinear(point.y, plotBounds.yMin, plotBounds.yMax, area.bottom, area.top);
+        const pointStyle =
+          point.styleKey === undefined ? undefined : this.config.styles?.[point.styleKey];
+        context.fillStyle = point.color ?? pointStyle?.color ?? foreground;
+        context.beginPath();
+        context.arc(x, y, point.size ?? pointStyle?.size ?? 3, 0, Math.PI * 2);
+        context.fill();
+      }
+    }
+  }
+}
+
+function createPanelHeader(config: OutputConfig, fallbackKind: string): HTMLElement {
+  const header = document.createElement("header");
+  header.className = "output-header";
+
+  const text = document.createElement("div");
+  text.className = "output-title-block";
+
+  const title = document.createElement("strong");
+  title.textContent = config.title ?? config.id;
+
+  const meta = document.createElement("span");
+  meta.textContent = `${fallbackKind} / ${config.id}`;
+
+  text.append(title, meta);
+  header.append(text);
+  return header;
+}
+
+function pickConfiguredValues(
+  values: Record<string, number>,
+  config: TimeSeriesLineOutputConfig,
+): Record<string, number> {
+  const nextValues: Record<string, number> = {};
+
+  for (const seriesName of Object.keys(config.series)) {
+    const value = values[seriesName];
+
+    if (typeof value === "number") {
+      nextValues[seriesName] = value;
+    }
+  }
+
+  return nextValues;
+}
+
+function getCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | undefined {
+  try {
+    return canvas.getContext("2d") ?? undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function getCanvasSize(canvas: HTMLCanvasElement): { width: number; height: number } {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    width: Math.max(320, Math.floor(rect.width)),
+    height: Math.max(260, Math.floor(rect.height)),
+  };
+}
+
+function readCssColor(style: CSSStyleDeclaration, name: string, fallback: string): string {
+  const value = style.getPropertyValue(name).trim();
+  return value.length === 0 ? fallback : value;
+}
+
+function inferBounds(
+  packet: FramePlot2dPacket | undefined,
+): { xMin: number; xMax: number; yMin: number; yMax: number } | undefined {
+  const points = packet?.layers.flatMap((layer) => layer.points) ?? [];
+
+  if (points.length === 0) {
+    return undefined;
+  }
+
+  const xValues = points.map((point) => point.x);
+  const yValues = points.map((point) => point.y);
+  const xMin = Math.min(...xValues);
+  const xMax = Math.max(...xValues);
+  const yMin = Math.min(...yValues);
+  const yMax = Math.max(...yValues);
+
+  return {
+    xMin: xMin === xMax ? xMin - 1 : xMin,
+    xMax: xMin === xMax ? xMax + 1 : xMax,
+    yMin: yMin === yMax ? yMin - 1 : yMin,
+    yMax: yMin === yMax ? yMax + 1 : yMax,
+  };
+}
+
+function drawCenterAxes(
+  context: CanvasRenderingContext2D,
+  bounds: { xMin: number; xMax: number; yMin: number; yMax: number },
+  area: { left: number; top: number; right: number; bottom: number },
+  color: string,
+): void {
+  context.strokeStyle = color;
+  context.beginPath();
+
+  if (bounds.xMin < 0 && bounds.xMax > 0) {
+    const x = scaleLinear(0, bounds.xMin, bounds.xMax, area.left, area.right);
+    context.moveTo(x, area.top);
+    context.lineTo(x, area.bottom);
+  }
+
+  if (bounds.yMin < 0 && bounds.yMax > 0) {
+    const y = scaleLinear(0, bounds.yMin, bounds.yMax, area.bottom, area.top);
+    context.moveTo(area.left, y);
+    context.lineTo(area.right, y);
+  }
+
+  context.stroke();
+}
+
+function scaleLinear(
+  value: number,
+  fromMin: number,
+  fromMax: number,
+  toMin: number,
+  toMax: number,
+): number {
+  if (fromMin === fromMax) {
+    return (toMin + toMax) / 2;
+  }
+
+  return toMin + ((value - fromMin) / (fromMax - fromMin)) * (toMax - toMin);
+}

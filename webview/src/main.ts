@@ -1,17 +1,15 @@
-import uPlot from "uplot";
 import "uplot/dist/uPlot.min.css";
 import "./styles.css";
 import appHtml from "./app.html?raw";
 import { baudRatePresets, isBaudRateInputValid, parseBaudRateInput } from "./baudRate";
+import { MonitorOutputController } from "./monitorOutputs";
 import {
   isParserMode,
   parserModes,
-  type OutputPacket,
   type ParserMode,
   type ProfileConfig,
   type ProfileSummary,
   type SerialPortSummary,
-  type TimeSeriesLineOutputConfig,
   type ToExtensionMessage,
   type ToWebviewMessage,
 } from "../../src/shared/protocol";
@@ -59,32 +57,23 @@ const baudRateDatalist = requireElement(document, "#baudRatePresets", HTMLDataLi
 const parserModeSelect = requireElement(document, "#parserModeSelect", HTMLSelectElement);
 const connectButton = requireElement(document, "#connectButton", HTMLButtonElement);
 const connectionStatus = requireElement(document, "#connectionStatus", HTMLElement);
-const chartElement = requireElement(document, "#chart", HTMLElement);
-const legendElement = requireElement(document, "#legend", HTMLElement);
-const clearLogButton = requireElement(document, "#clearLogButton", HTMLButtonElement);
-const rawLog = requireElement(document, "#rawLog", HTMLPreElement);
+const outputWorkspace = requireElement(document, "#outputWorkspace", HTMLElement);
 const sendForm = requireElement(document, "#sendForm", HTMLFormElement);
 const sendInput = requireElement(document, "#sendInput", HTMLInputElement);
 const sendButton = requireElement(document, "#sendButton", HTMLButtonElement);
 const errorToast = requireElement(document, "#errorToast", HTMLElement);
 
-const rawLines: string[] = [];
-const timeValues: number[] = [];
-const channelData = new Map<string, Array<number | null>>();
-const channelVisibility = new Map<string, boolean>();
-const maxRawLines = 500;
-const maxPlotPoints = 3000;
-const colors = ["#4cc9f0", "#f72585", "#ffd166", "#06d6a0", "#c77dff", "#f77f00", "#90be6d"];
-
-let firstTimestamp: number | undefined;
-let plot: uPlot | undefined;
 let ports: SerialPortSummary[] = [];
 let profiles: ProfileSummary[] = [];
 let activeProfile: ProfileConfig = defaultProfile;
 let userChangedBaudRate = persistedState?.baudRate !== undefined;
+const outputController = new MonitorOutputController({
+  root: outputWorkspace,
+  postMessage,
+});
 
 setupControls();
-rebuildPlot();
+outputController.renderOutputs(defaultProfile.outputs);
 requestProfiles();
 requestPorts();
 
@@ -116,17 +105,17 @@ window.addEventListener("message", (event: MessageEvent<ToWebviewMessage>) => {
   }
 
   if (message.type === "rawLine") {
-    appendRawLine(message.line, message.t);
+    outputController.appendLegacyRawLine(message.line, message.t);
     return;
   }
 
   if (message.type === "seriesAppend") {
-    appendSamples(message.samples);
+    outputController.appendLegacySeries(message.samples);
     return;
   }
 
   if (message.type === "outputPacket") {
-    handleOutputPacket(message.packet);
+    outputController.appendPacket(message.packet);
     return;
   }
 
@@ -134,14 +123,6 @@ window.addEventListener("message", (event: MessageEvent<ToWebviewMessage>) => {
     showError(message.message);
   }
 });
-
-new ResizeObserver(() => {
-  if (plot === undefined) {
-    return;
-  }
-
-  plot.setSize(getChartSize());
-}).observe(chartElement);
 
 function setupControls(): void {
   for (const baudRate of baudRatePresets) {
@@ -170,7 +151,6 @@ function setupControls(): void {
 
   refreshPortsButton.addEventListener("click", () => requestPorts());
   connectButton.addEventListener("click", () => toggleConnection());
-  clearLogButton.addEventListener("click", () => clearLog());
 
   baudRateInput.addEventListener("input", handleBaudRateInput);
   baudRateInput.addEventListener("change", handleBaudRateInput);
@@ -264,9 +244,7 @@ function applyProfile(profile: ProfileConfig, profileKey: string): void {
 
   profileSelect.value = state.profileKey;
   saveState();
-  clearPlot();
-  clearLogView();
-  rebuildPlot();
+  outputController.renderOutputs(profile.outputs);
 }
 
 function renderPorts(): void {
@@ -356,255 +334,6 @@ function updateConnectionControls(): void {
     !state.connected && (state.selectedPath.length === 0 || !updateBaudRateInputValidity());
   sendInput.disabled = !state.connected;
   sendButton.disabled = !state.connected;
-}
-
-function handleOutputPacket(packet: OutputPacket): void {
-  if (packet.kind === "terminalAppend") {
-    appendTerminalLines(
-      packet.lines.map((line) => line.text),
-      packet.receivedAt,
-    );
-    return;
-  }
-
-  if (packet.kind === "timeSeriesAppend") {
-    appendTimeSeriesSamples(packet.samples);
-  }
-}
-
-function appendRawLine(line: string, timestamp: number): void {
-  appendTerminalLines([line], timestamp);
-}
-
-function appendTerminalLines(lines: readonly string[], timestamp: number): void {
-  const time = new Date(timestamp).toLocaleTimeString();
-  rawLines.push(...lines.map((line) => `[${time}] ${line}`));
-
-  const maxLines = getRawMaxLines();
-
-  if (rawLines.length > maxLines) {
-    rawLines.splice(0, rawLines.length - maxLines);
-  }
-
-  rawLog.textContent = rawLines.join("\n");
-  rawLog.scrollTop = rawLog.scrollHeight;
-}
-
-function clearLog(): void {
-  clearLogView();
-  postMessage({ type: "clearLog" });
-}
-
-function clearLogView(): void {
-  rawLines.length = 0;
-  rawLog.textContent = "";
-}
-
-function appendSamples(samples: readonly { t: number; values: Record<string, number> }[]): void {
-  appendTimeSeriesSamples(samples.map((sample) => ({ time: sample.t, values: sample.values })));
-}
-
-function appendTimeSeriesSamples(
-  samples: readonly { time: number; values: Record<string, number> }[],
-): void {
-  let needsRebuild = false;
-
-  for (const sample of samples) {
-    if (firstTimestamp === undefined) {
-      firstTimestamp = sample.time;
-    }
-
-    for (const channelName of Object.keys(sample.values)) {
-      if (!channelData.has(channelName)) {
-        channelData.set(
-          channelName,
-          Array.from({ length: timeValues.length }, () => null),
-        );
-        channelVisibility.set(channelName, true);
-        needsRebuild = true;
-      }
-    }
-
-    timeValues.push(sample.time);
-
-    for (const [channelName, values] of channelData.entries()) {
-      const value = sample.values[channelName];
-      values.push(typeof value === "number" && Number.isFinite(value) ? value : null);
-    }
-  }
-
-  trimPlotData();
-
-  if (needsRebuild) {
-    rebuildPlot();
-    return;
-  }
-
-  updatePlotData();
-}
-
-function trimPlotData(): void {
-  const maxPoints = getPlotMaxPoints();
-
-  if (timeValues.length <= maxPoints) {
-    return;
-  }
-
-  const removeCount = timeValues.length - maxPoints;
-  timeValues.splice(0, removeCount);
-
-  for (const values of channelData.values()) {
-    values.splice(0, removeCount);
-  }
-}
-
-function rebuildPlot(): void {
-  plot?.destroy();
-
-  const channelNames = [...channelData.keys()];
-  const series: uPlot.Series[] = [
-    {},
-    ...channelNames.map((channelName, index) => ({
-      label: getSeriesLabel(channelName),
-      stroke: getSeriesColor(channelName, index),
-      width: getSeriesWidth(channelName),
-      show: channelVisibility.get(channelName) ?? getSeriesVisible(channelName),
-    })),
-  ];
-
-  plot = new uPlot(
-    {
-      ...getChartSize(),
-      scales: {
-        x: {
-          time: false,
-        },
-      },
-      axes: [
-        {
-          label: "Seconds",
-          stroke: "var(--vscode-foreground)",
-          grid: {
-            stroke: "var(--vscode-panel-border)",
-          },
-        },
-        {
-          label: "Value",
-          stroke: "var(--vscode-foreground)",
-          grid: {
-            stroke: "var(--vscode-panel-border)",
-          },
-        },
-      ],
-      series,
-    },
-    getPlotData(),
-    chartElement,
-  );
-
-  renderLegend(channelNames);
-}
-
-function updatePlotData(): void {
-  if (plot === undefined) {
-    return;
-  }
-
-  plot.setData(getPlotData());
-}
-
-function getPlotData(): uPlot.AlignedData {
-  const values = [...channelData.values()];
-  const yValues: Array<Array<number | null>> = values.length === 0 ? [[]] : values;
-
-  return [timeValues, ...yValues];
-}
-
-function clearPlot(): void {
-  firstTimestamp = undefined;
-  timeValues.length = 0;
-  channelData.clear();
-  channelVisibility.clear();
-}
-
-function getRawMaxLines(): number {
-  const rawOutput = activeProfile.outputs.find((output) => output.kind === "terminalAppend");
-  return rawOutput?.maxLines ?? maxRawLines;
-}
-
-function getPlotMaxPoints(): number {
-  const plotOutput = getTimeSeriesOutput();
-  return plotOutput?.window?.mode === "points"
-    ? (plotOutput.window.maxPoints ?? maxPlotPoints)
-    : maxPlotPoints;
-}
-
-function getTimeSeriesOutput(): TimeSeriesLineOutputConfig | undefined {
-  return activeProfile.outputs.find((output) => output.kind === "timeSeriesLine");
-}
-
-function getSeriesLabel(channelName: string): string {
-  const series = getTimeSeriesOutput()?.series[channelName];
-  const unit = series?.unit;
-  const label = series?.label ?? channelName;
-  return unit === undefined ? label : `${label} (${unit})`;
-}
-
-function getSeriesColor(channelName: string, index: number): string {
-  return (
-    getTimeSeriesOutput()?.series[channelName]?.color ?? colors[index % colors.length] ?? colors[0]
-  );
-}
-
-function getSeriesWidth(channelName: string): number {
-  return getTimeSeriesOutput()?.series[channelName]?.line?.width ?? 2;
-}
-
-function getSeriesVisible(channelName: string): boolean {
-  return getTimeSeriesOutput()?.series[channelName]?.visible ?? true;
-}
-
-function renderLegend(channelNames: string[]): void {
-  legendElement.replaceChildren();
-
-  if (channelNames.length === 0) {
-    const empty = document.createElement("span");
-    empty.className = "legend-empty";
-    empty.textContent = "Waiting for numeric data";
-    legendElement.append(empty);
-    return;
-  }
-
-  for (const [index, channelName] of channelNames.entries()) {
-    const label = document.createElement("label");
-    label.className = "legend-item";
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = channelVisibility.get(channelName) ?? true;
-    checkbox.addEventListener("change", () => {
-      channelVisibility.set(channelName, checkbox.checked);
-      plot?.setSeries(index + 1, { show: checkbox.checked });
-    });
-
-    const swatch = document.createElement("span");
-    swatch.className = "legend-swatch";
-    swatch.style.backgroundColor = getSeriesColor(channelName, index);
-
-    const text = document.createElement("span");
-    text.textContent = channelName;
-
-    label.append(checkbox, swatch, text);
-    legendElement.append(label);
-  }
-}
-
-function getChartSize(): { width: number; height: number } {
-  const rect = chartElement.getBoundingClientRect();
-  return {
-    width: Math.max(320, Math.floor(rect.width)),
-    height: Math.max(260, Math.floor(rect.height)),
-  };
 }
 
 function showError(message: string): void {

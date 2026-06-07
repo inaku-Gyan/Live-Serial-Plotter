@@ -29,28 +29,16 @@
     <button id="connectButton" class="button button-primary" type="button">Connect</button>
     <span id="connectionStatus" class="status" aria-live="polite">Disconnected</span>
   </header>
-  <section class="workspace">
-    <section class="plot-area" aria-label="Live plot">
-      <div id="chart" class="chart"></div>
-      <div id="legend" class="legend"></div>
-    </section>
-    <section class="terminal-area" aria-label="Serial monitor">
-      <div class="terminal-header">
-        <span>Raw Monitor</span>
-        <button id="clearLogButton" class="button button-secondary" type="button">Clear</button>
-      </div>
-      <pre id="rawLog" class="raw-log"></pre>
-      <form id="sendForm" class="send-row">
-        <input
-          id="sendInput"
-          type="text"
-          autocomplete="off"
-          spellcheck="false"
-          placeholder="Send text"
-        />
-        <button id="sendButton" class="button button-primary" type="submit">Send</button>
-      </form>
-    </section>
-  </section>
+  <section id="outputWorkspace" class="workspace" aria-label="Monitor outputs"></section>
+  <form id="sendForm" class="send-row">
+    <input
+      id="sendInput"
+      type="text"
+      autocomplete="off"
+      spellcheck="false"
+      placeholder="Send text"
+    />
+    <button id="sendButton" class="button button-primary" type="submit">Send</button>
+  </form>
   <div id="errorToast" class="error-toast" role="status" aria-live="polite"></div>
 </main>
