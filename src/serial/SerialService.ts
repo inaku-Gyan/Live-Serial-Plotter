@@ -1,12 +1,15 @@
 import { EventEmitter } from "node:events";
 import { SerialPort } from "serialport";
-import { toPlotSample } from "../parsers/parseLine";
-import { LineDecoder } from "./LineDecoder";
+import { PipelineRunner, type AsyncScriptParserLoader } from "../pipeline/PipelineRunner";
+import { defaultProfile } from "../profiles/defaultProfile";
 import type {
   ConnectionSettings,
   ConnectionState,
+  LineEnding,
+  OutputPacket,
   ParserMode,
   PlotSample,
+  ProfileConfig,
   SerialPortSummary,
 } from "../shared/protocol";
 
@@ -26,7 +29,12 @@ export interface SerialServiceEvents {
   onConnectionState?(state: ConnectionState): void;
   onRawLine?(line: string, t: number): void;
   onSample?(sample: PlotSample): void;
+  onOutputPacket?(packet: OutputPacket): void;
   onError?(message: string): void;
+}
+
+export interface SerialServiceOptions {
+  readonly scriptParserLoader?: AsyncScriptParserLoader;
 }
 
 export class NodeSerialPortFactory implements SerialPortFactory {
@@ -52,15 +60,17 @@ export class NodeSerialPortFactory implements SerialPortFactory {
 }
 
 export class SerialService {
-  private readonly decoder = new LineDecoder();
   private port: SerialPortLike | undefined;
   private parserMode: ParserMode = "auto";
+  private activeProfile: ProfileConfig = defaultProfile;
+  private pipelineRunner: PipelineRunner | undefined;
   private currentSettings: ConnectionSettings | undefined;
   private disconnecting = false;
 
   constructor(
     private readonly events: SerialServiceEvents = {},
     private readonly factory: SerialPortFactory = new NodeSerialPortFactory(),
+    private readonly options: SerialServiceOptions = {},
   ) {}
 
   async listPorts(): Promise<SerialPortSummary[]> {
@@ -70,9 +80,10 @@ export class SerialService {
   async connect(settings: ConnectionSettings): Promise<void> {
     await this.disconnect();
 
-    this.parserMode = settings.parserMode;
+    this.parserMode = settings.parserMode ?? "auto";
     this.currentSettings = settings;
-    this.decoder.reset();
+    this.pipelineRunner?.dispose();
+    this.pipelineRunner = await this.createPipelineRunner(settings);
     this.disconnecting = false;
 
     const port = this.factory.create(settings);
@@ -116,7 +127,9 @@ export class SerialService {
     }
 
     this.disconnecting = true;
-    this.decoder.flush();
+    this.pipelineRunner?.flush();
+    this.pipelineRunner?.dispose();
+    this.pipelineRunner = undefined;
     this.detachPortListeners(port);
 
     if (port.isOpen) {
@@ -146,7 +159,7 @@ export class SerialService {
     }
 
     await new Promise<void>((resolve, reject) => {
-      port.write(text, (error) => {
+      port.write(this.encodeTextForSend(text), (error) => {
         if (error) {
           reject(error);
           return;
@@ -159,6 +172,13 @@ export class SerialService {
 
   setParserMode(parserMode: ParserMode): void {
     this.parserMode = parserMode;
+    this.activeProfile = {
+      ...this.activeProfile,
+      parser: {
+        kind: "builtin",
+        mode: parserMode,
+      },
+    };
 
     if (this.currentSettings !== undefined) {
       this.currentSettings = {
@@ -166,6 +186,21 @@ export class SerialService {
         parserMode,
       };
     }
+
+    this.pipelineRunner?.dispose();
+    void this.recreatePipelineRunner();
+  }
+
+  setProfile(profile: ProfileConfig): void {
+    this.activeProfile = profile;
+    this.parserMode = profile.parser.kind === "builtin" ? profile.parser.mode : "raw";
+
+    if (this.currentSettings === undefined) {
+      return;
+    }
+
+    this.pipelineRunner?.dispose();
+    void this.recreatePipelineRunner();
   }
 
   dispose(): void {
@@ -175,18 +210,7 @@ export class SerialService {
   }
 
   private readonly handleData = (chunk: Buffer | Uint8Array): void => {
-    const lines = this.decoder.push(chunk);
-
-    for (const line of lines) {
-      const timestamp = Date.now();
-      this.events.onRawLine?.(line, timestamp);
-
-      const sample = toPlotSample(line, this.parserMode, timestamp);
-
-      if (sample !== null) {
-        this.events.onSample?.(sample);
-      }
-    }
+    this.pipelineRunner?.handleBytes(chunk);
   };
 
   private readonly handlePortError = (error: Error): void => {
@@ -200,6 +224,8 @@ export class SerialService {
 
     this.port = undefined;
     this.currentSettings = undefined;
+    this.pipelineRunner?.dispose();
+    this.pipelineRunner = undefined;
     this.events.onConnectionState?.({ connected: false });
   };
 
@@ -208,6 +234,88 @@ export class SerialService {
     port.off("error", this.handlePortError);
     port.off("close", this.handleClose);
   }
+
+  private async createPipelineRunner(settings: ConnectionSettings): Promise<PipelineRunner> {
+    const profile = this.createRuntimeProfile(settings);
+
+    return PipelineRunner.create({
+      codec: profile.codec,
+      framing: profile.framing,
+      parser: profile.parser,
+      outputs: profile.outputs,
+      scriptParserLoader: this.options.scriptParserLoader,
+      onPacket: (packet) => this.handleOutputPacket(packet),
+      onError: (message) => this.events.onError?.(message),
+    });
+  }
+
+  private async recreatePipelineRunner(): Promise<void> {
+    if (this.currentSettings === undefined) {
+      this.pipelineRunner = undefined;
+      return;
+    }
+
+    try {
+      this.pipelineRunner = await this.createPipelineRunner(this.currentSettings);
+    } catch (error) {
+      this.pipelineRunner = undefined;
+      this.events.onError?.(formatError(error));
+    }
+  }
+
+  private createRuntimeProfile(settings: ConnectionSettings): ProfileConfig {
+    return {
+      ...this.activeProfile,
+      parser:
+        settings.parserMode === undefined
+          ? this.activeProfile.parser
+          : {
+              kind: "builtin",
+              mode: settings.parserMode,
+            },
+    };
+  }
+
+  private encodeTextForSend(text: string): Buffer {
+    const lineEnding = getLineEndingText(this.activeProfile.codec.sendLineEnding ?? "none");
+
+    return Buffer.from(`${text}${lineEnding}`, this.activeProfile.codec.encoding);
+  }
+
+  private handleOutputPacket(packet: OutputPacket): void {
+    this.events.onOutputPacket?.(packet);
+
+    if (packet.kind === "terminalAppend" && packet.outputId === "raw") {
+      for (const line of packet.lines) {
+        this.events.onRawLine?.(line.text, line.timestamp ?? packet.receivedAt);
+      }
+    }
+
+    if (packet.kind === "timeSeriesAppend") {
+      for (const sample of packet.samples) {
+        this.events.onSample?.({
+          t: sample.time,
+          values: sample.values,
+        });
+      }
+    }
+  }
+}
+
+function getLineEndingText(lineEnding: LineEnding): string {
+  if (lineEnding === "lf") {
+    return "\n";
+  }
+
+  if (lineEnding === "crlf") {
+    return "\r\n";
+  }
+
+  if (lineEnding === "cr") {
+    return "\r";
+  }
+
+  return "";
 }
 
 function formatError(error: unknown): string {

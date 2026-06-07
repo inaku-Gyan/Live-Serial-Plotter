@@ -1,0 +1,319 @@
+html,
+body,
+#profileApp {
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+  margin: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+  font-family: var(--vscode-font-family);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.button {
+  height: 28px;
+  min-width: 72px;
+  border: 1px solid var(--vscode-button-border, transparent);
+  border-radius: 4px;
+  padding: 0 8px;
+  color: var(--vscode-button-foreground);
+  background: var(--vscode-button-background);
+  cursor: pointer;
+}
+
+.button:hover {
+  background: var(--vscode-button-hoverBackground);
+}
+
+.button-secondary {
+  color: var(--vscode-button-secondaryForeground);
+  background: var(--vscode-button-secondaryBackground);
+}
+
+.button-secondary:hover {
+  background: var(--vscode-button-secondaryHoverBackground);
+}
+
+.profile-home,
+.profile-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 280px;
+  padding: 10px;
+  color: var(--vscode-foreground);
+  background: var(--vscode-sideBar-background, var(--vscode-editor-background));
+}
+
+.profile-editor-toolbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.profile-list {
+  display: grid;
+  gap: 4px;
+}
+
+.profile-list-item {
+  display: grid;
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 0;
+  color: var(--vscode-list-foreground, var(--vscode-foreground));
+  background: transparent;
+}
+
+.profile-list-item:hover {
+  background: var(--vscode-list-hoverBackground);
+}
+
+.profile-list-item[data-active="true"] {
+  border-color: var(--vscode-focusBorder);
+  background: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground, var(--vscode-foreground));
+}
+
+.profile-list-item strong,
+.profile-list-item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-list-item strong {
+  font-size: 12px;
+}
+
+.profile-list-item span {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.profile-list-main {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  border: 0;
+  padding: 7px 8px;
+  color: inherit;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-list-main:focus {
+  outline: 1px solid var(--vscode-focusBorder);
+  outline-offset: -1px;
+}
+
+.profile-list-menu-root {
+  display: grid;
+  position: relative;
+  align-items: center;
+  padding-right: 4px;
+}
+
+.profile-menu-trigger {
+  width: 24px;
+  height: 24px;
+  border: 0;
+  border-radius: 4px;
+  padding: 0;
+  opacity: 0;
+  color: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+
+.profile-list-item:hover .profile-menu-trigger,
+.profile-list-item:focus-within .profile-menu-trigger,
+.profile-list-item[data-menu-open="true"] .profile-menu-trigger {
+  opacity: 1;
+}
+
+.profile-menu-trigger:hover,
+.profile-menu-trigger:focus {
+  outline: none;
+  background: var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground));
+}
+
+.profile-list-menu {
+  display: grid;
+  position: absolute;
+  z-index: 10;
+  top: 28px;
+  right: 0;
+  min-width: 120px;
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  padding: 3px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 24%);
+  background: var(--vscode-menu-background, var(--vscode-editorWidget-background));
+}
+
+.profile-list-menu button {
+  min-width: 0;
+  border: 0;
+  padding: 5px 8px;
+  color: var(--vscode-menu-foreground, var(--vscode-foreground));
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.profile-list-menu button:hover,
+.profile-list-menu button:focus {
+  outline: none;
+  color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
+  background: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
+}
+
+.profile-editor-title {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.profile-editor-title strong,
+.profile-editor-title span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-editor-title span {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+}
+
+.profile-section {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.profile-section h2,
+.profile-output h2 {
+  margin: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.profile-output {
+  display: grid;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.profile-output-readonly {
+  color: var(--vscode-descriptionForeground);
+}
+
+.profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.profile-field {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.profile-field span {
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.profile-field input,
+.profile-field select,
+.profile-field textarea,
+.profile-editor-toolbar select {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--vscode-input-border);
+  color: var(--vscode-input-foreground);
+  background: var(--vscode-input-background);
+}
+
+.profile-field input,
+.profile-field select,
+.profile-editor-toolbar select {
+  height: 28px;
+  padding: 0 7px;
+}
+
+.profile-field textarea {
+  min-height: 74px;
+  resize: vertical;
+  padding: 6px 7px;
+  font-family: var(--vscode-editor-font-family);
+  font-size: var(--vscode-editor-font-size);
+}
+
+.profile-field code {
+  overflow-wrap: anywhere;
+  color: var(--vscode-descriptionForeground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+}
+
+.series-table {
+  display: grid;
+  gap: 8px;
+}
+
+.series-row {
+  display: grid;
+  grid-template-columns: minmax(84px, 1fr) minmax(96px, 1.1fr);
+  gap: 6px;
+  align-items: end;
+  padding: 8px 0;
+  border-top: 1px solid var(--vscode-panel-border);
+}
+
+.series-row .button {
+  grid-column: span 2;
+}
+
+.profile-status {
+  max-height: 120px;
+  margin: 0;
+  overflow: auto;
+  padding: 8px;
+  border: 1px solid var(--vscode-inputValidation-warningBorder, var(--vscode-panel-border));
+  color: var(--vscode-descriptionForeground);
+  background: var(--vscode-inputValidation-warningBackground, transparent);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
+  white-space: pre-wrap;
+}

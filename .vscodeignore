@@ -5,6 +5,7 @@ scripts/**
 
 # Tests and coverage
 tests/**
+.vscode-dev/**
 .vscode-test/**
 .vscode-test.mjs
 coverage/**

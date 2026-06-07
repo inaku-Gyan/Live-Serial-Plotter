@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { parseLine, toPlotSample } from "../../src/parsers/parseLine";
+import { BuiltinLineParser, parseLine, toPlotSample } from "../../src/parsers/parseLine";
 
 describe("parseLine", () => {
   test("parses CSV numeric channels", () => {
@@ -52,5 +52,64 @@ describe("parseLine", () => {
   test("malformed line keeps parser result empty instead of throwing", () => {
     expect(() => parseLine("plain text", "auto")).not.toThrow();
     expect(parseLine("plain text", "auto")).toEqual({ values: {} });
+  });
+
+  test("stateful CSV parser supports first-line headers", () => {
+    const parser = new BuiltinLineParser({
+      kind: "builtin",
+      mode: "csv",
+      options: { header: "firstLine" },
+    });
+
+    expect(parser.parseFrame({ seq: 1, receivedAt: 100, raw: "temp,humidity" })).toEqual([
+      { fields: {} },
+    ]);
+    expect(parser.parseFrame({ seq: 2, receivedAt: 110, raw: "23.5,45" })).toEqual([
+      {
+        fields: {
+          temp: 23.5,
+          humidity: 45,
+        },
+      },
+    ]);
+  });
+
+  test("JSON Lines parser can flatten nested fields", () => {
+    const parser = new BuiltinLineParser({
+      kind: "builtin",
+      mode: "jsonl",
+      options: { flatten: true },
+    });
+
+    expect(
+      parser.parseFrame({
+        seq: 1,
+        receivedAt: 100,
+        raw: '{"imu":{"ax":1,"ay":2},"name":"sensor"}',
+      }),
+    ).toEqual([
+      {
+        fields: {
+          "imu.ax": 1,
+          "imu.ay": 2,
+          name: "sensor",
+        },
+      },
+    ]);
+  });
+
+  test("builtin parser can carry forward previous fields", () => {
+    const parser = new BuiltinLineParser({
+      kind: "builtin",
+      mode: "keyValue",
+      options: { carryForward: true },
+    });
+
+    expect(parser.parseFrame({ seq: 1, receivedAt: 100, raw: "temp=20 humidity=40" })).toEqual([
+      { fields: { temp: 20, humidity: 40 } },
+    ]);
+    expect(parser.parseFrame({ seq: 2, receivedAt: 110, raw: "temp=21" })).toEqual([
+      { fields: { temp: 21, humidity: 40 } },
+    ]);
   });
 });

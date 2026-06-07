@@ -6,6 +6,7 @@ import {
   type SerialPortFactory,
   type SerialPortLike,
 } from "../../src/serial/SerialService";
+import { defaultProfile } from "../../src/profiles/defaultProfile";
 import type { ConnectionSettings, SerialPortSummary } from "../../src/shared/protocol";
 
 interface MockPortBinding {
@@ -139,6 +140,24 @@ describe("SerialService", () => {
     await waitForMicrotask();
 
     expect(factory.lastPort?.port?.lastWrite?.toString()).toBe("ping");
+
+    await service.disconnect();
+  });
+
+  test("applies text codec send line endings", async () => {
+    const factory = new MockSerialPortFactory();
+    const service = new SerialService({}, factory);
+
+    service.setProfile({
+      ...defaultProfile,
+      codec: { kind: "text", encoding: "utf8", sendLineEnding: "crlf" },
+    });
+
+    await service.connect({ path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" });
+    await service.send("AT");
+    await waitForMicrotask();
+
+    expect(factory.lastPort?.port?.lastWrite?.toString()).toBe("AT\r\n");
 
     await service.disconnect();
   });

@@ -3,23 +3,25 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 
 const require = createRequire(import.meta.url);
+const serialportPackageRoot = dirname(require.resolve("serialport/package.json"));
 const targetNodeModules = resolve("dist/node_modules");
 const copiedPackages = new Set();
 
 await rm(join(targetNodeModules, "@serialport"), { recursive: true, force: true });
-await copyPackageWithRuntimeDependencies("@serialport/bindings-cpp");
+await copyPackageWithRuntimeDependencies("@serialport/bindings-cpp", [serialportPackageRoot]);
 
-async function copyPackageWithRuntimeDependencies(packageName) {
+async function copyPackageWithRuntimeDependencies(packageName, resolvePaths = []) {
   if (copiedPackages.has(packageName)) {
     return;
   }
 
   copiedPackages.add(packageName);
 
-  const { packageJson, sourceDir } = await findPackageRoot(packageName);
+  const { packageJson, sourceDir } = await findPackageRoot(packageName, resolvePaths);
+  const dependencyResolvePaths = [sourceDir, ...resolvePaths];
 
   for (const dependencyName of Object.keys(packageJson.dependencies ?? {})) {
-    await copyPackageWithRuntimeDependencies(dependencyName);
+    await copyPackageWithRuntimeDependencies(dependencyName, dependencyResolvePaths);
   }
 
   const targetDir = join(targetNodeModules, ...packageName.split("/"));
@@ -31,8 +33,8 @@ async function copyPackageWithRuntimeDependencies(packageName) {
   });
 }
 
-async function findPackageRoot(packageName) {
-  let currentDir = dirname(require.resolve(packageName));
+async function findPackageRoot(packageName, resolvePaths) {
+  let currentDir = dirname(resolvePackageEntry(packageName, resolvePaths));
 
   while (currentDir !== dirname(currentDir)) {
     try {
@@ -52,4 +54,12 @@ async function findPackageRoot(packageName) {
   }
 
   throw new Error(`Unable to find package root for ${packageName}.`);
+}
+
+function resolvePackageEntry(packageName, resolvePaths) {
+  try {
+    return require.resolve(packageName);
+  } catch {
+    return require.resolve(packageName, { paths: resolvePaths });
+  }
 }

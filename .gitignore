@@ -8,6 +8,7 @@ dist/
 # Test and coverage output
 coverage/
 .vscode-test/
+.vscode-dev/
 
 # Package manager logs
 npm-debug.log*

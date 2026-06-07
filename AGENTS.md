@@ -30,6 +30,18 @@ Live Serial Plotter 是一个 VS Code 桌面扩展，用于串口监控、串口
 - `tests/extension/`：VS Code 扩展激活和命令注册测试。
 - `scripts/copy-serial-binding.mjs`：复制 `@serialport/bindings-cpp` native 运行时到 `dist/node_modules`。
 
+## 代码规范
+
+- 优先保持模块化。避免把 UI 状态、DOM 事件、VS Code 消息、串口数据处理和图表更新继续堆在同一个大文件里；新增功能时按职责拆分，例如 Webview bridge、连接控件、日志面板、uPlot 图表、图例和持久化状态。
+- 协议类型优先。Extension Host 和 Webview 之间新增消息时，先更新 `src/shared/protocol.ts` 的 discriminated union，再同步调整两端处理逻辑；不要在消息链路中使用 `any` 或未校验的自由对象。
+- 保持串口、解析、缓冲和 UI 解耦。串口读取、行解码、文本解析、点批处理和图表展示应各自独立，核心逻辑要能脱离 VS Code Webview 做单元测试。
+- uPlot 走命令式高性能路径。图表实例和大批量点数据不要放进深层响应式状态；即使未来迁移到 Vue 3，也应只让框架管理 UI 状态，uPlot 实例和数据数组使用非响应式引用管理。
+- 高频数据更新必须批处理。不要每收到一个点就重建图表或触发 DOM 列表渲染；优先通过 `PointBatcher`、环形缓冲和数组原地更新控制刷新频率。
+- 只在必要时重建 uPlot。新增/删除通道或图表结构性配置变化时可以重建；普通数据追加使用 `setData()`，通道显示切换使用 `setSeries()`，尺寸变化使用 `setSize()`。
+- 控制内存和分配。持续运行场景必须保留最大点数和最大日志行数限制；热路径中减少临时对象、重复排序和整表重算，避免长时间串口输出导致 Webview 卡顿。
+- Webview UI 使用 VS Code 主题变量和本地打包资源。保持严格 CSP，不加载远程脚本，不执行用户脚本；样式应兼容浅色/深色主题并避免固定品牌色主导界面。
+- 测试覆盖风险路径。修改 parser、串口读取、缓冲、批处理或图表数据变换时优先补充 Vitest 单元测试；涉及扩展激活、命令注册或 Webview panel 生命周期时补充 VS Code 集成测试。
+
 ## 常用命令
 
 ```sh
