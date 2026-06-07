@@ -27,18 +27,6 @@ function formatOutputs(profile: ProfileConfig): string {
   return profile.outputs.map((output) => `${output.kind}:${output.id}`).join(", ");
 }
 
-function handleProfileMenuFocusOut(event: FocusEvent, store: ProfileEditorStore): void {
-  const relatedTarget = event.relatedTarget;
-
-  if (relatedTarget instanceof Node && event.currentTarget instanceof Node) {
-    if (event.currentTarget.contains(relatedTarget)) {
-      return;
-    }
-  }
-
-  store.closeProfileMenu();
-}
-
 function handleProfileContextMenu(
   event: MouseEvent,
   store: ProfileEditorStore,
@@ -74,7 +62,7 @@ async function focusOpenProfileMenu(): Promise<void> {
           <strong>{{ profile.name }}</strong>
           <span>{{ formatProfileLocation(profile) }}</span>
         </button>
-        <div class="profile-list-menu-root" @focusout="handleProfileMenuFocusOut($event, store)">
+        <div class="profile-list-menu-root">
           <button
             class="profile-menu-trigger"
             type="button"

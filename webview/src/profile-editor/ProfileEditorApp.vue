@@ -26,6 +26,16 @@ function handlePointerDown(event: PointerEvent): void {
   props.store.closeProfileMenu();
 }
 
+function handleFocusIn(event: FocusEvent): void {
+  const target = event.target;
+
+  if (target instanceof Element && target.closest(".profile-list-menu-root") !== null) {
+    return;
+  }
+
+  props.store.closeProfileMenu();
+}
+
 function handleKeyDown(event: KeyboardEvent): void {
   if (event.key === "Escape") {
     props.store.closeProfileMenu();
@@ -35,6 +45,7 @@ function handleKeyDown(event: KeyboardEvent): void {
 onMounted(() => {
   window.addEventListener("message", handleHostMessage);
   document.addEventListener("pointerdown", handlePointerDown, { capture: true });
+  document.addEventListener("focusin", handleFocusIn, { capture: true });
   document.addEventListener("keydown", handleKeyDown);
   props.store.requestProfileEditorState();
 });
@@ -42,6 +53,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   window.removeEventListener("message", handleHostMessage);
   document.removeEventListener("pointerdown", handlePointerDown, { capture: true });
+  document.removeEventListener("focusin", handleFocusIn, { capture: true });
   document.removeEventListener("keydown", handleKeyDown);
   props.store.dispose();
 });

@@ -114,7 +114,7 @@ describe("ProfileConfigViewProvider", () => {
     );
   });
 
-  test("reports copy errors for missing profile keys", async () => {
+  test("shows native warnings for missing profile keys", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-invalid-"));
     const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Invalid");
     const { provider, webviewView, dispatch } = createProvider({
@@ -137,11 +137,46 @@ describe("ProfileConfigViewProvider", () => {
     });
     await waitForAsyncWork();
 
-    expect(webviewView.webview.postMessage).toHaveBeenCalledWith(
-      expect.objectContaining({
-        type: "error",
-        message: 'Profile "builtin:missing" was not found.',
-      }),
+    expect(__vscodeMock.showWarningMessage).toHaveBeenCalledWith(
+      'Profile "builtin:missing" was not found.',
+    );
+    expect(webviewView.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
+    );
+  });
+
+  test("shows native warnings when copied profile ids already exist", async () => {
+    const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-view-duplicate-"));
+    const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "workspace");
+    const profilesDirectory = workspaceDirectory.profilesDirectory;
+    await mkdir(profilesDirectory, { recursive: true });
+    await writeFile(
+      path.join(profilesDirectory, "default.jsonc"),
+      `${JSON.stringify(defaultProfile, null, 2)}\n`,
+      "utf8",
+    );
+    const { provider, webviewView, dispatch } = createProvider({
+      workspaceProfilesDirectories: [workspaceDirectory],
+    });
+    __vscodeMock.showQuickPick.mockResolvedValue({
+      label: "Workspace: workspace",
+      scope: "workspace",
+      workspaceFolderUri: workspaceDirectory.folderUri,
+      workspaceName: workspaceDirectory.folderName,
+    });
+    __vscodeMock.showInputBox.mockResolvedValue("default");
+
+    provider.resolveWebviewView(webviewView);
+    await waitForAsyncWork();
+    webviewView.webview.postMessage.mockClear();
+    dispatch({ type: "copyProfileByKey", profileKey: "builtin:default" });
+    await waitForAsyncWork();
+
+    expect(__vscodeMock.showWarningMessage).toHaveBeenCalledWith(
+      'Profile "default" already exists in Workspace: workspace.',
+    );
+    expect(webviewView.webview.postMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "error" }),
     );
   });
 

@@ -131,7 +131,7 @@ describe("ProfileEditorApp", () => {
     expect(wrapper.find(".profile-list-menu").exists()).toBe(false);
   });
 
-  test("profile action menu closes when focus leaves the menu root", async () => {
+  test("profile action menu closes when focus moves outside the menu root", async () => {
     const { wrapper } = mountProfileEditor();
     dispatchEditorState(createEditorState({ selectedProfile: defaultProfile }));
     await nextTick();
@@ -139,9 +139,8 @@ describe("ProfileEditorApp", () => {
     await wrapper.find(".profile-menu-trigger").trigger("click");
     expect(wrapper.find(".profile-list-menu").exists()).toBe(true);
 
-    await wrapper
-      .find(".profile-list-menu-root")
-      .trigger("focusout", { relatedTarget: document.body });
+    wrapper.find<HTMLButtonElement>(".profile-list-main").element.focus();
+    await nextTick();
 
     expect(wrapper.find(".profile-list-menu").exists()).toBe(false);
   });

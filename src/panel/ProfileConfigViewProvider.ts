@@ -103,7 +103,7 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
         await this.openProfileJson(message.profileKey);
       }
     } catch (error) {
-      this.postMessage({ type: "error", message: formatError(error) });
+      await vscode.window.showWarningMessage(formatError(error));
     }
   }
 
