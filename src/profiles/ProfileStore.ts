@@ -18,6 +18,8 @@ import {
   type SerialDefaultsConfig,
 } from "../shared/protocol";
 
+export const profileSchemaUri = "vscode://schemas/live-serial-plotter/profile";
+
 export interface LoadedProfile {
   summary: ProfileSummary;
   config: ProfileConfig;
@@ -175,7 +177,7 @@ export class ProfileStore {
       throw new Error(`Profile "${request.profileId}" already exists in ${request.target.label}.`);
     }
 
-    await writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+    await writeProfileFile(filePath, config);
     const source = {
       ...createProfileSource(
         createProfileRef(config.id, request.target.scope, request.target.workspaceFolderUri),
@@ -205,7 +207,7 @@ export class ProfileStore {
       },
       request.source.filePath,
     );
-    await writeFile(request.source.filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
+    await writeProfileFile(request.source.filePath, config);
 
     return {
       config,
@@ -544,6 +546,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+async function writeProfileFile(filePath: string, config: ProfileConfig): Promise<void> {
+  await writeFile(filePath, `${JSON.stringify(withProfileSchema(config), null, 2)}\n`, "utf8");
+}
+
+function withProfileSchema(config: ProfileConfig): { $schema: string } & ProfileConfig {
+  return {
+    $schema: profileSchemaUri,
+    ...config,
+  };
 }
 
 function sanitizeProfileId(profileId: string): string {

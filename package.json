@@ -122,7 +122,13 @@
           "group": "navigation@2"
         }
       ]
-    }
+    },
+    "jsonValidation": [
+      {
+        "fileMatch": "**/.live-serial-plotter/profiles/*.jsonc",
+        "url": "./schemas/profile.schema.json"
+      }
+    ]
   },
   "icon": "assets/icon.png",
   "galleryBanner": {

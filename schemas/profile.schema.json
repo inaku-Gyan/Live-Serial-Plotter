@@ -1,0 +1,628 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "vscode://schemas/live-serial-plotter/profile",
+  "title": "Live Serial Plotter Profile",
+  "description": "Schema for Live Serial Plotter profile JSONC files.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name", "codec", "framing", "parser", "outputs"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "enum": ["vscode://schemas/live-serial-plotter/profile"],
+      "description": "VS Code JSON Schema association for Live Serial Plotter profiles."
+    },
+    "schemaVersion": {
+      "type": "integer",
+      "const": 2,
+      "description": "Profile schema version. Version 2 is the only supported profile format."
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Profile id. It must be unique within its user or workspace namespace."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable profile name shown in the profile picker and sidebar."
+    },
+    "serialDefaults": {
+      "$ref": "#/definitions/serialDefaults"
+    },
+    "codec": {
+      "$ref": "#/definitions/codec"
+    },
+    "framing": {
+      "$ref": "#/definitions/framing"
+    },
+    "parser": {
+      "$ref": "#/definitions/parser"
+    },
+    "outputs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/output"
+      }
+    },
+    "export": {
+      "$ref": "#/definitions/export"
+    }
+  },
+  "definitions": {
+    "serialDefaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "baudRate": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Default serial baud rate suggested when this profile is selected."
+        }
+      }
+    },
+    "codec": {
+      "type": "object",
+      "required": ["kind", "encoding"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "text"
+        },
+        "encoding": {
+          "type": "string",
+          "const": "utf8"
+        },
+        "sendLineEnding": {
+          "$ref": "#/definitions/lineEnding"
+        }
+      }
+    },
+    "framing": {
+      "type": "object",
+      "required": ["kind", "delimiter"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "line"
+        },
+        "delimiter": {
+          "type": "string",
+          "enum": ["auto", "lf", "crlf", "cr"]
+        },
+        "trim": {
+          "type": "boolean"
+        },
+        "maxFrameBytes": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "parser": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/builtinParser"
+        },
+        {
+          "$ref": "#/definitions/scriptParser"
+        }
+      ]
+    },
+    "builtinParser": {
+      "type": "object",
+      "required": ["kind", "mode"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "builtin"
+        },
+        "mode": {
+          "type": "string",
+          "enum": ["auto", "raw", "csv", "jsonl", "keyValue"]
+        },
+        "options": {
+          "$ref": "#/definitions/jsonObject"
+        }
+      }
+    },
+    "scriptParser": {
+      "type": "object",
+      "required": ["kind", "path"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "script"
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Workspace-relative parser path under .live-serial-plotter/parsers."
+        },
+        "options": {
+          "$ref": "#/definitions/jsonObject"
+        }
+      }
+    },
+    "output": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/terminalAppendOutput"
+        },
+        {
+          "$ref": "#/definitions/terminalFrameOutput"
+        },
+        {
+          "$ref": "#/definitions/timeSeriesLineOutput"
+        },
+        {
+          "$ref": "#/definitions/framePlot2dOutput"
+        }
+      ]
+    },
+    "outputBaseProperties": {
+      "id": {
+        "type": "string",
+        "minLength": 1
+      },
+      "title": {
+        "type": "string"
+      }
+    },
+    "terminalAppendOutput": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/outputBaseProperties/id"
+        },
+        "title": {
+          "$ref": "#/definitions/outputBaseProperties/title"
+        },
+        "kind": {
+          "type": "string",
+          "const": "terminalAppend"
+        },
+        "source": {
+          "type": "string",
+          "enum": ["raw", "template"]
+        },
+        "template": {
+          "type": "string"
+        },
+        "maxLines": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "autoScroll": {
+          "type": "boolean"
+        },
+        "style": {
+          "$ref": "#/definitions/terminalStyle"
+        }
+      }
+    },
+    "terminalFrameOutput": {
+      "type": "object",
+      "required": ["id", "kind", "template"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/outputBaseProperties/id"
+        },
+        "title": {
+          "$ref": "#/definitions/outputBaseProperties/title"
+        },
+        "kind": {
+          "type": "string",
+          "const": "terminalFrame"
+        },
+        "template": {
+          "type": "string"
+        },
+        "frameId": {
+          "$ref": "#/definitions/fieldReference"
+        },
+        "style": {
+          "$ref": "#/definitions/terminalStyle"
+        }
+      }
+    },
+    "timeSeriesLineOutput": {
+      "type": "object",
+      "required": ["id", "kind", "time", "series"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/outputBaseProperties/id"
+        },
+        "title": {
+          "$ref": "#/definitions/outputBaseProperties/title"
+        },
+        "kind": {
+          "type": "string",
+          "const": "timeSeriesLine"
+        },
+        "time": {
+          "$ref": "#/definitions/timeAxis"
+        },
+        "series": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/timeSeries"
+          }
+        },
+        "window": {
+          "$ref": "#/definitions/timeSeriesWindow"
+        },
+        "style": {
+          "$ref": "#/definitions/timeSeriesStyle"
+        }
+      }
+    },
+    "framePlot2dOutput": {
+      "type": "object",
+      "required": ["id", "kind", "points"],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/outputBaseProperties/id"
+        },
+        "title": {
+          "$ref": "#/definitions/outputBaseProperties/title"
+        },
+        "kind": {
+          "type": "string",
+          "const": "framePlot2d"
+        },
+        "frameId": {
+          "$ref": "#/definitions/fieldReference"
+        },
+        "bounds": {
+          "$ref": "#/definitions/plotBounds"
+        },
+        "points": {
+          "$ref": "#/definitions/plotPoints"
+        },
+        "styles": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/plot2dPointStyle"
+          }
+        }
+      }
+    },
+    "terminalStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "font": {
+          "type": "string",
+          "enum": ["editor", "ui"]
+        },
+        "wrap": {
+          "type": "boolean"
+        },
+        "levels": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "info": {
+              "$ref": "#/definitions/terminalLineStyle"
+            },
+            "warn": {
+              "$ref": "#/definitions/terminalLineStyle"
+            },
+            "error": {
+              "$ref": "#/definitions/terminalLineStyle"
+            },
+            "debug": {
+              "$ref": "#/definitions/terminalLineStyle"
+            }
+          }
+        }
+      }
+    },
+    "terminalLineStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string"
+        }
+      }
+    },
+    "timeAxis": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["source"],
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "hostReceived"
+            },
+            "unit": {
+              "type": "string",
+              "enum": ["s", "ms"]
+            },
+            "zero": {
+              "$ref": "#/definitions/timeZero"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["source", "field", "unit"],
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "field"
+            },
+            "field": {
+              "type": "string",
+              "minLength": 1
+            },
+            "unit": {
+              "type": "string",
+              "enum": ["s", "ms", "us"]
+            },
+            "zero": {
+              "$ref": "#/definitions/timeZero"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["source", "intervalMs"],
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "fixedInterval"
+            },
+            "intervalMs": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["source"],
+          "additionalProperties": false,
+          "properties": {
+            "source": {
+              "type": "string",
+              "const": "sequence"
+            }
+          }
+        }
+      ]
+    },
+    "timeSeries": {
+      "type": "object",
+      "required": ["field"],
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": "string"
+        },
+        "unit": {
+          "type": "string"
+        },
+        "scale": {
+          "type": "number"
+        },
+        "color": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "line": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "dash": {
+              "type": "string",
+              "enum": ["solid", "dash"]
+            }
+          }
+        },
+        "format": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "decimals": {
+              "type": "number",
+              "minimum": 0
+            }
+          }
+        }
+      }
+    },
+    "timeSeriesWindow": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["mode"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "points"
+            },
+            "maxPoints": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["mode"],
+          "additionalProperties": false,
+          "properties": {
+            "mode": {
+              "type": "string",
+              "const": "duration"
+            },
+            "seconds": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          }
+        }
+      ]
+    },
+    "timeSeriesStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "showLegend": {
+          "type": "boolean"
+        }
+      }
+    },
+    "fieldReference": {
+      "type": "object",
+      "required": ["source", "field"],
+      "additionalProperties": false,
+      "properties": {
+        "source": {
+          "type": "string",
+          "const": "field"
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "plotBounds": {
+      "type": "object",
+      "required": ["xMin", "xMax", "yMin", "yMax"],
+      "additionalProperties": false,
+      "properties": {
+        "xMin": {
+          "type": "number"
+        },
+        "xMax": {
+          "type": "number"
+        },
+        "yMin": {
+          "type": "number"
+        },
+        "yMax": {
+          "type": "number"
+        }
+      }
+    },
+    "plotPoints": {
+      "type": "object",
+      "required": ["field", "x", "y"],
+      "additionalProperties": false,
+      "properties": {
+        "field": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x": {
+          "type": "string",
+          "minLength": 1
+        },
+        "y": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "plot2dPointStyle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "color": {
+          "type": "string"
+        },
+        "size": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "export": {
+      "type": "object",
+      "required": ["mode", "format"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": ["raw", "parsed", "packets"]
+        },
+        "format": {
+          "type": "string",
+          "enum": ["txt", "csv", "jsonl"]
+        },
+        "includeMetadata": {
+          "type": "boolean"
+        }
+      }
+    },
+    "lineEnding": {
+      "type": "string",
+      "enum": ["none", "lf", "crlf", "cr"]
+    },
+    "timeZero": {
+      "type": "string",
+      "enum": ["none", "first"]
+    },
+    "jsonObject": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/definitions/jsonValue"
+      }
+    },
+    "jsonValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/jsonValue"
+          }
+        },
+        {
+          "$ref": "#/definitions/jsonObject"
+        }
+      ]
+    }
+  }
+}

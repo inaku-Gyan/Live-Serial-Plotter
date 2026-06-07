@@ -2,10 +2,13 @@ import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { describe, expect, test } from "vitest";
+import packageJson from "../../package.json";
 import { builtinProfiles, defaultProfile } from "../../src/profiles/defaultProfile";
 import {
   createProfileKey,
   getWorkspaceProfilesDirectory,
+  normalizeProfileConfig,
+  profileSchemaUri,
   ProfileStore,
   type WorkspaceProfilesDirectory,
 } from "../../src/profiles/ProfileStore";
@@ -20,6 +23,7 @@ describe("ProfileStore", () => {
       path.join(profilesDirectory, "sensor.jsonc"),
       `{
         // JSONC comments are supported.
+        "$schema": "${profileSchemaUri}",
         "schemaVersion": 2,
         "id": "sensor",
         "name": "Sensor",
@@ -87,6 +91,22 @@ describe("ProfileStore", () => {
     });
     expect(loaded.activeProfile.serialDefaults?.baudRate).toBe(9600);
     expect(loaded.activeProfile.codec.sendLineEnding).toBe("lf");
+  });
+
+  test("normalizes profiles with a JSON schema association", () => {
+    const normalized = normalizeProfileConfig({
+      $schema: profileSchemaUri,
+      ...defaultProfile,
+      id: "schema-profile",
+      name: "Schema Profile",
+    });
+
+    expect(normalized).toEqual({
+      ...defaultProfile,
+      id: "schema-profile",
+      name: "Schema Profile",
+    });
+    expect("$schema" in normalized).toBe(false);
   });
 
   test("collects invalid profile errors without dropping builtin profile", async () => {
@@ -241,6 +261,9 @@ describe("ProfileStore", () => {
       workspaceName: undefined,
     });
 
+    const savedText = await readFile(path.join(userProfilesDirectory, "saved-user.jsonc"), "utf8");
+    expect(savedText.startsWith(`{\n  "$schema": "${profileSchemaUri}",\n`)).toBe(true);
+
     const loaded = await store.loadProfiles("user:saved-user");
     expect(loaded.activeProfile.id).toBe("saved-user");
     expect(loaded.activeProfile.export).toEqual({
@@ -280,6 +303,7 @@ describe("ProfileStore", () => {
       path.join(profilesDirectory, "workspace-profile.jsonc"),
       "utf8",
     );
+    expect(savedText.startsWith(`{\n  "$schema": "${profileSchemaUri}",\n`)).toBe(true);
     expect(savedText).toContain('"id": "workspace-profile"');
     expect(savedText).not.toContain('"connection"');
     expect(savedText).not.toContain('"encoding": "utf8",\n    "delimiter"');
@@ -317,6 +341,27 @@ describe("ProfileStore", () => {
   });
 });
 
+describe("profile JSON schema contribution", () => {
+  test("registers profile JSONC validation in the extension manifest", () => {
+    expect(packageJson.contributes.jsonValidation).toEqual([
+      {
+        fileMatch: "**/.live-serial-plotter/profiles/*.jsonc",
+        url: "./schemas/profile.schema.json",
+      },
+    ]);
+  });
+
+  test("ships a schema with the expected id", async () => {
+    const schemaText = await readFile(
+      path.join(import.meta.dirname, "../../schemas/profile.schema.json"),
+      "utf8",
+    );
+    const schema: unknown = JSON.parse(schemaText);
+
+    expect(isRecord(schema) ? schema.$id : undefined).toBe(profileSchemaUri);
+  });
+});
+
 function createWorkspaceDirectory(
   workspaceRoot: string,
   folderName: string,
@@ -334,4 +379,8 @@ async function writeProfile(directory: string, id: string, name: string): Promis
     `${JSON.stringify({ ...defaultProfile, id, name }, null, 2)}\n`,
     "utf8",
   );
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
