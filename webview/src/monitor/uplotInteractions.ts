@@ -38,6 +38,7 @@ interface WheelPanBinding extends WheelBinding {
 interface WheelZoomBinding extends WheelBinding {
   deltaAxis: "x" | "y";
   factor: number;
+  referenceDelta: number;
 }
 
 interface PointerInteractionConfig {
@@ -131,10 +132,11 @@ export const defaultTimeSeriesInteractionConfig: TimeSeriesInteractionConfig = {
     ],
     zoomX: {
       deltaAxis: "y",
-      factor: 0.85,
+      factor: 0.92,
       modifiers: {
         ctrlKey: true,
       },
+      referenceDelta: 100,
     },
   },
   pointer: {
@@ -251,10 +253,11 @@ function installGestureHandlers(
     const anchorRatio = left / rect.width;
     const anchorValue = targetPlot.posToVal(left, "x");
     const currentRange = xScale.max - xScale.min;
-    const nextRange =
-      zoomDelta < 0
-        ? currentRange * wheelConfig.zoomX.factor
-        : currentRange / wheelConfig.zoomX.factor;
+    const zoomRatio = Math.pow(
+      wheelConfig.zoomX.factor,
+      Math.abs(zoomDelta) / wheelConfig.zoomX.referenceDelta,
+    );
+    const nextRange = zoomDelta < 0 ? currentRange * zoomRatio : currentRange / zoomRatio;
 
     return setXRangeAroundAnchor(
       targetPlot,

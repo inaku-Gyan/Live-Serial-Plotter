@@ -48,11 +48,13 @@
 - 用户用鼠标拖拽放大 time-series 图表区域后，缩放视图应保持，不应被下一次数据刷新立刻回弹到默认滚动窗口。
 - time-series 图表交互入口应优先实现为 uPlot plugin/hooks：包括手动 scale 变更检测、鼠标滚轮缩放、拖拽平移、触摸平移/捏合缩放和双击重置视图。
 - time-series 图表交互绑定应集中在统一配置中；普通左键保持 uPlot 默认框选缩放，普通滚轮上下平移，`Shift + 滚轮` 左右平移，`Ctrl + 滚轮` 缩放；触控板双指滚动沿 `deltaX/deltaY` 平移，触控板捏合按 `Ctrl + wheel` 缩放处理。
+- time-series wheel/触控板缩放应按 wheel delta 连续计算，避免触控板小步高频事件导致缩放过于敏感。
 - 普通左键框选缩放应设置最小拖拽距离死区，避免点击或极小拖拽误触发缩放。
 - time-series 十字准线可保留 hover marker，但 marker 只应在鼠标接近某条可见曲线时显示；鼠标离开曲线或图表时不应把最近点残留在曲线上。
 - 默认状态仍自动滚动追踪最新数据；一旦用户手动缩放，应暂停自动追踪，直到图表结构重建、清空或切换 profile。
-- time-series 面板应提供恢复追踪操作，将 X 轴切回当前滚动窗口并重新启用 auto-follow；该操作不清空数据、不重置 legend 可见性。
+- time-series 面板应提供恢复追踪操作，将当前 X 轴跨度平移到最新点并重新启用 auto-follow；该操作不清空数据、不重置 legend 可见性、不改变纵轴范围。
 - `window.mode: "points"` 保留并显示最新 `maxPoints` 个采样点。
+- `window.mode: "points"` 的默认可视 X 轴窗口应有合理上限，避免 profile 配置较大的 `maxPoints` 导致初始视图过度压缩；数据保留上限仍按 `maxPoints` 执行。
 - `window.mode: "duration"` 按最新样本时间显示最近 `seconds` 秒。
 - 横轴应显示坐标和单位；非 sequence 时间轴当前按秒绘制，显示为 `Time (s)`。
 - 图表缩小时仍应显示坐标轴数字；坐标轴刻度密度应随图表尺寸动态调整，而不是直接隐藏全部数字。

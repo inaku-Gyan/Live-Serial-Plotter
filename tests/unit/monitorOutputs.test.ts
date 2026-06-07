@@ -396,6 +396,31 @@ describe("MonitorOutputController", () => {
     expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: -2, max: 1 });
   });
 
+  test("caps the default visible x range while retaining the configured point buffer", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 1_000 },
+      },
+    ]);
+
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+      ],
+    });
+
+    const plot = latestPlot();
+    expect(plot.data[0]).toEqual([0, 1]);
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: -298, max: 1 });
+  });
+
   test("keeps a rolling duration window and tracks the latest x range", () => {
     const { controller } = createController();
     controller.renderOutputs([
@@ -508,7 +533,8 @@ describe("MonitorOutputController", () => {
 
     rpmCheckbox.checked = true;
     rpmCheckbox.dispatchEvent(new Event("change"));
-    plot.options.hooks?.setScale?.[0]?.(plot, "x");
+    plot.scales.y1 = { min: 10, max: 30 };
+    plot.setScale("x", { min: 1.5, max: 2 });
     controller.appendPacket({
       kind: "timeSeriesAppend",
       outputId: "plot",
@@ -533,7 +559,8 @@ describe("MonitorOutputController", () => {
       [2, 3, 4],
     ]);
     expect(rpmCheckbox.checked).toBe(true);
-    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 1, max: 3 });
+    expect(plot.scales.y1).toEqual({ min: 10, max: 30 });
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 2.5, max: 3 });
 
     controller.appendPacket({
       kind: "timeSeriesAppend",
@@ -549,9 +576,10 @@ describe("MonitorOutputController", () => {
         [22, 23, 24],
         [3, 4, 5],
       ],
-      true,
+      false,
     );
-    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 2, max: 4 });
+    expect(plot.scales.y1).toEqual({ min: 10, max: 30 });
+    expect(plot.setScale).toHaveBeenLastCalledWith("x", { min: 3.5, max: 4 });
   });
 
   test("zooms the x range with ctrl wheel through the uPlot interaction config", () => {
@@ -588,8 +616,8 @@ describe("MonitorOutputController", () => {
 
     const zoomCall = plot.setScale.mock.calls.at(-1);
     expect(zoomCall?.[0]).toBe("x");
-    expect(zoomCall?.[1].min).toBeCloseTo(0.15);
-    expect(zoomCall?.[1].max).toBeCloseTo(1.85);
+    expect(zoomCall?.[1].min).toBeCloseTo(0.08);
+    expect(zoomCall?.[1].max).toBeCloseTo(1.92);
 
     controller.appendPacket({
       kind: "timeSeriesAppend",

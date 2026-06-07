@@ -44,6 +44,7 @@ interface OutputView {
 
 const defaultMaxRawLines = 500;
 const defaultMaxPlotPoints = 3000;
+const defaultVisiblePlotPoints = 300;
 const defaultDurationSeconds = 30;
 const defaultValueUnit = "Value";
 const uPlotPathCacheKey = "_paths";
@@ -376,6 +377,7 @@ class TimeSeriesLineView implements OutputView {
   private readonly resizeObserver: ResizeObserver | undefined;
   private isAutoFollowEnabled = true;
   private isApplyingScaleUpdate = false;
+  private shouldPreserveScaleWhileFollowing = false;
   private viewLayout: TimeSeriesViewLayoutConfig | undefined;
   private plot: uPlot | undefined;
 
@@ -460,6 +462,7 @@ class TimeSeriesLineView implements OutputView {
 
   clear(): void {
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();
+    this.shouldPreserveScaleWhileFollowing = false;
     this.timeValues.length = 0;
     this.seriesData.clear();
     this.seriesVisibility.clear();
@@ -476,6 +479,7 @@ class TimeSeriesLineView implements OutputView {
   applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
     this.viewLayout = layout?.kind === "timeSeriesLine" ? layout : undefined;
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();
+    this.shouldPreserveScaleWhileFollowing = false;
   }
 
   resetView(): void {
@@ -491,7 +495,8 @@ class TimeSeriesLineView implements OutputView {
 
   resumeAutoFollow(): void {
     this.isAutoFollowEnabled = true;
-    this.applyAutoFollowRange();
+    this.shouldPreserveScaleWhileFollowing = true;
+    this.applyAutoFollowRange(true);
   }
 
   captureViewLayout(): OutputLayoutConfig["view"] {
@@ -512,6 +517,7 @@ class TimeSeriesLineView implements OutputView {
 
   private rebuildPlot(): void {
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();
+    this.shouldPreserveScaleWhileFollowing = false;
     this.plot?.destroy();
 
     const channelNames = [...this.seriesData.keys()];
@@ -595,9 +601,12 @@ class TimeSeriesLineView implements OutputView {
     this.isApplyingScaleUpdate = true;
     try {
       invalidatePlotPaths(this.plot);
-      this.plot.setData(this.getPlotData(), this.isAutoFollowEnabled);
+      this.plot.setData(
+        this.getPlotData(),
+        this.isAutoFollowEnabled && !this.shouldPreserveScaleWhileFollowing,
+      );
 
-      const xWindowRange = this.getXWindowRange();
+      const xWindowRange = this.getAutoFollowRange(this.shouldPreserveScaleWhileFollowing);
 
       if (this.isAutoFollowEnabled && hasScaleRange(xWindowRange)) {
         this.setPlotScale("x", xWindowRange);
@@ -699,7 +708,8 @@ class TimeSeriesLineView implements OutputView {
     }
 
     const max = latestTime;
-    const min = latestTime - this.getPointWindowSpan(windowConfig.maxPoints);
+    const visiblePointCount = Math.min(windowConfig.maxPoints, defaultVisiblePlotPoints);
+    const min = latestTime - this.getPointWindowSpan(visiblePointCount);
 
     if (min === max) {
       return {
@@ -892,16 +902,52 @@ class TimeSeriesLineView implements OutputView {
     }
 
     if (this.isAutoFollowEnabled) {
-      this.applyAutoFollowRange();
+      this.applyAutoFollowRange(false);
     }
   }
 
-  private applyAutoFollowRange(): void {
-    const range = this.getXWindowRange();
+  private applyAutoFollowRange(preserveCurrentSpan: boolean): void {
+    const range = this.getAutoFollowRange(preserveCurrentSpan);
 
     if (this.plot !== undefined && hasScaleRange(range)) {
       this.setPlotScale("x", range);
     }
+  }
+
+  private getAutoFollowRange(preserveCurrentSpan: boolean): { min?: number; max?: number } {
+    if (preserveCurrentSpan) {
+      const range = this.getPreservedXWindowRange();
+
+      if (hasScaleRange(range)) {
+        return range;
+      }
+    }
+
+    return this.getXWindowRange();
+  }
+
+  private getPreservedXWindowRange(): { min?: number; max?: number } {
+    const latestTime = this.timeValues.at(-1);
+    const xScale = this.plot?.scales.x;
+    const currentMin = xScale?.min;
+    const currentMax = xScale?.max;
+
+    if (
+      latestTime === undefined ||
+      typeof currentMin !== "number" ||
+      typeof currentMax !== "number" ||
+      !Number.isFinite(currentMin) ||
+      !Number.isFinite(currentMax) ||
+      currentMax <= currentMin
+    ) {
+      return {};
+    }
+
+    const span = currentMax - currentMin;
+    return {
+      min: latestTime - span,
+      max: latestTime,
+    };
   }
 
   private setPlotScale(scaleKey: string, range: { min: number; max: number }): void {
