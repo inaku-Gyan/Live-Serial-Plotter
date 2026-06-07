@@ -30,6 +30,7 @@
 - 用户显式 Save Layout 才覆盖当前 layout preset；Save As Layout 创建新 layout preset，并更新当前 profile 的 `layout.defaultPreset`。
 - 每个 output 面板应支持单独 Reset View；页面应支持 Reset Layout。reset 只恢复布局/视图状态，不清空实时数据。
 - 实时数据点、terminal 当前文本、canvas frame、hover/cursor、临时选区、toast 和串口连接状态永不写入 profile 或 layout。
+- monitor layout 控制条（当前 layout 名称、Reset Layout、Save Layout、Save As）应紧跟连接 toolbar 显示，使用内容高度，不应占用 workspace 的可伸缩空间。
 
 ### 监视器页面 Vue 外壳与高频渲染边界
 
