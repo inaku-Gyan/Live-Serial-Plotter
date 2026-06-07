@@ -28,10 +28,6 @@ const sourceLabel = computed(
     "builtin",
 );
 
-function scheduleAutoSave(): void {
-  props.store.scheduleAutoSave();
-}
-
 function terminalPatch(output: TerminalAppendOutputConfig): TerminalAppendOutputPatch {
   const patch = draft.value?.terminalAppendOutputs.find(
     (candidate) => candidate.originalId === output.id,
@@ -68,12 +64,10 @@ function addSeries(outputPatch: TimeSeriesOutputPatch): void {
     lineWidth: "",
     decimals: "",
   });
-  scheduleAutoSave();
 }
 
 function removeSeries(outputPatch: TimeSeriesOutputPatch, series: TimeSeriesPatch): void {
   outputPatch.series = outputPatch.series.filter((candidate) => candidate !== series);
-  scheduleAutoSave();
 }
 
 function outputTitle(output: OutputConfig): string {
@@ -101,7 +95,7 @@ function outputTitle(output: OutputConfig): string {
       </div>
     </header>
 
-    <form class="profile-editor-form" @input="scheduleAutoSave" @change="scheduleAutoSave">
+    <form class="profile-editor-form">
       <section class="profile-section">
         <h2>Identity</h2>
         <label class="profile-field">

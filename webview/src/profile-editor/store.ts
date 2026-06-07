@@ -1,4 +1,4 @@
-import { computed, reactive } from "vue";
+import { computed, reactive, watch, type WatchStopHandle } from "vue";
 import type {
   ProfileConfig,
   ProfileEditorState,
@@ -43,6 +43,8 @@ export function createProfileEditorStore(
   const persistedState = vscode.getState();
   const autosaveDelayMs = options.autosaveDelayMs ?? 350;
   let autoSaveTimer: ReturnType<typeof setTimeout> | undefined;
+  let isApplyingEditorState = false;
+  let stopDraftWatcher: WatchStopHandle | undefined;
 
   const state = reactive<ProfileEditorUiState>({
     editorState: undefined,
@@ -59,6 +61,18 @@ export function createProfileEditorStore(
   const isBuiltin = computed(() => state.selectedSource?.scope === "builtin");
   const isReady = computed(
     () => state.editorState !== undefined && state.selectedProfile !== undefined,
+  );
+
+  stopDraftWatcher = watch(
+    () => state.draft,
+    () => {
+      if (isApplyingEditorState) {
+        return;
+      }
+
+      scheduleAutoSave();
+    },
+    { deep: true, flush: "sync" },
   );
 
   function requestProfileEditorState(profileKey = state.selectedProfileKey): void {
@@ -137,10 +151,13 @@ export function createProfileEditorStore(
 
   function replaceDraft(draft: ProfileEditorPatch): void {
     state.draft = draft;
-    scheduleAutoSave();
   }
 
   function scheduleAutoSave(): void {
+    if (state.view !== "editor" || isBuiltin.value) {
+      return;
+    }
+
     if (autoSaveTimer !== undefined) {
       clearTimeout(autoSaveTimer);
     }
@@ -171,16 +188,24 @@ export function createProfileEditorStore(
       clearTimeout(autoSaveTimer);
       autoSaveTimer = undefined;
     }
+
+    stopDraftWatcher?.();
+    stopDraftWatcher = undefined;
   }
 
   function applyEditorState(editorState: ProfileEditorState): void {
-    state.editorState = editorState;
-    state.selectedProfile = cloneProfile(editorState.selectedProfile);
-    state.selectedProfileKey = editorState.selectedProfileKey;
-    state.selectedSource = editorState.selectedSource;
-    state.draft = createProfileEditorPatch(editorState.selectedProfile);
-    state.statusText = editorState.errors.join("\n");
-    persistState();
+    isApplyingEditorState = true;
+    try {
+      state.editorState = editorState;
+      state.selectedProfile = cloneProfile(editorState.selectedProfile);
+      state.selectedProfileKey = editorState.selectedProfileKey;
+      state.selectedSource = editorState.selectedSource;
+      state.draft = createProfileEditorPatch(editorState.selectedProfile);
+      state.statusText = editorState.errors.join("\n");
+      persistState();
+    } finally {
+      isApplyingEditorState = false;
+    }
   }
 
   function setStatusText(text: string): void {

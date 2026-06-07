@@ -66,7 +66,7 @@ describe("profileEditorStore", () => {
     expect(vscode.messages).toContainEqual({ type: "setProfileEditorView", view: "editor" });
   });
 
-  test("autosaves editable profiles after debounce", () => {
+  test("autosaves editable draft changes after debounce", () => {
     vi.useFakeTimers();
     const vscode = createVscodeApi();
     const store = createProfileEditorStore(vscode.api);
@@ -77,9 +77,9 @@ describe("profileEditorStore", () => {
         profile: { ...defaultProfile, id: "editable", name: "Editable" },
       }),
     });
+    store.openEditor();
 
     store.state.draft!.name = "Edited";
-    store.scheduleAutoSave();
     vi.advanceTimersByTime(350);
 
     expect(vscode.messages).toContainEqual({
@@ -99,15 +99,34 @@ describe("profileEditorStore", () => {
         profile: { ...defaultProfile, id: "editable", name: "Editable" },
       }),
     });
+    store.openEditor();
 
     store.state.draft!.builtinParser!.optionsJson = "{";
-    store.scheduleAutoSave();
     vi.advanceTimersByTime(350);
 
     expect(vscode.messages).not.toContainEqual(
       expect.objectContaining({ type: "autoSaveProfile" }),
     );
     expect(store.state.statusText).toContain("Expected");
+  });
+
+  test("does not autosave host state refreshes", () => {
+    vi.useFakeTimers();
+    const vscode = createVscodeApi({ view: "editor" });
+    const store = createProfileEditorStore(vscode.api);
+
+    store.handleHostMessage({
+      type: "profileEditorState",
+      state: createEditorState({
+        sourceScope: "workspace",
+        profile: { ...defaultProfile, id: "editable", name: "Editable" },
+      }),
+    });
+    vi.advanceTimersByTime(350);
+
+    expect(vscode.messages).not.toContainEqual(
+      expect.objectContaining({ type: "autoSaveProfile" }),
+    );
   });
 });
 
