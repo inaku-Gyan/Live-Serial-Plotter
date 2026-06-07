@@ -6,6 +6,7 @@
     "suspicious": "error",
   },
   "options": {
+    "typeAware": true,
     "reportUnusedDisableDirectives": "warn",
   },
   "env": {
