@@ -13,15 +13,19 @@ serial bytes -> codec -> framing -> parser -> output mappers -> output sinks -> 
 ```txt
 .live-serial-plotter/
   profiles/*.jsonc
+  layouts/*.jsonc
   parsers/*.mjs
 ```
 
 用户全局 profile 会从 VS Code `globalStorageUri/profiles` 读取。内置 `default`
 profile 等价于当前默认行为：UTF-8 文本 codec、行分割、`auto` parser、raw terminal 和实时折线图。
+用户全局 layout 会从 VS Code `globalStorageUri/layouts` 读取。
 
-扩展会通过 VS Code `contributes.jsonValidation` 为工作区 `.live-serial-plotter/profiles/*.jsonc` 文件提供 JSON Schema 校验、补全和 hover 说明。
+扩展会通过 VS Code `contributes.jsonValidation` 为工作区 `.live-serial-plotter/profiles/*.jsonc` 和
+`.live-serial-plotter/layouts/*.jsonc` 文件提供 JSON Schema 校验、补全和 hover 说明。
 
-`schemas/profile.schema.json` 由 TypeScript 的 profile 类型生成。修改 `ProfileConfig`、parser、output 或相关配置类型后，运行
+`schemas/profile.schema.json` 和 `schemas/layout.schema.json` 由 TypeScript 类型生成。修改 `ProfileConfig`、`LayoutConfig`、parser、output
+或相关配置类型后，运行
 `pnpm schema:generate` 更新 schema；`pnpm schema:check` 会检查提交的 schema 是否已经同步。
 
 Profile id 只需要在自己的命名空间内唯一。命名空间包括：
@@ -33,8 +37,23 @@ Profile id 只需要在自己的命名空间内唯一。命名空间包括：
 因此 `workspace/default`、`user/default` 和 `builtin/default` 可以同时存在。下拉列表按 workspace、user、builtin
 排序；多 workspace 时按 VS Code workspace folder 顺序排序，并显示具体 workspace 名称。
 
-Profile 只描述协议、解析和输出。具体串口端口和当前波特率属于监控页面的运行时连接设置，不写入 profile。Profile 中的
-`serialDefaults.baudRate` 只作为默认值提示。
+Profile 只描述协议、解析、输出和默认 layout preset 引用。具体串口端口和当前波特率属于监控页面的运行时连接设置，不写入
+profile。Profile 中的 `serialDefaults.baudRate` 只作为默认值提示。
+
+## Layout Preset
+
+Monitor 页面排布由独立 layout preset 管理。Profile 通过 `layout.defaultPreset` 引用默认 layout；每次打开新 monitor
+窗口都会按该 preset 构建初始布局。
+
+layout preset 可配置：
+
+- 页面级设置：grid 列策略、density。
+- 输出面板设置：`order`、`columnSpan`、`minHeight`、`collapsed`、`maximized`。
+- 输出视图默认值：plot legend、auto-follow、显式保存后的 zoom、terminal auto-scroll、2D frame bounds。
+
+用户在 monitor 窗口中临时改变排布、legend、zoom 等状态时，只影响当前窗口。点击 `Save Layout` 才覆盖当前 layout preset；
+点击 `Save As` 会新建 layout preset，并把当前 profile 的 `layout.defaultPreset` 指向新 preset。Reset View / Reset Layout
+只恢复视图和排布，不清空实时数据。
 
 ## 侧边栏可视化配置
 
@@ -62,11 +81,14 @@ profile 后生效。
 
 ```jsonc
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "id": "sample-telemetry",
   "name": "Sample Telemetry",
   "serialDefaults": {
     "baudRate": 115200,
+  },
+  "layout": {
+    "defaultPreset": "builtin:default",
   },
   "codec": {
     "kind": "text",
