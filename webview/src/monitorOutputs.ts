@@ -1,15 +1,21 @@
 import uPlot from "uplot";
+import { defaultLayout } from "../../src/profiles/defaultLayout";
 import type {
   FramePlot2dOutputConfig,
   FramePlot2dPacket,
+  FramePlot2dViewLayoutConfig,
+  LayoutConfig,
+  OutputLayoutConfig,
   OutputConfig,
   OutputPacket,
   TerminalAppendOutputConfig,
   TerminalAppendPacket,
   TerminalFrameOutputConfig,
   TerminalFramePacket,
+  TerminalViewLayoutConfig,
   TimeSeriesLineOutputConfig,
   TimeSeriesSample,
+  TimeSeriesViewLayoutConfig,
   TimeSeriesWindowConfig,
   ToExtensionMessage,
 } from "../../src/shared/protocol";
@@ -25,6 +31,9 @@ interface OutputView {
   readonly outputId: string;
   readonly kind: OutputConfig["kind"];
   appendPacket(packet: OutputPacket): void;
+  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void;
+  resetView(): void;
+  captureViewLayout(): OutputLayoutConfig["view"] | undefined;
   clear(): void;
   dispose(): void;
 }
@@ -46,18 +55,21 @@ interface UnitGroup {
 
 export class MonitorOutputController {
   private readonly views = new Map<string, OutputView>();
+  private currentLayout: LayoutConfig | undefined;
   private readonly postMessage: PostMessage;
 
   constructor(private readonly options: MonitorOutputControllerOptions) {
     this.postMessage = options.postMessage;
   }
 
-  renderOutputs(outputs: readonly OutputConfig[]): void {
+  renderOutputs(outputs: readonly OutputConfig[], layout: LayoutConfig = defaultLayout): void {
     this.disposeViews();
+    this.currentLayout = layout;
+    this.applyPageLayout(layout);
     this.options.root.replaceChildren();
 
-    for (const output of outputs) {
-      const view = this.createOutputView(output);
+    for (const output of sortOutputsByLayout(outputs, layout)) {
+      const view = this.createOutputView(output, layout.outputs[output.id]);
       this.views.set(output.id, view);
     }
   }
@@ -88,30 +100,85 @@ export class MonitorOutputController {
     }
   }
 
+  resetOutputView(outputId: string): void {
+    this.views.get(outputId)?.resetView();
+  }
+
+  resetPageLayout(): void {
+    if (this.currentLayout === undefined) {
+      return;
+    }
+
+    this.applyPageLayout(this.currentLayout);
+
+    for (const view of this.views.values()) {
+      view.resetView();
+      const panel = this.options.root.querySelector<HTMLElement>(
+        `[data-output-id="${cssEscape(view.outputId)}"]`,
+      );
+      applyPanelLayout(panel, this.currentLayout.outputs[view.outputId]);
+    }
+  }
+
+  captureSavableViewState(): LayoutConfig {
+    const baseLayout = this.currentLayout;
+
+    if (baseLayout === undefined) {
+      return {
+        schemaVersion: 1,
+        id: "unsaved",
+        name: "Unsaved Layout",
+        page: { mode: "grid", columns: "auto", density: "normal" },
+        outputs: {},
+      };
+    }
+
+    const outputs: Record<string, OutputLayoutConfig> = {};
+
+    for (const [outputId, view] of this.views.entries()) {
+      outputs[outputId] = {
+        ...baseLayout.outputs[outputId],
+        view: view.captureViewLayout(),
+      };
+    }
+
+    return {
+      ...baseLayout,
+      outputs: {
+        ...baseLayout.outputs,
+        ...outputs,
+      },
+    };
+  }
+
   dispose(): void {
     this.disposeViews();
   }
 
-  private createOutputView(output: OutputConfig): OutputView {
+  private createOutputView(
+    output: OutputConfig,
+    layout: OutputLayoutConfig | undefined,
+  ): OutputView {
     const section = document.createElement("section");
     section.className = `output-panel output-panel-${output.kind}`;
     section.dataset.outputId = output.id;
     section.dataset.outputKind = output.kind;
+    applyPanelLayout(section, layout);
     this.options.root.append(section);
 
     if (output.kind === "terminalAppend") {
-      return new TerminalAppendView(section, output, this.postMessage);
+      return new TerminalAppendView(section, output, layout?.view, this.postMessage);
     }
 
     if (output.kind === "terminalFrame") {
-      return new TerminalFrameView(section, output);
+      return new TerminalFrameView(section, output, layout?.view);
     }
 
     if (output.kind === "timeSeriesLine") {
-      return new TimeSeriesLineView(section, output);
+      return new TimeSeriesLineView(section, output, layout?.view);
     }
 
-    return new FramePlot2dView(section, output);
+    return new FramePlot2dView(section, output, layout?.view);
   }
 
   private findFirstView(kind: OutputConfig["kind"]): OutputView | undefined {
@@ -125,6 +192,11 @@ export class MonitorOutputController {
 
     this.views.clear();
   }
+
+  private applyPageLayout(layout: LayoutConfig): void {
+    this.options.root.dataset.layoutColumns = layout.page.columns ?? "auto";
+    this.options.root.dataset.layoutDensity = layout.page.density ?? "normal";
+  }
 }
 
 class TerminalAppendView implements OutputView {
@@ -133,15 +205,18 @@ class TerminalAppendView implements OutputView {
 
   private readonly lines: string[] = [];
   private readonly pre: HTMLPreElement;
+  private viewLayout: TerminalViewLayoutConfig | undefined;
 
   constructor(
     parent: HTMLElement,
     private readonly config: TerminalAppendOutputConfig,
+    viewLayout: OutputLayoutConfig["view"] | undefined,
     private readonly postMessage: PostMessage,
   ) {
     this.outputId = config.id;
+    this.applyViewLayout(viewLayout);
 
-    const header = createPanelHeader(config, "Terminal");
+    const header = createPanelHeader(config, "Terminal", () => this.resetView());
     const clearButton = document.createElement("button");
     clearButton.className = "button button-secondary output-clear-button";
     clearButton.type = "button";
@@ -180,9 +255,24 @@ class TerminalAppendView implements OutputView {
     this.pre.classList.remove("output-standby");
     this.pre.textContent = this.lines.join("\n");
 
-    if (this.config.autoScroll !== false) {
+    if (this.getAutoScroll()) {
       this.pre.scrollTop = this.pre.scrollHeight;
     }
+  }
+
+  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
+    this.viewLayout = layout?.kind === "terminalAppend" ? layout : undefined;
+  }
+
+  resetView(): void {
+    this.applyViewLayout(undefined);
+  }
+
+  captureViewLayout(): OutputLayoutConfig["view"] {
+    return {
+      kind: "terminalAppend",
+      autoScroll: this.getAutoScroll(),
+    };
   }
 
   clear(): void {
@@ -192,6 +282,10 @@ class TerminalAppendView implements OutputView {
   }
 
   dispose(): void {}
+
+  private getAutoScroll(): boolean {
+    return this.viewLayout?.autoScroll ?? this.config.autoScroll !== false;
+  }
 }
 
 class TerminalFrameView implements OutputView {
@@ -200,14 +294,23 @@ class TerminalFrameView implements OutputView {
 
   private readonly frames = new Map<string | number, string>();
   private readonly pre: HTMLPreElement;
+  private viewLayout: TerminalViewLayoutConfig | undefined;
 
-  constructor(parent: HTMLElement, config: TerminalFrameOutputConfig) {
+  constructor(
+    parent: HTMLElement,
+    config: TerminalFrameOutputConfig,
+    viewLayout: OutputLayoutConfig["view"] | undefined,
+  ) {
     this.outputId = config.id;
+    this.applyViewLayout(viewLayout);
     this.pre = document.createElement("pre");
     this.pre.className = "output-terminal output-frame-terminal output-standby";
     this.pre.textContent = "Waiting for frame data";
 
-    parent.append(createPanelHeader(config, "Frame Terminal"), this.pre);
+    parent.append(
+      createPanelHeader(config, "Frame Terminal", () => this.resetView()),
+      this.pre,
+    );
   }
 
   appendPacket(packet: OutputPacket): void {
@@ -224,6 +327,21 @@ class TerminalFrameView implements OutputView {
     this.pre.textContent = [...this.frames.entries()]
       .map(([frameId, text]) => `#${String(frameId)}\n${text}`)
       .join("\n\n");
+  }
+
+  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
+    this.viewLayout = layout?.kind === "terminalFrame" ? layout : undefined;
+  }
+
+  resetView(): void {
+    this.applyViewLayout(undefined);
+  }
+
+  captureViewLayout(): OutputLayoutConfig["view"] {
+    return {
+      kind: "terminalFrame",
+      autoScroll: this.viewLayout?.autoScroll,
+    };
   }
 
   clear(): void {
@@ -247,19 +365,26 @@ class TimeSeriesLineView implements OutputView {
   private readonly resizeObserver: ResizeObserver | undefined;
   private isAutoFollowEnabled = true;
   private isApplyingScaleUpdate = false;
+  private viewLayout: TimeSeriesViewLayoutConfig | undefined;
   private plot: uPlot | undefined;
 
   constructor(
     parent: HTMLElement,
     private readonly config: TimeSeriesLineOutputConfig,
+    viewLayout: OutputLayoutConfig["view"] | undefined,
   ) {
     this.outputId = config.id;
+    this.applyViewLayout(viewLayout);
     this.chartElement = document.createElement("div");
     this.chartElement.className = "output-chart";
     this.legendElement = document.createElement("div");
     this.legendElement.className = "output-legend";
 
-    parent.append(createPanelHeader(config, "Time Series"), this.chartElement, this.legendElement);
+    parent.append(
+      createPanelHeader(config, "Time Series", () => this.resetView()),
+      this.chartElement,
+      this.legendElement,
+    );
     this.initializeConfiguredSeries();
     this.rebuildPlot();
 
@@ -318,7 +443,7 @@ class TimeSeriesLineView implements OutputView {
   }
 
   clear(): void {
-    this.isAutoFollowEnabled = true;
+    this.isAutoFollowEnabled = this.getDefaultAutoFollow();
     this.timeValues.length = 0;
     this.seriesData.clear();
     this.seriesVisibility.clear();
@@ -332,6 +457,26 @@ class TimeSeriesLineView implements OutputView {
     this.plot = undefined;
   }
 
+  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
+    this.viewLayout = layout?.kind === "timeSeriesLine" ? layout : undefined;
+    this.isAutoFollowEnabled = this.getDefaultAutoFollow();
+  }
+
+  resetView(): void {
+    this.applyViewLayout(this.viewLayout);
+    this.applyViewDefaults();
+    this.renderLegend([...this.seriesData.keys()]);
+  }
+
+  captureViewLayout(): OutputLayoutConfig["view"] {
+    return {
+      kind: "timeSeriesLine",
+      showLegend: !this.legendElement.hidden,
+      autoFollow: this.isAutoFollowEnabled,
+      zoom: this.captureZoom(),
+    };
+  }
+
   private initializeConfiguredSeries(): void {
     for (const channelName of Object.keys(this.config.series)) {
       this.seriesData.set(channelName, []);
@@ -340,7 +485,7 @@ class TimeSeriesLineView implements OutputView {
   }
 
   private rebuildPlot(): void {
-    this.isAutoFollowEnabled = true;
+    this.isAutoFollowEnabled = this.getDefaultAutoFollow();
     this.plot?.destroy();
 
     const channelNames = [...this.seriesData.keys()];
@@ -412,6 +557,7 @@ class TimeSeriesLineView implements OutputView {
     );
 
     this.renderLegend(channelNames);
+    this.applyViewDefaults();
   }
 
   private updatePlotData(): void {
@@ -640,7 +786,7 @@ class TimeSeriesLineView implements OutputView {
 
   private renderLegend(channelNames: string[]): void {
     this.legendElement.replaceChildren();
-    this.legendElement.hidden = this.config.style?.showLegend === false;
+    this.legendElement.hidden = !this.getShowLegend();
 
     if (channelNames.length === 0) {
       const empty = document.createElement("span");
@@ -681,6 +827,66 @@ class TimeSeriesLineView implements OutputView {
       height: Math.max(260, Math.floor(rect.height)),
     };
   }
+
+  private getShowLegend(): boolean {
+    return this.viewLayout?.showLegend ?? this.config.style?.showLegend !== false;
+  }
+
+  private getDefaultAutoFollow(): boolean {
+    return this.viewLayout?.autoFollow ?? true;
+  }
+
+  private applyViewDefaults(): void {
+    if (this.plot === undefined) {
+      return;
+    }
+
+    const zoom = this.viewLayout?.zoom;
+
+    if (zoom?.x !== undefined) {
+      this.isApplyingScaleUpdate = true;
+      try {
+        this.plot.setScale("x", zoom.x);
+      } finally {
+        this.isApplyingScaleUpdate = false;
+      }
+      this.isAutoFollowEnabled = false;
+      return;
+    }
+
+    if (this.isAutoFollowEnabled) {
+      const range = this.getXWindowRange();
+
+      if (hasScaleRange(range)) {
+        this.isApplyingScaleUpdate = true;
+        try {
+          this.plot.setScale("x", range);
+        } finally {
+          this.isApplyingScaleUpdate = false;
+        }
+      }
+    }
+  }
+
+  private captureZoom(): TimeSeriesViewLayoutConfig["zoom"] {
+    const xScale = this.plot?.scales.x;
+
+    if (
+      xScale === undefined ||
+      typeof xScale.min !== "number" ||
+      typeof xScale.max !== "number" ||
+      this.isAutoFollowEnabled
+    ) {
+      return undefined;
+    }
+
+    return {
+      x: {
+        min: xScale.min,
+        max: xScale.max,
+      },
+    };
+  }
 }
 
 class FramePlot2dView implements OutputView {
@@ -690,17 +896,23 @@ class FramePlot2dView implements OutputView {
   private readonly canvas: HTMLCanvasElement;
   private readonly resizeObserver: ResizeObserver | undefined;
   private latestPacket: FramePlot2dPacket | undefined;
+  private viewLayout: FramePlot2dViewLayoutConfig | undefined;
 
   constructor(
     parent: HTMLElement,
     private readonly config: FramePlot2dOutputConfig,
+    viewLayout: OutputLayoutConfig["view"] | undefined,
   ) {
     this.outputId = config.id;
+    this.applyViewLayout(viewLayout);
     this.canvas = document.createElement("canvas");
     this.canvas.className = "output-frame-canvas";
     this.canvas.setAttribute("aria-label", "Frame plot");
 
-    parent.append(createPanelHeader(config, "Frame Plot"), this.canvas);
+    parent.append(
+      createPanelHeader(config, "Frame Plot", () => this.resetView()),
+      this.canvas,
+    );
     this.draw();
 
     if (typeof ResizeObserver !== "undefined") {
@@ -727,6 +939,22 @@ class FramePlot2dView implements OutputView {
     this.resizeObserver?.disconnect();
   }
 
+  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
+    this.viewLayout = layout?.kind === "framePlot2d" ? layout : undefined;
+  }
+
+  resetView(): void {
+    this.applyViewLayout(this.viewLayout);
+    this.draw();
+  }
+
+  captureViewLayout(): OutputLayoutConfig["view"] {
+    return {
+      kind: "framePlot2d",
+      bounds: this.viewLayout?.bounds,
+    };
+  }
+
   private draw(): void {
     const context = getCanvasContext(this.canvas);
 
@@ -746,7 +974,10 @@ class FramePlot2dView implements OutputView {
     const muted = readCssColor(style, "--vscode-descriptionForeground", "#8f8f8f");
     const grid = readCssColor(style, "--vscode-panel-border", "#3c3c3c");
     const bounds =
-      this.latestPacket?.bounds ?? this.config.bounds ?? inferBounds(this.latestPacket);
+      this.viewLayout?.bounds ??
+      this.latestPacket?.bounds ??
+      this.config.bounds ??
+      inferBounds(this.latestPacket);
     const plotBounds = bounds ?? { xMin: -1, xMax: 1, yMin: -1, yMax: 1 };
     const area = {
       left: 42,
@@ -796,7 +1027,11 @@ class FramePlot2dView implements OutputView {
   }
 }
 
-function createPanelHeader(config: OutputConfig, fallbackKind: string): HTMLElement {
+function createPanelHeader(
+  config: OutputConfig,
+  fallbackKind: string,
+  onReset?: () => void,
+): HTMLElement {
   const header = document.createElement("header");
   header.className = "output-header";
 
@@ -811,6 +1046,16 @@ function createPanelHeader(config: OutputConfig, fallbackKind: string): HTMLElem
 
   text.append(title, meta);
   header.append(text);
+
+  if (onReset !== undefined) {
+    const resetButton = document.createElement("button");
+    resetButton.className = "button button-secondary output-reset-button";
+    resetButton.type = "button";
+    resetButton.textContent = "Reset";
+    resetButton.addEventListener("click", onReset);
+    header.append(resetButton);
+  }
+
   return header;
 }
 
@@ -829,6 +1074,61 @@ function pickConfiguredValues(
   }
 
   return nextValues;
+}
+
+function sortOutputsByLayout(
+  outputs: readonly OutputConfig[],
+  layout: LayoutConfig,
+): readonly OutputConfig[] {
+  const sorted: OutputConfig[] = [];
+
+  for (const output of outputs) {
+    const insertIndex = sorted.findIndex(
+      (candidate) => compareOutputLayoutOrder(output, candidate, outputs, layout) < 0,
+    );
+
+    if (insertIndex === -1) {
+      sorted.push(output);
+    } else {
+      sorted.splice(insertIndex, 0, output);
+    }
+  }
+
+  return sorted;
+}
+
+function compareOutputLayoutOrder(
+  left: OutputConfig,
+  right: OutputConfig,
+  outputs: readonly OutputConfig[],
+  layout: LayoutConfig,
+): number {
+  const leftOrder = layout.outputs[left.id]?.panel?.order;
+  const rightOrder = layout.outputs[right.id]?.panel?.order;
+  const leftIndex = outputs.findIndex((output) => output.id === left.id);
+  const rightIndex = outputs.findIndex((output) => output.id === right.id);
+
+  return (leftOrder ?? 10_000 + leftIndex) - (rightOrder ?? 10_000 + rightIndex);
+}
+
+function applyPanelLayout(panel: HTMLElement | null, layout: OutputLayoutConfig | undefined): void {
+  if (panel === null) {
+    return;
+  }
+
+  const panelLayout = layout?.panel;
+  panel.style.order = panelLayout?.order === undefined ? "" : String(panelLayout.order);
+  panel.style.gridColumn =
+    panelLayout?.columnSpan === undefined ? "" : `span ${panelLayout.columnSpan}`;
+  panel.style.minHeight = panelLayout?.minHeight === undefined ? "" : `${panelLayout.minHeight}px`;
+  panel.dataset.collapsed = panelLayout?.collapsed === true ? "true" : "false";
+  panel.dataset.maximized = panelLayout?.maximized === true ? "true" : "false";
+}
+
+function cssEscape(value: string): string {
+  return typeof CSS === "undefined" || CSS.escape === undefined
+    ? value.replaceAll('"', '\\"')
+    : CSS.escape(value);
 }
 
 function getUnitScaleKey(unitIndex: number): string {

@@ -14,8 +14,8 @@
       "properties": {
         "schemaVersion": {
           "type": "integer",
-          "const": 2,
-          "description": "Profile schema version. Version 2 is the only supported profile format."
+          "const": 3,
+          "description": "Profile schema version. Version 3 is the only supported profile format."
         },
         "id": {
           "type": "string",
@@ -30,6 +30,10 @@
         "serialDefaults": {
           "$ref": "#/definitions/SerialDefaultsConfig",
           "description": "Optional serial defaults suggested when this profile is selected."
+        },
+        "layout": {
+          "$ref": "#/definitions/ProfileLayoutConfig",
+          "description": "Monitor layout preset used when opening a new monitor page for this profile."
         },
         "codec": {
           "$ref": "#/definitions/CodecConfig",
@@ -56,7 +60,16 @@
           "description": "Optional export defaults for future capture/export workflows."
         }
       },
-      "required": ["schemaVersion", "id", "name", "codec", "framing", "parser", "outputs"],
+      "required": [
+        "schemaVersion",
+        "id",
+        "name",
+        "layout",
+        "codec",
+        "framing",
+        "parser",
+        "outputs"
+      ],
       "additionalProperties": false,
       "description": "Serial protocol, parser, and output configuration for one Live Serial Plotter profile."
     },
@@ -69,6 +82,18 @@
           "exclusiveMinimum": 0
         }
       },
+      "additionalProperties": false
+    },
+    "ProfileLayoutConfig": {
+      "type": "object",
+      "properties": {
+        "defaultPreset": {
+          "type": "string",
+          "description": "Layout preset key resolved from builtin, user, or workspace layout stores.",
+          "minLength": 1
+        }
+      },
+      "required": ["defaultPreset"],
       "additionalProperties": false
     },
     "CodecConfig": {

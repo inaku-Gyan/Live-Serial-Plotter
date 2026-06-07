@@ -1,7 +1,11 @@
 import { computed, reactive } from "vue";
+import { defaultLayout } from "../../../src/profiles/defaultLayout";
 import { defaultProfile } from "../../../src/profiles/defaultProfile";
 import {
   isParserMode,
+  type LayoutConfig,
+  type LayoutSaveTarget,
+  type LayoutSummary,
   type OutputConfig,
   type OutputPacket,
   type ParserMode,
@@ -22,16 +26,20 @@ export interface VsCodeApi<State> {
 
 export interface MonitorPersistedState {
   baudRate?: number;
+  layoutKey?: string;
   parserMode?: ParserMode;
   profileKey?: string;
   selectedPath?: string;
 }
 
 export interface MonitorOutputAdapter {
-  renderOutputs(outputs: readonly OutputConfig[]): void;
+  renderOutputs(outputs: readonly OutputConfig[], layout: LayoutConfig): void;
   appendPacket(packet: OutputPacket): void;
   appendLegacyRawLine(line: string, timestamp: number): void;
   appendLegacySeries(samples: readonly { t: number; values: Record<string, number> }[]): void;
+  resetOutputView(outputId: string): void;
+  resetPageLayout(): void;
+  captureSavableViewState(): LayoutConfig;
   dispose(): void;
 }
 
@@ -46,9 +54,13 @@ export interface MonitorStoreOptions {
 
 interface MonitorUiState {
   profiles: ProfileSummary[];
+  layouts: LayoutSummary[];
+  layoutTargets: LayoutSaveTarget[];
   ports: SerialPortSummary[];
   activeProfile: ProfileConfig;
+  activeLayout: LayoutConfig;
   profileKey: string;
+  layoutKey: string;
   selectedPath: string;
   baudRate: number;
   baudRateInput: string;
@@ -80,9 +92,13 @@ export function createMonitorStore(
 
   const state = reactive<MonitorUiState>({
     profiles: [],
+    layouts: [],
+    layoutTargets: [],
     ports: [],
     activeProfile: defaultProfile,
+    activeLayout: defaultLayout,
     profileKey: options.initialProfileKey ?? persistedState?.profileKey ?? defaultProfileKey,
+    layoutKey: persistedState?.layoutKey ?? defaultProfile.layout.defaultPreset,
     selectedPath: persistedState?.selectedPath ?? "",
     baudRate: initialBaudRate,
     baudRateInput: String(initialBaudRate),
@@ -110,7 +126,7 @@ export function createMonitorStore(
   function mountOutputs(root: HTMLElement): void {
     outputAdapter?.dispose();
     outputAdapter = createOutputAdapter(root, postMessage);
-    outputAdapter.renderOutputs(state.activeProfile.outputs);
+    outputAdapter.renderOutputs(state.activeProfile.outputs, state.activeLayout);
   }
 
   function requestPorts(): void {
@@ -198,12 +214,36 @@ export function createMonitorStore(
 
     if (message.type === "profiles") {
       state.profiles = [...message.profiles];
-      applyProfile(message.activeProfile, message.activeProfileKey);
+      state.layouts = [...message.layouts];
+      state.layoutTargets = [...message.layoutTargets];
+      applyProfile(
+        message.activeProfile,
+        message.activeProfileKey,
+        message.activeLayout,
+        message.activeLayoutKey,
+      );
       return;
     }
 
     if (message.type === "activeProfile") {
-      applyProfile(message.profile, message.profileKey);
+      applyProfile(message.profile, message.profileKey, message.layout, message.layoutKey);
+      return;
+    }
+
+    if (message.type === "layoutSaved") {
+      state.activeLayout = message.layout;
+      state.layoutKey = message.layoutKey;
+      persistState();
+      outputAdapter?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
+      return;
+    }
+
+    if (message.type === "layoutSavedAs") {
+      state.activeProfile = message.profile;
+      state.activeLayout = message.layout;
+      state.layoutKey = message.layoutKey;
+      persistState();
+      outputAdapter?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
       return;
     }
 
@@ -227,7 +267,9 @@ export function createMonitorStore(
       return;
     }
 
-    showError(message.message);
+    if (message.type === "error") {
+      showError(message.message);
+    }
   }
 
   function dispose(): void {
@@ -256,9 +298,42 @@ export function createMonitorStore(
     persistState();
   }
 
-  function applyProfile(profile: ProfileConfig, profileKey: string): void {
+  function resetOutputView(outputId: string): void {
+    outputAdapter?.resetOutputView(outputId);
+  }
+
+  function resetPageLayout(): void {
+    outputAdapter?.resetPageLayout();
+  }
+
+  function saveLayout(): void {
+    const layout = outputAdapter?.captureSavableViewState() ?? state.activeLayout;
+    postMessage({ type: "saveLayout", request: { layout, layoutKey: state.layoutKey } });
+  }
+
+  function saveLayoutAs(layoutId: string, target: LayoutSaveTarget): void {
+    const layout = outputAdapter?.captureSavableViewState() ?? state.activeLayout;
+    postMessage({
+      type: "saveLayoutAs",
+      request: {
+        layout,
+        layoutId,
+        target,
+        profileKey: state.profileKey,
+      },
+    });
+  }
+
+  function applyProfile(
+    profile: ProfileConfig,
+    profileKey: string,
+    layout: LayoutConfig,
+    layoutKey: string,
+  ): void {
     state.activeProfile = profile;
     state.profileKey = profileKey;
+    state.activeLayout = layout;
+    state.layoutKey = layoutKey;
 
     if (!userChangedBaudRate && profile.serialDefaults?.baudRate !== undefined) {
       state.baudRate = profile.serialDefaults.baudRate;
@@ -270,7 +345,7 @@ export function createMonitorStore(
     }
 
     persistState();
-    outputAdapter?.renderOutputs(profile.outputs);
+    outputAdapter?.renderOutputs(profile.outputs, layout);
   }
 
   function showError(message: string): void {
@@ -290,6 +365,7 @@ export function createMonitorStore(
   function persistState(): void {
     vscode.setState({
       baudRate: state.baudRate,
+      layoutKey: state.layoutKey,
       parserMode: state.parserMode,
       profileKey: state.profileKey,
       selectedPath: state.selectedPath,
@@ -318,6 +394,10 @@ export function createMonitorStore(
     toggleConnection,
     sendText,
     handleHostMessage,
+    resetOutputView,
+    resetPageLayout,
+    saveLayout,
+    saveLayoutAs,
     dispose,
   };
 }

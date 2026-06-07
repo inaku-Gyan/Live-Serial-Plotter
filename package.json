@@ -29,8 +29,8 @@
     "lint:fix": "oxlint --fix",
     "fmt": "oxfmt",
     "fmt:check": "oxfmt --check",
-    "schema:generate": "node scripts/generate-profile-schema.mjs",
-    "schema:check": "node scripts/generate-profile-schema.mjs --check",
+    "schema:generate": "node scripts/generate-profile-schema.mjs && node scripts/generate-layout-schema.mjs",
+    "schema:check": "node scripts/generate-profile-schema.mjs --check && node scripts/generate-layout-schema.mjs --check",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "dev:serial:e2e": "node scripts/dev-serial/e2e-virtual-ports.mjs",
@@ -130,6 +130,10 @@
       {
         "fileMatch": "**/.live-serial-plotter/profiles/*.jsonc",
         "url": "./schemas/profile.schema.json"
+      },
+      {
+        "fileMatch": "**/.live-serial-plotter/layouts/*.jsonc",
+        "url": "./schemas/layout.schema.json"
       }
     ]
   },

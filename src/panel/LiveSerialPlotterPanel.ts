@@ -1,15 +1,22 @@
 import * as vscode from "vscode";
 import type { AsyncScriptParserLoader } from "../pipeline/PipelineRunner";
+import { LayoutStore } from "../profiles/LayoutStore";
 import { ProfileStore } from "../profiles/ProfileStore";
 import { SerialService, type SerialPortFactory } from "../serial/SerialService";
 import { OutputPacketBatcher } from "../session/OutputPacketBatcher";
-import { isParserMode, type ConnectionState, type ToExtensionMessage } from "../shared/protocol";
+import {
+  isParserMode,
+  type ConnectionState,
+  type ProfileConfig,
+  type ToExtensionMessage,
+} from "../shared/protocol";
 
 const panelViewType = "liveSerialPlotter.panel";
 
 export interface LiveSerialPlotterPanelOptions {
   readonly serialPortFactory?: SerialPortFactory;
   readonly profileStore?: ProfileStore;
+  readonly layoutStore?: LayoutStore;
   readonly scriptParserLoader?: AsyncScriptParserLoader;
   readonly initialProfileKey?: string;
 }
@@ -21,6 +28,7 @@ export class LiveSerialPlotterPanel {
   private readonly disposables: vscode.Disposable[] = [];
   private readonly serialService: SerialService;
   private readonly profileStore: ProfileStore;
+  private readonly layoutStore: LayoutStore;
   private readonly outputPacketBatcher = new OutputPacketBatcher(50, (packet) => {
     this.postMessage({ type: "outputPacket", packet });
   });
@@ -47,6 +55,7 @@ export class LiveSerialPlotterPanel {
     options: LiveSerialPlotterPanelOptions,
   ) {
     this.profileStore = options.profileStore ?? new ProfileStore();
+    this.layoutStore = options.layoutStore ?? new LayoutStore();
     this.activeProfileKey = options.initialProfileKey;
     this.serialService = new SerialService(
       {
@@ -112,6 +121,34 @@ export class LiveSerialPlotterPanel {
         return;
       }
 
+      if (message.type === "saveLayout") {
+        const saved = await this.layoutStore.saveLayout(
+          message.request.layoutKey,
+          message.request.layout,
+        );
+        this.postMessage({
+          type: "layoutSaved",
+          layout: saved.layout,
+          layoutKey: saved.layoutKey,
+        });
+        return;
+      }
+
+      if (message.type === "saveLayoutAs") {
+        const savedLayout = await this.layoutStore.saveLayoutAs(message.request);
+        const updatedProfile = await this.updateProfileLayoutPreset(
+          message.request.profileKey,
+          savedLayout.layoutKey,
+        );
+        this.postMessage({
+          type: "layoutSavedAs",
+          layout: savedLayout.layout,
+          layoutKey: savedLayout.layoutKey,
+          profile: updatedProfile,
+        });
+        return;
+      }
+
       if (message.type === "clearLog") {
         return;
       }
@@ -131,6 +168,9 @@ export class LiveSerialPlotterPanel {
 
   private async postProfiles(activeProfileKey: string | undefined): Promise<void> {
     const loadedProfiles = await this.profileStore.loadProfiles(activeProfileKey);
+    const resolvedLayout = await this.layoutStore.resolveLayout(
+      loadedProfiles.activeProfile.layout.defaultPreset,
+    );
     this.activeProfileKey = loadedProfiles.activeProfileKey;
     this.serialService.setProfile(loadedProfiles.activeProfile);
     this.postMessage({
@@ -138,26 +178,55 @@ export class LiveSerialPlotterPanel {
       profiles: loadedProfiles.profiles.map((profile) => profile.summary),
       activeProfile: loadedProfiles.activeProfile,
       activeProfileKey: loadedProfiles.activeProfileKey,
+      activeLayout: resolvedLayout.layout,
+      activeLayoutKey: resolvedLayout.layoutKey,
+      layouts: resolvedLayout.layouts.map((layout) => layout.summary),
+      layoutTargets: resolvedLayout.layoutTargets,
     });
 
-    for (const error of loadedProfiles.errors) {
+    for (const error of [...loadedProfiles.errors, ...resolvedLayout.errors]) {
       this.postError(error);
     }
   }
 
   private async selectProfile(profileKey: string): Promise<void> {
     const loadedProfiles = await this.profileStore.loadProfiles(profileKey);
+    const resolvedLayout = await this.layoutStore.resolveLayout(
+      loadedProfiles.activeProfile.layout.defaultPreset,
+    );
     this.activeProfileKey = loadedProfiles.activeProfileKey;
     this.serialService.setProfile(loadedProfiles.activeProfile);
     this.postMessage({
       type: "activeProfile",
       profile: loadedProfiles.activeProfile,
       profileKey: loadedProfiles.activeProfileKey,
+      layout: resolvedLayout.layout,
+      layoutKey: resolvedLayout.layoutKey,
     });
 
-    for (const error of loadedProfiles.errors) {
+    for (const error of [...loadedProfiles.errors, ...resolvedLayout.errors]) {
       this.postError(error);
     }
+  }
+
+  private async updateProfileLayoutPreset(
+    profileKey: string,
+    layoutKey: string,
+  ): Promise<ProfileConfig> {
+    const loadedProfiles = await this.profileStore.loadProfiles(profileKey);
+    const profile = {
+      ...loadedProfiles.activeProfile,
+      layout: {
+        ...loadedProfiles.activeProfile.layout,
+        defaultPreset: layoutKey,
+      },
+    };
+    const saved = await this.profileStore.autoSaveProfile({
+      config: profile,
+      source: loadedProfiles.activeProfileSource,
+    });
+
+    return saved.config;
   }
 
   private postMessage(message: Parameters<vscode.Webview["postMessage"]>[0]): void {

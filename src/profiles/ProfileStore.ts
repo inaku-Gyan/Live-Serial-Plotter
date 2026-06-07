@@ -11,6 +11,7 @@ import {
   type OutputConfig,
   type ParserConfig,
   type ProfileConfig,
+  type ProfileLayoutConfig,
   type ProfileRef,
   type ProfileScope,
   type ProfileSummary,
@@ -362,8 +363,8 @@ export function normalizeProfileConfig(value: unknown, source = "profile"): Prof
     throw new Error(`${source} must contain a JSON object.`);
   }
 
-  if (value.schemaVersion !== 2) {
-    throw new Error(`${source} must use schemaVersion 2.`);
+  if (value.schemaVersion !== 3) {
+    throw new Error(`${source} must use schemaVersion 3.`);
   }
 
   if (typeof value.id !== "string" || value.id.length === 0) {
@@ -375,21 +376,37 @@ export function normalizeProfileConfig(value: unknown, source = "profile"): Prof
   }
 
   const serialDefaults = normalizeSerialDefaults(value.serialDefaults);
+  const layout = normalizeProfileLayout(value.layout, source);
   const codec = normalizeCodec(value.codec, source);
   const framing = normalizeFraming(value.framing, source);
   const parser = normalizeParser(value.parser, source);
   const outputs = normalizeOutputs(value.outputs, source);
 
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: value.id,
     name: value.name,
     serialDefaults,
+    layout,
     codec,
     framing,
     parser,
     outputs,
     export: normalizeExport(value.export),
+  };
+}
+
+function normalizeProfileLayout(value: unknown, source: string): ProfileLayoutConfig {
+  if (!isPlainObject(value)) {
+    throw new Error(`${source} must define layout.`);
+  }
+
+  if (typeof value.defaultPreset !== "string" || value.defaultPreset.length === 0) {
+    throw new Error(`${source} layout must define defaultPreset.`);
+  }
+
+  return {
+    defaultPreset: value.defaultPreset,
   };
 }
 

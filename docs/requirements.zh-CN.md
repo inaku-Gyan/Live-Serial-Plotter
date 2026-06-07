@@ -15,9 +15,21 @@
 
 - 新打开监视器页面、尚未连接串口时，也要按当前 active profile 的 `outputs` 显示待机/骨架视图。
 - 同种输出终端使用统一待机图或待机态；输出终端包括 `timeSeriesLine`、`terminalAppend`、`terminalFrame`、`framePlot2d` 等。
-- 监视器视图有哪些输出、顺序、大致排版和基础样式由 profile 的 `outputs` 推导。
-- 不新增 profile layout 字段；布局按 `outputs` 顺序和 output kind 的默认响应式规则推导。
+- 监视器视图有哪些输出仍由 profile 的 `outputs` 定义；页面排布和可保存视图样式由 profile 引用的独立 layout preset 定义。
+- `ProfileConfig` 使用 `schemaVersion: 3`，必须配置 `layout.defaultPreset`，指向 builtin/user/workspace layout preset。
 - `timeSeriesLine.series: {}` 保持“运行时自动发现 numeric field”语义；待机态不猜测通道。
+
+### 监视器 Layout Preset
+
+- layout preset 是独立 JSONC 配置文件，workspace 路径为 `.live-serial-plotter/layouts/*.jsonc`，user layout 与 user profiles 平级，builtin layout 由扩展内置。
+- layout preset 使用 `schemaVersion: 1`，包含 `id`、`name`、`page` 和按 `outputId` 索引的 `outputs`。
+- 每次打开新 monitor 窗口，都必须按当前 profile 的 `layout.defaultPreset` 解析初始页面布局。
+- layout preset 可保存页面级设置，例如 grid 列策略、density、输出面板 order、columnSpan、minHeight、collapsed、maximized。
+- layout preset 可保存输出视图默认值，例如 plot legend、auto-follow、显式保存后的 zoom 范围、terminal auto-scroll、2D frame bounds。
+- 当前窗口内由用户拖拽、点击、缩放产生的视图变化先进入 window session override，不自动覆盖 profile 或 layout 文件。
+- 用户显式 Save Layout 才覆盖当前 layout preset；Save As Layout 创建新 layout preset，并更新当前 profile 的 `layout.defaultPreset`。
+- 每个 output 面板应支持单独 Reset View；页面应支持 Reset Layout。reset 只恢复布局/视图状态，不清空实时数据。
+- 实时数据点、terminal 当前文本、canvas frame、hover/cursor、临时选区、toast 和串口连接状态永不写入 profile 或 layout。
 
 ### 监视器页面 Vue 外壳与高频渲染边界
 
@@ -47,7 +59,7 @@
 - 具体串口端口和当前波特率属于运行时连接设置，不写入 profile。
 - `serialDefaults.baudRate` 只作为 profile 选择后的默认提示；用户手动改过 baud 后，不应被 profile 切换覆盖。
 - 修改 Extension Host 和 Webview 协议时，先改 `src/shared/protocol.ts` 的 discriminated union，再同步两端处理。
-- 上述监视器待机视图、Vue 外壳迁移、time-series plot 优化均不要求修改 public protocol 或 JSON schema。
+- layout preset 架构要求修改 profile schema、layout schema 和 Extension Host/Webview 消息协议；高频 `outputPacket` 协议保持不变。
 
 ### 性能与测试
 
@@ -60,3 +72,4 @@
 ## 已发现并处理的冲突
 
 - 旧约束写着“监控页继续使用 Vanilla TypeScript”；现需求和实现已改为“监视器页面使用 Vue 3 外壳，uPlot/canvas 保持命令式高性能路径”。`AGENTS.md` 应以新架构为准。
+- 旧需求写着“不新增 profile layout 字段，布局按 `outputs` 顺序和 output kind 推导”；现需求已改为“profile v3 必须引用独立 layout preset”。`outputs` 仍定义输出语义，但默认排布由 layout preset 决定。

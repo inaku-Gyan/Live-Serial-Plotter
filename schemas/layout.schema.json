@@ -1,0 +1,222 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://inaku-Gyan.github.io/Live-Serial-Plotter/schemas/layout.schema.json",
+  "title": "Live Serial Plotter Layout",
+  "description": "Schema for Live Serial Plotter monitor layout JSONC files.",
+  "$ref": "#/definitions/LayoutConfigFile",
+  "definitions": {
+    "LayoutConfigFile": {
+      "$ref": "#/definitions/LayoutConfig"
+    },
+    "LayoutConfig": {
+      "type": "object",
+      "properties": {
+        "schemaVersion": {
+          "type": "integer",
+          "const": 1,
+          "description": "Layout schema version. Version 1 is the only supported layout format."
+        },
+        "id": {
+          "type": "string",
+          "description": "Layout id. It must be unique within its user or workspace namespace.",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable layout name shown in layout controls.",
+          "minLength": 1
+        },
+        "page": {
+          "$ref": "#/definitions/MonitorPageLayoutConfig",
+          "description": "Page-level workspace layout options."
+        },
+        "outputs": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/definitions/OutputLayoutConfig"
+          },
+          "description": "Per-output panel and view defaults, keyed by profile output id."
+        }
+      },
+      "required": ["schemaVersion", "id", "name", "page", "outputs"],
+      "additionalProperties": false,
+      "description": "Reusable monitor page layout preset."
+    },
+    "MonitorPageLayoutConfig": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "const": "grid",
+          "description": "Page layout mode."
+        },
+        "columns": {
+          "type": "string",
+          "enum": ["auto", "single", "two"],
+          "description": "Responsive column strategy used by the monitor workspace."
+        },
+        "density": {
+          "type": "string",
+          "enum": ["compact", "normal", "comfortable"],
+          "description": "Workspace density."
+        }
+      },
+      "required": ["mode"],
+      "additionalProperties": false
+    },
+    "OutputLayoutConfig": {
+      "type": "object",
+      "properties": {
+        "panel": {
+          "$ref": "#/definitions/OutputPanelLayoutConfig",
+          "description": "Panel placement and sizing defaults."
+        },
+        "view": {
+          "$ref": "#/definitions/OutputViewLayoutConfig",
+          "description": "Output renderer view defaults."
+        }
+      },
+      "additionalProperties": false
+    },
+    "OutputPanelLayoutConfig": {
+      "type": "object",
+      "properties": {
+        "order": {
+          "type": "number",
+          "description": "Sort order within the workspace."
+        },
+        "columnSpan": {
+          "type": "number",
+          "description": "Number of grid columns occupied by this panel.",
+          "minimum": 1
+        },
+        "minHeight": {
+          "type": "number",
+          "description": "Minimum panel height in CSS pixels.",
+          "minimum": 1
+        },
+        "collapsed": {
+          "type": "boolean",
+          "description": "Whether the panel starts collapsed."
+        },
+        "maximized": {
+          "type": "boolean",
+          "description": "Whether the panel starts maximized."
+        }
+      },
+      "additionalProperties": false
+    },
+    "OutputViewLayoutConfig": {
+      "oneOf": [
+        {
+          "$ref": "#/definitions/TimeSeriesViewLayoutConfig"
+        },
+        {
+          "$ref": "#/definitions/TerminalViewLayoutConfig"
+        },
+        {
+          "$ref": "#/definitions/FramePlot2dViewLayoutConfig"
+        }
+      ]
+    },
+    "TimeSeriesViewLayoutConfig": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "timeSeriesLine"
+        },
+        "showLegend": {
+          "type": "boolean"
+        },
+        "autoFollow": {
+          "type": "boolean"
+        },
+        "zoom": {
+          "$ref": "#/definitions/AxisRangeLayoutConfig"
+        }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    "AxisRangeLayoutConfig": {
+      "type": "object",
+      "properties": {
+        "x": {
+          "type": "object",
+          "properties": {
+            "min": {
+              "type": "number"
+            },
+            "max": {
+              "type": "number"
+            }
+          },
+          "required": ["min", "max"],
+          "additionalProperties": false
+        },
+        "y": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "number"
+              },
+              "max": {
+                "type": "number"
+              }
+            },
+            "required": ["min", "max"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "TerminalViewLayoutConfig": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["terminalAppend", "terminalFrame"]
+        },
+        "autoScroll": {
+          "type": "boolean"
+        }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    },
+    "FramePlot2dViewLayoutConfig": {
+      "type": "object",
+      "properties": {
+        "kind": {
+          "type": "string",
+          "const": "framePlot2d"
+        },
+        "bounds": {
+          "type": "object",
+          "properties": {
+            "xMin": {
+              "type": "number"
+            },
+            "xMax": {
+              "type": "number"
+            },
+            "yMin": {
+              "type": "number"
+            },
+            "yMax": {
+              "type": "number"
+            }
+          },
+          "required": ["xMin", "xMax", "yMin", "yMax"],
+          "additionalProperties": false
+        }
+      },
+      "required": ["kind"],
+      "additionalProperties": false
+    }
+  }
+}

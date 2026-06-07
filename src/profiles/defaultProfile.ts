@@ -1,11 +1,14 @@
 import type { ProfileConfig } from "../shared/protocol";
 
 export const defaultProfile: ProfileConfig = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   id: "default",
   name: "Default Auto Plot",
   serialDefaults: {
     baudRate: 115200,
+  },
+  layout: {
+    defaultPreset: "builtin:default",
   },
   codec: {
     kind: "text",
@@ -53,11 +56,14 @@ export const defaultProfile: ProfileConfig = {
 export const builtinProfiles: readonly ProfileConfig[] = [
   defaultProfile,
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: "jsonl-telemetry",
     name: "JSONL Telemetry",
     serialDefaults: {
       baudRate: 115200,
+    },
+    layout: {
+      defaultPreset: "builtin:default",
     },
     codec: {
       kind: "text",
@@ -146,11 +152,14 @@ export const builtinProfiles: readonly ProfileConfig[] = [
     },
   },
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: "csv-four-channel",
     name: "CSV Four Channel",
     serialDefaults: {
       baudRate: 230400,
+    },
+    layout: {
+      defaultPreset: "builtin:default",
     },
     codec: {
       kind: "text",
@@ -237,11 +246,14 @@ export const builtinProfiles: readonly ProfileConfig[] = [
     },
   },
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: "key-value-status",
     name: "Key-Value Status",
     serialDefaults: {
       baudRate: 57600,
+    },
+    layout: {
+      defaultPreset: "builtin:default",
     },
     codec: {
       kind: "text",
@@ -313,11 +325,14 @@ export const builtinProfiles: readonly ProfileConfig[] = [
     ],
   },
   {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: "frame-plot-2d",
     name: "2D Frame Plot",
     serialDefaults: {
       baudRate: 921600,
+    },
+    layout: {
+      defaultPreset: "builtin:default",
     },
     codec: {
       kind: "text",

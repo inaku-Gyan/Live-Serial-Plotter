@@ -72,10 +72,10 @@ export interface ProfileEditorState {
  */
 export interface ProfileConfig {
   /**
-   * Profile schema version. Version 2 is the only supported profile format.
+   * Profile schema version. Version 3 is the only supported profile format.
    * @asType integer
    */
-  schemaVersion: 2;
+  schemaVersion: 3;
   /**
    * Profile id. It must be unique within its user or workspace namespace.
    * @minLength 1
@@ -90,6 +90,10 @@ export interface ProfileConfig {
    * Optional serial defaults suggested when this profile is selected.
    */
   serialDefaults?: SerialDefaultsConfig;
+  /**
+   * Monitor layout preset used when opening a new monitor page for this profile.
+   */
+  layout: ProfileLayoutConfig;
   /**
    * Codec used to decode received bytes and encode sent text.
    */
@@ -111,6 +115,14 @@ export interface ProfileConfig {
    * Optional export defaults for future capture/export workflows.
    */
   export?: ExportConfig;
+}
+
+export interface ProfileLayoutConfig {
+  /**
+   * Layout preset key resolved from builtin, user, or workspace layout stores.
+   * @minLength 1
+   */
+  defaultPreset: string;
 }
 
 export interface SerialDefaultsConfig {
@@ -592,6 +604,161 @@ export interface Plot2dPoint {
   size?: number;
 }
 
+export interface LayoutSummary {
+  key: string;
+  ref: LayoutRef;
+  id: string;
+  name: string;
+  scope: ProfileScope;
+  workspaceName?: string;
+}
+
+export interface LayoutRef {
+  scope: ProfileScope;
+  id: string;
+  workspaceFolderUri?: string;
+}
+
+export interface LayoutSourceMetadata {
+  key: string;
+  ref: LayoutRef;
+  scope: ProfileScope;
+  filePath?: string;
+  workspaceFolderUri?: string;
+  workspaceName?: string;
+}
+
+/**
+ * Reusable monitor page layout preset.
+ */
+export interface LayoutConfig {
+  /**
+   * Layout schema version. Version 1 is the only supported layout format.
+   * @asType integer
+   */
+  schemaVersion: 1;
+  /**
+   * Layout id. It must be unique within its user or workspace namespace.
+   * @minLength 1
+   */
+  id: string;
+  /**
+   * Human-readable layout name shown in layout controls.
+   * @minLength 1
+   */
+  name: string;
+  /**
+   * Page-level workspace layout options.
+   */
+  page: MonitorPageLayoutConfig;
+  /**
+   * Per-output panel and view defaults, keyed by profile output id.
+   */
+  outputs: Record<string, OutputLayoutConfig>;
+}
+
+export interface MonitorPageLayoutConfig {
+  /**
+   * Page layout mode.
+   */
+  mode: "grid";
+  /**
+   * Responsive column strategy used by the monitor workspace.
+   */
+  columns?: "auto" | "single" | "two";
+  /**
+   * Workspace density.
+   */
+  density?: "compact" | "normal" | "comfortable";
+}
+
+export interface OutputLayoutConfig {
+  /**
+   * Panel placement and sizing defaults.
+   */
+  panel?: OutputPanelLayoutConfig;
+  /**
+   * Output renderer view defaults.
+   */
+  view?: OutputViewLayoutConfig;
+}
+
+export interface OutputPanelLayoutConfig {
+  /**
+   * Sort order within the workspace.
+   */
+  order?: number;
+  /**
+   * Number of grid columns occupied by this panel.
+   * @minimum 1
+   */
+  columnSpan?: number;
+  /**
+   * Minimum panel height in CSS pixels.
+   * @minimum 1
+   */
+  minHeight?: number;
+  /**
+   * Whether the panel starts collapsed.
+   */
+  collapsed?: boolean;
+  /**
+   * Whether the panel starts maximized.
+   */
+  maximized?: boolean;
+}
+
+export type OutputViewLayoutConfig =
+  | TimeSeriesViewLayoutConfig
+  | TerminalViewLayoutConfig
+  | FramePlot2dViewLayoutConfig;
+
+export interface TimeSeriesViewLayoutConfig {
+  kind: "timeSeriesLine";
+  showLegend?: boolean;
+  autoFollow?: boolean;
+  zoom?: AxisRangeLayoutConfig;
+}
+
+export interface TerminalViewLayoutConfig {
+  kind: "terminalAppend" | "terminalFrame";
+  autoScroll?: boolean;
+}
+
+export interface FramePlot2dViewLayoutConfig {
+  kind: "framePlot2d";
+  bounds?: {
+    xMin: number;
+    xMax: number;
+    yMin: number;
+    yMax: number;
+  };
+}
+
+export interface AxisRangeLayoutConfig {
+  x?: { min: number; max: number };
+  y?: Record<string, { min: number; max: number }>;
+}
+
+export interface SaveLayoutRequest {
+  layout: LayoutConfig;
+  layoutKey: string;
+}
+
+export interface SaveLayoutAsRequest {
+  layout: LayoutConfig;
+  layoutId: string;
+  target: LayoutSaveTarget;
+  profileKey: string;
+}
+
+export interface LayoutSaveTarget {
+  label: string;
+  scope: "user" | "workspace";
+  workspaceFolderUri?: string;
+  workspaceName?: string;
+}
+
 export type ToExtensionMessage =
   | { type: "requestPorts" }
   | { type: "requestProfiles"; profileKey?: string }
@@ -600,7 +767,9 @@ export type ToExtensionMessage =
   | { type: "disconnect" }
   | { type: "send"; text: string }
   | { type: "setParserMode"; parserMode: ParserMode }
-  | { type: "clearLog" };
+  | { type: "clearLog" }
+  | { type: "saveLayout"; request: SaveLayoutRequest }
+  | { type: "saveLayoutAs"; request: SaveLayoutAsRequest };
 
 export type ToWebviewMessage =
   | { type: "ports"; ports: SerialPortSummary[] }
@@ -609,8 +778,20 @@ export type ToWebviewMessage =
       profiles: ProfileSummary[];
       activeProfile: ProfileConfig;
       activeProfileKey: string;
+      activeLayout: LayoutConfig;
+      activeLayoutKey: string;
+      layouts: LayoutSummary[];
+      layoutTargets: LayoutSaveTarget[];
     }
-  | { type: "activeProfile"; profile: ProfileConfig; profileKey: string }
+  | {
+      type: "activeProfile";
+      profile: ProfileConfig;
+      profileKey: string;
+      layout: LayoutConfig;
+      layoutKey: string;
+    }
+  | { type: "layoutSaved"; layout: LayoutConfig; layoutKey: string }
+  | { type: "layoutSavedAs"; layout: LayoutConfig; layoutKey: string; profile: ProfileConfig }
   | { type: "outputPacket"; packet: OutputPacket }
   | { type: "connectionState"; state: ConnectionState }
   | { type: "rawLine"; line: string; t: number }

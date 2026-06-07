@@ -3,6 +3,7 @@ import { LiveSerialPlotterPanel } from "./panel/LiveSerialPlotterPanel";
 import { ProfileConfigViewProvider } from "./panel/ProfileConfigViewProvider";
 import { VscodeScriptParserTrustStore } from "./panel/VscodeScriptParserTrustStore";
 import { ScriptParserLoader } from "./parsers/ScriptParserLoader";
+import { getWorkspaceLayoutsDirectory, LayoutStore } from "./profiles/LayoutStore";
 import { getWorkspaceProfilesDirectory, ProfileStore } from "./profiles/ProfileStore";
 import { DevelopmentSerialPortFactory } from "./serial/dev/DevelopmentSerialPortFactory";
 import { NodeSerialPortFactory, type SerialPortFactory } from "./serial/SerialService";
@@ -10,6 +11,7 @@ import { NodeSerialPortFactory, type SerialPortFactory } from "./serial/SerialSe
 export function activate(context: vscode.ExtensionContext): void {
   const serialPortFactory = createSerialPortFactory(context);
   const profileStore = createProfileStore(context);
+  const layoutStore = createLayoutStore(context);
   const scriptParserLoader = createScriptParserLoader(context);
   const profileConfigViewProvider = new ProfileConfigViewProvider({
     extensionUri: context.extensionUri,
@@ -18,6 +20,7 @@ export function activate(context: vscode.ExtensionContext): void {
       LiveSerialPlotterPanel.open(context.extensionUri, {
         serialPortFactory,
         profileStore,
+        layoutStore,
         scriptParserLoader,
         initialProfileKey: profileKey,
       });
@@ -34,6 +37,7 @@ export function activate(context: vscode.ExtensionContext): void {
       LiveSerialPlotterPanel.open(context.extensionUri, {
         serialPortFactory,
         profileStore,
+        layoutStore,
         scriptParserLoader,
       });
     }),
@@ -66,6 +70,18 @@ export function createProfileStore(context: vscode.ExtensionContext): ProfileSto
         folderUri: folder.uri.toString(),
         folderName: folder.name,
         profilesDirectory: getWorkspaceProfilesDirectory(folder.uri.fsPath),
+      })) ?? [],
+  });
+}
+
+export function createLayoutStore(context: vscode.ExtensionContext): LayoutStore {
+  return new LayoutStore({
+    userLayoutsDirectory: vscode.Uri.joinPath(context.globalStorageUri, "layouts").fsPath,
+    workspaceLayoutsDirectories:
+      vscode.workspace.workspaceFolders?.map((folder) => ({
+        folderUri: folder.uri.toString(),
+        folderName: folder.name,
+        layoutsDirectory: getWorkspaceLayoutsDirectory(folder.uri.fsPath),
       })) ?? [],
   });
 }

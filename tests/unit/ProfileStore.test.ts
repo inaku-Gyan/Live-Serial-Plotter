@@ -27,11 +27,14 @@ describe("ProfileStore", () => {
       `{
         // JSONC comments are supported.
         "$schema": "https://example.invalid/profile.schema.json",
-        "schemaVersion": 2,
+        "schemaVersion": 3,
         "id": "sensor",
         "name": "Sensor",
         "serialDefaults": {
           "baudRate": 9600
+        },
+        "layout": {
+          "defaultPreset": "builtin:default"
         },
         "codec": {
           "kind": "text",
@@ -232,7 +235,7 @@ describe("ProfileStore", () => {
 
     expect(loaded.activeProfile.id).toBe("default");
     expect(loaded.profiles).toHaveLength(builtinProfiles.length);
-    expect(loaded.errors[0]).toContain("must use schemaVersion 2");
+    expect(loaded.errors[0]).toContain("must use schemaVersion 3");
   });
 
   test("saves user profiles and can load them again", async () => {
@@ -243,10 +246,11 @@ describe("ProfileStore", () => {
       target: { label: "User", scope: "user" },
       profileId: "saved-user",
       config: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         id: "draft",
         name: "Saved User",
         serialDefaults: { baudRate: 115200 },
+        layout: { defaultPreset: "builtin:default" },
         codec: { kind: "text", encoding: "utf8", sendLineEnding: "none" },
         framing: { kind: "line", delimiter: "auto" },
         parser: { kind: "builtin", mode: "jsonl", options: { flatten: true } },
@@ -265,7 +269,7 @@ describe("ProfileStore", () => {
     });
 
     const savedText = await readFile(path.join(userProfilesDirectory, "saved-user.jsonc"), "utf8");
-    expect(savedText.startsWith(`{\n  "schemaVersion": 2,\n`)).toBe(true);
+    expect(savedText.startsWith(`{\n  "schemaVersion": 3,\n`)).toBe(true);
     expect(savedText).not.toContain('"$schema"');
 
     const loaded = await store.loadProfiles("user:saved-user");
@@ -292,10 +296,11 @@ describe("ProfileStore", () => {
       },
       profileId: "workspace-profile",
       config: {
-        schemaVersion: 2,
+        schemaVersion: 3,
         id: "workspace-profile",
         name: "Workspace Profile",
         serialDefaults: { baudRate: 9600 },
+        layout: { defaultPreset: "builtin:default" },
         codec: { kind: "text", encoding: "utf8", sendLineEnding: "none" },
         framing: { kind: "line", delimiter: "lf" },
         parser: { kind: "builtin", mode: "keyValue" },
@@ -307,7 +312,7 @@ describe("ProfileStore", () => {
       path.join(profilesDirectory, "workspace-profile.jsonc"),
       "utf8",
     );
-    expect(savedText.startsWith(`{\n  "schemaVersion": 2,\n`)).toBe(true);
+    expect(savedText.startsWith(`{\n  "schemaVersion": 3,\n`)).toBe(true);
     expect(savedText).not.toContain('"$schema"');
     expect(savedText).toContain('"id": "workspace-profile"');
     expect(savedText).not.toContain('"connection"');
@@ -353,10 +358,16 @@ describe("profile JSON schema contribution", () => {
         fileMatch: "**/.live-serial-plotter/profiles/*.jsonc",
         url: "./schemas/profile.schema.json",
       },
+      {
+        fileMatch: "**/.live-serial-plotter/layouts/*.jsonc",
+        url: "./schemas/layout.schema.json",
+      },
     ]);
-    expect(packageJson.scripts["schema:generate"]).toBe("node scripts/generate-profile-schema.mjs");
+    expect(packageJson.scripts["schema:generate"]).toBe(
+      "node scripts/generate-profile-schema.mjs && node scripts/generate-layout-schema.mjs",
+    );
     expect(packageJson.scripts["schema:check"]).toBe(
-      "node scripts/generate-profile-schema.mjs --check",
+      "node scripts/generate-profile-schema.mjs --check && node scripts/generate-layout-schema.mjs --check",
     );
   });
 

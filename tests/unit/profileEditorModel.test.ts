@@ -203,10 +203,11 @@ describe("profileEditorModel", () => {
 
 function createProfile(): ProfileConfig {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     id: "base",
     name: "Base",
     serialDefaults: { baudRate: 115200 },
+    layout: { defaultPreset: "builtin:default" },
     codec: { kind: "text", encoding: "utf8", sendLineEnding: "none" },
     framing: { kind: "line", delimiter: "auto" },
     parser: { kind: "builtin", mode: "auto" },

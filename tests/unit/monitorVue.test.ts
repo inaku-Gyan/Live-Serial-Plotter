@@ -3,8 +3,10 @@
 import { mount } from "@vue/test-utils";
 import { nextTick } from "vue";
 import { describe, expect, test, vi } from "vitest";
+import { defaultLayout } from "../../src/profiles/defaultLayout";
 import { builtinProfiles, defaultProfile } from "../../src/profiles/defaultProfile";
 import type {
+  LayoutConfig,
   OutputConfig,
   OutputPacket,
   ProfileConfig,
@@ -29,7 +31,7 @@ describe("MonitorApp", () => {
     expect(wrapper.find(".workspace").exists()).toBe(true);
     expect(wrapper.find(".send-row").exists()).toBe(true);
     expect(wrapper.find(".status").text()).toBe("Disconnected");
-    expect(adapter.renderOutputs).toHaveBeenCalledWith(defaultProfile.outputs);
+    expect(adapter.renderOutputs).toHaveBeenCalledWith(defaultProfile.outputs, defaultLayout);
     expect(vscode.messages).toContainEqual({
       type: "requestProfiles",
       profileKey: "builtin:default",
@@ -52,6 +54,10 @@ describe("MonitorApp", () => {
       })),
       activeProfile: profile,
       activeProfileKey: "builtin:jsonl-telemetry",
+      activeLayout: defaultLayout,
+      activeLayoutKey: "builtin:default",
+      layouts: [createLayoutSummary()],
+      layoutTargets: [],
     });
     await nextTick();
 
@@ -59,7 +65,7 @@ describe("MonitorApp", () => {
       "builtin:jsonl-telemetry",
     );
     expect(wrapper.text()).toContain("JSONL Telemetry (builtin)");
-    expect(adapter.renderOutputs).toHaveBeenLastCalledWith(profile.outputs);
+    expect(adapter.renderOutputs).toHaveBeenLastCalledWith(profile.outputs, defaultLayout);
   });
 
   test("profile selection posts selectProfile", async () => {
@@ -129,6 +135,8 @@ describe("MonitorApp", () => {
       type: "activeProfile",
       profile: scriptProfile,
       profileKey: "user:script",
+      layout: defaultLayout,
+      layoutKey: "builtin:default",
     });
     await nextTick();
 
@@ -201,6 +209,10 @@ function dispatchProfiles(activeProfile: ProfileConfig): void {
     })),
     activeProfile,
     activeProfileKey: `builtin:${activeProfile.id}`,
+    activeLayout: defaultLayout,
+    activeLayoutKey: "builtin:default",
+    layouts: [createLayoutSummary()],
+    layoutTargets: [],
   });
 }
 
@@ -209,23 +221,41 @@ function dispatchHostMessage(data: unknown): void {
 }
 
 interface MockOutputAdapter extends MonitorOutputAdapter {
-  renderOutputs: ReturnType<typeof vi.fn<(outputs: readonly OutputConfig[]) => void>>;
+  renderOutputs: ReturnType<
+    typeof vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>
+  >;
   appendPacket: ReturnType<typeof vi.fn<(packet: OutputPacket) => void>>;
   appendLegacyRawLine: ReturnType<typeof vi.fn<(line: string, timestamp: number) => void>>;
   appendLegacySeries: ReturnType<
     typeof vi.fn<(samples: readonly { t: number; values: Record<string, number> }[]) => void>
   >;
+  resetOutputView: ReturnType<typeof vi.fn<(outputId: string) => void>>;
+  resetPageLayout: ReturnType<typeof vi.fn<() => void>>;
+  captureSavableViewState: ReturnType<typeof vi.fn<() => LayoutConfig>>;
   dispose: ReturnType<typeof vi.fn<() => void>>;
 }
 
 function createOutputAdapter(): MockOutputAdapter {
   return {
-    renderOutputs: vi.fn<(outputs: readonly OutputConfig[]) => void>(),
+    renderOutputs: vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>(),
     appendPacket: vi.fn<(packet: OutputPacket) => void>(),
     appendLegacyRawLine: vi.fn<(line: string, timestamp: number) => void>(),
     appendLegacySeries:
       vi.fn<(samples: readonly { t: number; values: Record<string, number> }[]) => void>(),
+    resetOutputView: vi.fn<(outputId: string) => void>(),
+    resetPageLayout: vi.fn<() => void>(),
+    captureSavableViewState: vi.fn<() => LayoutConfig>(() => defaultLayout),
     dispose: vi.fn<() => void>(),
+  };
+}
+
+function createLayoutSummary() {
+  return {
+    key: "builtin:default",
+    ref: { scope: "builtin" as const, id: "default" },
+    id: "default",
+    name: "Default Monitor Layout",
+    scope: "builtin" as const,
   };
 }
 

@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 
 import { describe, expect, test, vi } from "vitest";
+import { defaultLayout } from "../../src/profiles/defaultLayout";
 import { defaultProfile } from "../../src/profiles/defaultProfile";
 import type {
+  LayoutConfig,
   OutputConfig,
   OutputPacket,
   ParserMode,
@@ -70,12 +72,24 @@ describe("monitor store", () => {
       ],
       activeProfile: profile,
       activeProfileKey: "user:telemetry",
+      activeLayout: defaultLayout,
+      activeLayoutKey: "builtin:default",
+      layouts: [
+        {
+          key: "builtin:default",
+          ref: { scope: "builtin", id: "default" },
+          id: "default",
+          name: "Default Monitor Layout",
+          scope: "builtin",
+        },
+      ],
+      layoutTargets: [],
     });
 
     expect(store.state.profileKey).toBe("user:telemetry");
     expect(store.state.baudRate).toBe(230_400);
     expect(store.state.parserMode).toBe("jsonl");
-    expect(adapter.renderOutputs).toHaveBeenLastCalledWith(profile.outputs);
+    expect(adapter.renderOutputs).toHaveBeenLastCalledWith(profile.outputs, defaultLayout);
   });
 
   test("keeps user-edited baud rate when profiles change", () => {
@@ -91,6 +105,8 @@ describe("monitor store", () => {
         serialDefaults: { baudRate: 115_200 },
       }),
       profileKey: "user:next",
+      layout: defaultLayout,
+      layoutKey: "builtin:default",
     });
 
     expect(store.state.baudRate).toBe(9_600);
@@ -167,6 +183,8 @@ describe("monitor store", () => {
         parser: { kind: "script", path: "parser.mjs" },
       }),
       profileKey: "user:script",
+      layout: defaultLayout,
+      layoutKey: "builtin:default",
     });
 
     expect(store.parserModeSelectDisabled.value).toBe(true);
@@ -186,22 +204,30 @@ function createStore(vscode: VsCodeApi<MonitorPersistedState>): {
 }
 
 interface MockOutputAdapter extends MonitorOutputAdapter {
-  renderOutputs: ReturnType<typeof vi.fn<(outputs: readonly OutputConfig[]) => void>>;
+  renderOutputs: ReturnType<
+    typeof vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>
+  >;
   appendPacket: ReturnType<typeof vi.fn<(packet: OutputPacket) => void>>;
   appendLegacyRawLine: ReturnType<typeof vi.fn<(line: string, timestamp: number) => void>>;
   appendLegacySeries: ReturnType<
     typeof vi.fn<(samples: readonly { t: number; values: Record<string, number> }[]) => void>
   >;
+  resetOutputView: ReturnType<typeof vi.fn<(outputId: string) => void>>;
+  resetPageLayout: ReturnType<typeof vi.fn<() => void>>;
+  captureSavableViewState: ReturnType<typeof vi.fn<() => LayoutConfig>>;
   dispose: ReturnType<typeof vi.fn<() => void>>;
 }
 
 function createOutputAdapter(): MockOutputAdapter {
   return {
-    renderOutputs: vi.fn<(outputs: readonly OutputConfig[]) => void>(),
+    renderOutputs: vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>(),
     appendPacket: vi.fn<(packet: OutputPacket) => void>(),
     appendLegacyRawLine: vi.fn<(line: string, timestamp: number) => void>(),
     appendLegacySeries:
       vi.fn<(samples: readonly { t: number; values: Record<string, number> }[]) => void>(),
+    resetOutputView: vi.fn<(outputId: string) => void>(),
+    resetPageLayout: vi.fn<() => void>(),
+    captureSavableViewState: vi.fn<() => LayoutConfig>(() => defaultLayout),
     dispose: vi.fn<() => void>(),
   };
 }
