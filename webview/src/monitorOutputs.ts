@@ -19,7 +19,10 @@ import type {
   TimeSeriesWindowConfig,
   ToExtensionMessage,
 } from "../../src/shared/protocol";
-import { createTimeSeriesInteractionPlugins } from "./monitor/uplotInteractions";
+import {
+  createTimeSeriesInteractionPlugins,
+  defaultTimeSeriesInteractionConfig,
+} from "./monitor/uplotInteractions";
 
 type PostMessage = (message: ToExtensionMessage) => void;
 
@@ -549,7 +552,9 @@ class TimeSeriesLineView implements OutputView {
         legend: {
           show: false,
         },
+        cursor: defaultTimeSeriesInteractionConfig.cursor,
         plugins: createTimeSeriesInteractionPlugins({
+          config: defaultTimeSeriesInteractionConfig,
           onScaleChanged: (scaleKey) => this.handlePlotScaleChanged(scaleKey),
           resetView: () => this.resetView(),
         }),

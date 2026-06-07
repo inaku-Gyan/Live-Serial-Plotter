@@ -12,6 +12,7 @@ import { MonitorOutputController } from "../../webview/src/monitorOutputs";
 interface MockUPlotInstance {
   options: {
     axes?: Array<{ label?: string; side?: number }>;
+    cursor?: unknown;
     hooks?: {
       setScale?: Array<(plot: MockUPlotInstance, scaleKey: string) => void>;
       ready?: Array<(plot: MockUPlotInstance) => void>;
@@ -397,7 +398,7 @@ describe("MonitorOutputController", () => {
     expect(plot.redraw).toHaveBeenLastCalledWith(true, false);
   });
 
-  test("zooms the x range with the uPlot wheel interaction plugin", () => {
+  test("zooms the x range with ctrl wheel through the uPlot interaction config", () => {
     const { controller } = createController();
     controller.renderOutputs([
       {
@@ -424,6 +425,7 @@ describe("MonitorOutputController", () => {
         bubbles: true,
         cancelable: true,
         clientX: 200,
+        ctrlKey: true,
         deltaY: -100,
       }),
     );
@@ -451,6 +453,115 @@ describe("MonitorOutputController", () => {
       false,
     );
     expect(plot.redraw).toHaveBeenLastCalledWith(true, false);
+  });
+
+  test("pans y scales with ordinary wheel through the uPlot interaction config", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    plot.scales.y1 = { min: 0, max: 100 };
+    plot.scales.y2 = { min: 200, max: 300 };
+
+    plot.over.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaY: 26,
+      }),
+    );
+
+    expect(plot.setScale).toHaveBeenCalledWith("y1", { min: 10, max: 110 });
+    expect(plot.setScale).toHaveBeenCalledWith("y2", { min: 210, max: 310 });
+  });
+
+  test("pans the x range with shift wheel through the uPlot interaction config", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+
+    plot.over.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaY: 40,
+        shiftKey: true,
+      }),
+    );
+
+    const panCall = plot.setScale.mock.calls.at(-1);
+    expect(panCall?.[0]).toBe("x");
+    expect(panCall?.[1].min).toBeCloseTo(0.2);
+    expect(panCall?.[1].max).toBeCloseTo(2.2);
+  });
+
+  test("pans both axes with touchpad wheel deltas through the uPlot interaction config", () => {
+    const { controller } = createController();
+    controller.renderOutputs([
+      {
+        ...createTimeSeriesOutput(),
+        window: { mode: "points", maxPoints: 3 },
+      },
+    ]);
+    controller.appendPacket({
+      kind: "timeSeriesAppend",
+      outputId: "plot",
+      seq: 1,
+      receivedAt: 1_000,
+      samples: [
+        { time: 0, values: { temp: 20, rpm: 1 } },
+        { time: 1, values: { temp: 21, rpm: 2 } },
+        { time: 2, values: { temp: 22, rpm: 3 } },
+      ],
+    });
+    const plot = latestPlot();
+    plot.scales.y1 = { min: 0, max: 100 };
+
+    plot.over.dispatchEvent(
+      new WheelEvent("wheel", {
+        bubbles: true,
+        cancelable: true,
+        deltaX: 40,
+        deltaY: 26,
+      }),
+    );
+
+    expect(plot.setScale).toHaveBeenCalledWith("x", {
+      min: 0.2,
+      max: 2.2,
+    });
+    expect(plot.setScale).toHaveBeenCalledWith("y1", { min: 10, max: 110 });
   });
 
   test("pans the x range with the uPlot pointer interaction plugin", () => {
