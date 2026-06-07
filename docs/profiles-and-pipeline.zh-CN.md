@@ -22,6 +22,9 @@ profile 等价于当前默认行为：UTF-8 文本 codec、行分割、`auto` pa
 扩展会为工作区 `.live-serial-plotter/profiles/*.jsonc` 文件提供 JSON Schema 校验、补全和 hover 说明。通过侧边栏复制或保存的
 profile 会自动写入 `$schema: "vscode://schemas/live-serial-plotter/profile"`，因此手动打开用户全局 profile JSONC 时也能获得同样的编辑支持。
 
+`schemas/profile.schema.json` 由 TypeScript 的 profile 类型生成。修改 `ProfileConfig`、parser、output 或相关配置类型后，运行
+`pnpm schema:generate` 更新 schema；`pnpm schema:check` 会检查提交的 schema 是否已经同步。
+
 Profile id 只需要在自己的命名空间内唯一。命名空间包括：
 
 - 每个 VS Code workspace folder。

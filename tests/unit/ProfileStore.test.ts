@@ -1,6 +1,8 @@
+import { execFile } from "node:child_process";
 import { mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { promisify } from "node:util";
 import { describe, expect, test } from "vitest";
 import packageJson from "../../package.json";
 import { builtinProfiles, defaultProfile } from "../../src/profiles/defaultProfile";
@@ -12,6 +14,8 @@ import {
   ProfileStore,
   type WorkspaceProfilesDirectory,
 } from "../../src/profiles/ProfileStore";
+
+const execFileAsync = promisify(execFile);
 
 describe("ProfileStore", () => {
   test("loads builtin and workspace JSONC profiles", async () => {
@@ -349,6 +353,10 @@ describe("profile JSON schema contribution", () => {
         url: "./schemas/profile.schema.json",
       },
     ]);
+    expect(packageJson.scripts["schema:generate"]).toBe("node scripts/generate-profile-schema.mjs");
+    expect(packageJson.scripts["schema:check"]).toBe(
+      "node scripts/generate-profile-schema.mjs --check",
+    );
   });
 
   test("ships a schema with the expected id", async () => {
@@ -360,6 +368,16 @@ describe("profile JSON schema contribution", () => {
 
     expect(isRecord(schema) ? schema.$id : undefined).toBe(profileSchemaUri);
   });
+
+  test("keeps the generated profile schema up to date", async () => {
+    await expect(
+      execFileAsync(
+        process.execPath,
+        [path.join(import.meta.dirname, "../../scripts/generate-profile-schema.mjs"), "--check"],
+        { cwd: path.join(import.meta.dirname, "../..") },
+      ),
+    ).resolves.toBeDefined();
+  }, 10_000);
 });
 
 function createWorkspaceDirectory(

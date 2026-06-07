@@ -67,19 +67,57 @@ export interface ProfileEditorState {
   errors: string[];
 }
 
+/**
+ * Serial protocol, parser, and output configuration for one Live Serial Plotter profile.
+ */
 export interface ProfileConfig {
+  /**
+   * Profile schema version. Version 2 is the only supported profile format.
+   * @asType integer
+   */
   schemaVersion: 2;
+  /**
+   * Profile id. It must be unique within its user or workspace namespace.
+   * @minLength 1
+   */
   id: string;
+  /**
+   * Human-readable profile name shown in the profile picker and sidebar.
+   * @minLength 1
+   */
   name: string;
+  /**
+   * Optional serial defaults suggested when this profile is selected.
+   */
   serialDefaults?: SerialDefaultsConfig;
+  /**
+   * Codec used to decode received bytes and encode sent text.
+   */
   codec: CodecConfig;
+  /**
+   * Framing strategy applied before parsing serial data.
+   */
   framing: FramingConfig;
+  /**
+   * Parser used to convert frames into field records.
+   */
   parser: ParserConfig;
+  /**
+   * Output sinks and renderers fed by parsed records.
+   * @minItems 1
+   */
   outputs: OutputConfig[];
+  /**
+   * Optional export defaults for future capture/export workflows.
+   */
   export?: ExportConfig;
 }
 
 export interface SerialDefaultsConfig {
+  /**
+   * Default serial baud rate suggested when this profile is selected.
+   * @exclusiveMinimum 0
+   */
   baudRate?: number;
 }
 
@@ -88,15 +126,37 @@ export type LineEnding = "none" | "lf" | "crlf" | "cr";
 export type CodecConfig = TextCodecConfig;
 
 export interface TextCodecConfig {
+  /**
+   * Text codec is the only supported codec kind.
+   */
   kind: "text";
+  /**
+   * UTF-8 is the only supported text encoding.
+   */
   encoding: "utf8";
+  /**
+   * Line ending appended when sending text from the monitor page.
+   */
   sendLineEnding?: LineEnding;
 }
 
 export interface LineFramingConfig {
+  /**
+   * Line framing is the only supported framing kind.
+   */
   kind: "line";
+  /**
+   * Delimiter used to split decoded text into frames.
+   */
   delimiter: "auto" | "lf" | "crlf" | "cr";
+  /**
+   * Whether to trim framed text before parsing.
+   */
   trim?: boolean;
+  /**
+   * Maximum buffered frame size in bytes.
+   * @exclusiveMinimum 0
+   */
   maxFrameBytes?: number;
 }
 
@@ -105,20 +165,48 @@ export type FramingConfig = LineFramingConfig;
 export type ParserConfig = BuiltinParserConfig | ScriptParserConfig;
 
 export interface BuiltinParserConfig {
+  /**
+   * Builtin parser selected by mode.
+   */
   kind: "builtin";
+  /**
+   * Builtin parser mode.
+   */
   mode: ParserMode;
+  /**
+   * Parser-specific JSON options.
+   */
   options?: JsonObject;
 }
 
 export interface ScriptParserConfig {
+  /**
+   * Workspace script parser.
+   */
   kind: "script";
+  /**
+   * Workspace-relative parser path under .live-serial-plotter/parsers.
+   * @minLength 1
+   */
   path: string;
+  /**
+   * Parser-specific JSON options passed to createParser().
+   */
   options?: JsonObject;
 }
 
 export interface ExportConfig {
+  /**
+   * Data source exported by default.
+   */
   mode: "raw" | "parsed" | "packets";
+  /**
+   * File format used by default.
+   */
   format: "txt" | "csv" | "jsonl";
+  /**
+   * Whether export output should include metadata fields.
+   */
   includeMetadata?: boolean;
 }
 
@@ -129,76 +217,250 @@ export type OutputConfig =
   | FramePlot2dOutputConfig;
 
 export interface OutputConfigBase {
+  /**
+   * Output id unique within this profile.
+   * @minLength 1
+   */
   id: string;
+  /**
+   * Human-readable output title.
+   */
   title?: string;
 }
 
 export interface TerminalAppendOutputConfig extends OutputConfigBase {
+  /**
+   * Appends lines to a terminal-style log.
+   */
   kind: "terminalAppend";
+  /**
+   * Text source for appended terminal lines.
+   */
   source?: "raw" | "template";
+  /**
+   * Template used when source is `template`.
+   */
   template?: string;
+  /**
+   * Maximum terminal lines retained by the Webview.
+   * @exclusiveMinimum 0
+   */
   maxLines?: number;
+  /**
+   * Whether the terminal should auto-scroll to new lines.
+   */
   autoScroll?: boolean;
+  /**
+   * Terminal rendering style.
+   */
   style?: TerminalStyleConfig;
 }
 
 export interface TerminalFrameOutputConfig extends OutputConfigBase {
+  /**
+   * Replaces a terminal frame by frame id.
+   */
   kind: "terminalFrame";
+  /**
+   * Template rendered for each frame.
+   */
   template: string;
+  /**
+   * Field used as the frame id. Falls back to sequence number.
+   */
   frameId?: FieldReferenceConfig;
+  /**
+   * Terminal rendering style.
+   */
   style?: TerminalStyleConfig;
 }
 
 export interface TerminalStyleConfig {
+  /**
+   * Font family source.
+   */
   font?: "editor" | "ui";
+  /**
+   * Whether terminal text wraps.
+   */
   wrap?: boolean;
+  /**
+   * Per-level line styles.
+   */
   levels?: Partial<Record<TerminalLineLevel, TerminalLineStyle>>;
 }
 
 export type TerminalLineLevel = "info" | "warn" | "error" | "debug";
 
 export interface TerminalLineStyle {
+  /**
+   * CSS color string.
+   */
   color?: string;
 }
 
 export interface TimeSeriesLineOutputConfig extends OutputConfigBase {
+  /**
+   * Streams numeric samples to a time-series line chart.
+   */
   kind: "timeSeriesLine";
+  /**
+   * Time axis configuration.
+   */
   time: TimeAxisConfig;
+  /**
+   * Series map. Leave empty to plot all numeric parser fields automatically.
+   */
   series: Record<string, TimeSeriesConfig>;
-  window?: {
-    mode: "points" | "duration";
-    maxPoints?: number;
-    seconds?: number;
-  };
+  /**
+   * Rolling chart retention window.
+   */
+  window?: TimeSeriesWindowConfig;
   style?: {
+    /**
+     * Whether the chart legend is visible.
+     */
     showLegend?: boolean;
   };
 }
 
+export type TimeSeriesWindowConfig = PointsTimeSeriesWindowConfig | DurationTimeSeriesWindowConfig;
+
+export interface PointsTimeSeriesWindowConfig {
+  /**
+   * Retain a maximum number of samples.
+   */
+  mode: "points";
+  /**
+   * Maximum samples retained in points mode.
+   * @exclusiveMinimum 0
+   */
+  maxPoints?: number;
+}
+
+export interface DurationTimeSeriesWindowConfig {
+  /**
+   * Retain samples for a rolling duration.
+   */
+  mode: "duration";
+  /**
+   * Rolling duration retained in duration mode.
+   * @exclusiveMinimum 0
+   */
+  seconds?: number;
+}
+
 export interface TimeSeriesConfig {
+  /**
+   * Parsed field path used as the series value.
+   * @minLength 1
+   */
   field: string;
+  /**
+   * Human-readable series label.
+   */
   label?: string;
+  /**
+   * Unit displayed beside values.
+   */
   unit?: string;
+  /**
+   * Numeric multiplier applied before plotting.
+   */
   scale?: number;
+  /**
+   * CSS color string.
+   */
   color?: string;
+  /**
+   * Initial series visibility.
+   */
   visible?: boolean;
   line?: {
+    /**
+     * Stroke width in pixels.
+     * @exclusiveMinimum 0
+     */
     width?: number;
     dash?: "solid" | "dash";
   };
   format?: {
+    /**
+     * Decimal places shown in labels.
+     * @minimum 0
+     */
     decimals?: number;
   };
 }
 
 export type TimeAxisConfig =
-  | { source: "hostReceived"; unit?: "s" | "ms"; zero?: "none" | "first" }
-  | { source: "field"; field: string; unit: "s" | "ms" | "us"; zero?: "none" | "first" }
-  | { source: "fixedInterval"; intervalMs: number }
-  | { source: "sequence" };
+  | HostReceivedTimeAxisConfig
+  | FieldTimeAxisConfig
+  | FixedIntervalTimeAxisConfig
+  | SequenceTimeAxisConfig;
+
+export interface HostReceivedTimeAxisConfig {
+  /**
+   * Use the host receive timestamp as the x-axis value.
+   */
+  source: "hostReceived";
+  /**
+   * Unit used for host timestamps.
+   */
+  unit?: "s" | "ms";
+  /**
+   * Whether to zero the time axis against the first sample.
+   */
+  zero?: "none" | "first";
+}
+
+export interface FieldTimeAxisConfig {
+  /**
+   * Use a parsed field as the x-axis value.
+   */
+  source: "field";
+  /**
+   * Parsed field path containing the time value.
+   * @minLength 1
+   */
+  field: string;
+  /**
+   * Unit used by the parsed time field.
+   */
+  unit: "s" | "ms" | "us";
+  /**
+   * Whether to zero the time axis against the first sample.
+   */
+  zero?: "none" | "first";
+}
+
+export interface FixedIntervalTimeAxisConfig {
+  /**
+   * Generate x-axis values from a fixed sample interval.
+   */
+  source: "fixedInterval";
+  /**
+   * Interval between samples in milliseconds.
+   * @exclusiveMinimum 0
+   */
+  intervalMs: number;
+}
+
+export interface SequenceTimeAxisConfig {
+  /**
+   * Use the frame sequence number as the x-axis value.
+   */
+  source: "sequence";
+}
 
 export interface FramePlot2dOutputConfig extends OutputConfigBase {
+  /**
+   * Renders per-frame 2D point layers.
+   */
   kind: "framePlot2d";
+  /**
+   * Field used as the frame id. Falls back to sequence number.
+   */
   frameId?: FieldReferenceConfig;
   bounds?: {
     xMin: number;
@@ -207,20 +469,49 @@ export interface FramePlot2dOutputConfig extends OutputConfigBase {
     yMax: number;
   };
   points: {
+    /**
+     * Parsed field path containing point objects.
+     * @minLength 1
+     */
     field: string;
+    /**
+     * Point object field path used as x coordinate.
+     * @minLength 1
+     */
     x: string;
+    /**
+     * Point object field path used as y coordinate.
+     * @minLength 1
+     */
     y: string;
   };
+  /**
+   * Per-style-key point styles.
+   */
   styles?: Record<string, Plot2dPointStyle>;
 }
 
 export interface FieldReferenceConfig {
+  /**
+   * Field references resolve against parsed fields.
+   */
   source: "field";
+  /**
+   * Parsed field path.
+   * @minLength 1
+   */
   field: string;
 }
 
 export interface Plot2dPointStyle {
+  /**
+   * CSS color string.
+   */
   color?: string;
+  /**
+   * Point radius in pixels.
+   * @exclusiveMinimum 0
+   */
   size?: number;
 }
 
