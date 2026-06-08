@@ -133,35 +133,20 @@ Live Serial Plotter 优先做成 VS Code 内的轻量实时串口可视化工具
 - [ ] 可选时间戳显示：raw log 每行显示本地时间或相对时间。
 - [ ] 支持复制选中日志、清空日志、保存日志。
 
-## 阶段 6：架构演进和 Vue 3 评估
+## 阶段 6：UI 架构演进
 
-目标：在功能复杂度上升时保持可维护性，但不为了框架而重写。
+目标：在功能复杂度上升时保持 UI 可维护性，并为更多 output renderer 类型预留清晰扩展点。
 
-### 先做 Vanilla TypeScript 模块化
+当前 Webview 已采用 Vue 3 外壳 + 命令式高频 renderer。具体架构路线图见
+`docs/ui-architecture-roadmap.zh-CN.md`，后续 UI 重构应按该文档重新分析和制定阶段级详细计划。
 
-- [ ] 拆分 Webview bridge：封装 `acquireVsCodeApi()`、`postMessage()`、状态持久化。
-- [ ] 拆分 controls：端口、波特率、parser、连接按钮和发送表单。
-- [ ] 拆分 plot：uPlot 实例、数据数组、legend、resize、series 更新。
-- [ ] 拆分 raw log：日志缓冲、滚动策略、清空和导出。
-- [ ] 拆分 toast/status：错误提示和连接状态展示。
+### 架构演进方向
 
-### 触发 Vue 3 迁移的条件
-
-满足以下多个条件时再考虑迁移：
-
-- UI 出现多个复杂面板，例如 profile、记录、回放、通道配置、命令面板。
-- Webview 入口文件再次增长到难以维护，并且模块化后仍不够清晰。
-- 表单、列表、条件渲染和组件复用成为主要开发成本。
-- 需要更系统的组件测试和 UI 状态组织。
-
-### Vue 3 迁移原则
-
-- [ ] 只迁移 Webview UI 层，不重写 Extension Host、parser、serial service 和 shared protocol。
-- [ ] 使用 Vue 3 + Composition API + Single File Components。
-- [ ] Vue 管理低频 UI 状态：端口、连接状态、parser、profile、toast、通道可见性。
-- [ ] uPlot 实例和大批量图表数据保持非响应式，例如使用 `shallowRef`、`markRaw` 或模块内普通变量。
-- [ ] 高频数据流不直接驱动组件整树渲染。
-- [ ] 迁移前先补齐当前 Webview 行为测试，迁移后用同一组测试验证无回归。
+- [ ] 模块化 monitor output renderer，降低 `monitorOutputs` 复杂度。
+- [ ] 模块化 profile editor 表单，让 profile/layout 可视化配置继续扩展。
+- [ ] 整理 Webview Host 与 bridge 边界，减少 HTML/CSP/asset helper 重复。
+- [ ] 在 output 类型继续增加后，再评估轻量 renderer registry。
+- [ ] 为记录、导出和回放工作流预留 session/render 边界。
 
 ## 阶段 7：测试、CI 和发布质量
 
@@ -183,7 +168,7 @@ Live Serial Plotter 优先做成 VS Code 内的轻量实时串口可视化工具
 3. 加记录和 CSV 导出，因为这会明显提升实际调试价值。
 4. 加图表游标、缩放和通道配置。
 5. 加 profile 和 parser preset。
-6. 再评估是否迁移 Vue 3。
+6. 按 `docs/ui-architecture-roadmap.zh-CN.md` 持续推进 UI 架构演进。
 
 ## 暂不优先的方向
 
@@ -191,6 +176,6 @@ Live Serial Plotter 优先做成 VS Code 内的轻量实时串口可视化工具
 - Web 版 VS Code 支持。
 - 在 Webview 中执行用户自定义 JavaScript。
 - 大型 UI 组件库。
-- 在首版引入 React 或 Vue 3 全量重写。
+- 引入 React 或大型全量 UI 重写。
 
 这些方向不是不能做，而是会显著扩大范围。除非产品目标改变，否则应等核心串口可视化链路稳定后再评估。

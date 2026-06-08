@@ -36,11 +36,18 @@
 ### 监视器页面 Vue 外壳与高频渲染边界
 
 - 监视器页面使用 Vue 3 管理低频 UI 外壳：toolbar、profile/port/baud/parser 状态、send row、toast、output workspace 容器。
-- 不引入 Pinia；沿用 typed composable store 风格。
+- 当前阶段不引入 Pinia；沿用 typed composable store 风格。该约束是基于当前状态规模和页面边界的阶段性架构判断，不是永久禁令；当多个 Webview 页面共享复杂实体状态、跨页面同步或 store 组合复杂度显著上升时，应重新评估。
 - uPlot、canvas、终端输出等高频渲染保留命令式 adapter。
 - uPlot 实例、图表数据数组、canvas frame 数据不得放入 Vue 深层响应式状态。
 - `outputPacket`、legacy `rawLine`、legacy `seriesAppend` 直接转发给命令式 renderer，不进入 Vue reactive packet buffer。
 - 不引入 React。
+
+### UI 架构重构路线图
+
+- UI 重构应按架构层级长期规划，而不是固定三阶段执行；每个阶段真正开工前都需要重新分析当前代码、需求和测试，再制定阶段级详细计划。
+- 架构路线图文档为 `docs/ui-architecture-roadmap.zh-CN.md`，用于记录长期边界、阶段规划要求、进入/退出条件和后续复评点。
+- 长期优先为更多 output renderer 类型预留空间，例如更多 chart、terminal、frame、export preview 或 replay view；但在需要前不提前引入过重插件系统。
+- 现有测试不是不可变资产。重构时可以修改、移动或移除旧测试，但必须用等价或更好的行为覆盖替代，特别是 renderer 生命周期、layout capture/reset、高频数据路径和 profile editor autosave。
 
 ### Time-Series Plot 行为
 
