@@ -29,6 +29,56 @@
 - Pinia 不是永久禁令。当 profile/layout/editor/replay/capture 等多个页面需要共享复杂实体状态，或 store 组合、订阅、缓存和跨页面同步成为主要维护成本时，应重新评估。
 - 旧测试可以修改、移动或移除，但必须保留行为覆盖。重构的目标不是维护测试文件形状，而是维护用户可见行为和关键架构约束。
 
+### UI 数据流
+
+Monitor 页面数据流：
+
+```txt
+Extension Host
+  -> ToWebviewMessage / ToExtensionMessage
+  -> monitor store
+  -> Vue shell components
+  -> OutputWorkspace DOM root
+  -> MonitorOutputController
+  -> renderer views: terminal / uPlot / canvas
+```
+
+Profile Editor 数据流：
+
+```txt
+Extension Host profile/layout stores
+  -> ToProfileEditorWebviewMessage / ToProfileEditorMessage
+  -> profile editor store
+  -> ProfileEditorPatch
+  -> Vue form sections
+  -> profileEditorModel
+  -> ProfileConfig autosave message
+```
+
+关键方向：
+
+- Host 是跨 Webview、文件系统、串口和 VS Code API 的边界。
+- Webview store 只承接低频 UI 状态、host message 和用户命令。
+- Vue component 只负责展示、表单输入和局部交互。
+- 命令式 renderer 独占高频渲染状态和图表/画布/终端实例。
+- profile/editor model 层负责配置对象和可编辑表单 patch 的转换。
+
+### 状态归属规则
+
+后续新增 UI 状态时，先按以下规则判断归属：
+
+| 状态或职责 | 归属层 | 说明 |
+| --- | --- | --- |
+| 串口连接、端口枚举、profile/layout 文件读写、script parser trust | Extension Host | 涉及 VS Code API、Node 能力、文件系统或跨 Webview 协调。 |
+| Extension Host 与 Webview 的消息形状 | `src/shared/protocol.ts` | 先改 discriminated union，再同步两端处理。 |
+| profile/layout 配置语义和 schema 类型 | `src/shared/protocol.ts`、`src/profiles/` | 配置语义属于共享协议和 profile/layout store，不属于 Vue 组件。 |
+| monitor 低频 UI 状态 | monitor store | profile/port/baud/parser 选择、连接状态、toast、layout 控制等。 |
+| profile editor 页面状态 | profile editor store | selected profile、view、menu、status、autosave debounce。 |
+| editable profile 表单 patch | `profileEditorModel.ts` | 负责 `ProfileConfig` 与表单字符串/checkbox/select 状态互转。 |
+| uPlot 实例、plot 数据数组、series visibility、canvas frame、terminal buffer | 命令式 renderer | 不进入 Vue 深层响应式状态，也不通过组件树逐点更新。 |
+| renderer view state capture/reset | renderer view + layout config | runtime 状态由 renderer 持有，显式保存时转成 layout view config。 |
+| 纯展示格式化和局部 DOM 交互 | Vue component 或 renderer 内部 helper | 只影响本组件或本 renderer，不上升到 store。 |
+
 ## 2. Monitor Output Renderer 层
 
 目标是降低命令式输出区复杂度，并为新增 output renderer 类型留出清晰入口。
@@ -130,7 +180,24 @@ registry 的约束：
 - 每种 renderer 的 config、packet、layout view state 是否有足够稳定的 discriminated union。
 - profile editor 是否需要借用同一份 renderer metadata 来决定可编辑字段和只读展示。
 
-## 6. 数据记录、导出与回放工作流
+## 6. 未来能力影响矩阵
+
+下表用于后续新增能力时快速判断需要重新设计的架构层。它不是实现清单；每个能力开工前仍需重新分析。
+
+| 未来能力 | 主要影响层 | 开工前重点判断 |
+| --- | --- | --- |
+| 新 chart renderer，例如 histogram、scatter、gauge | protocol、renderer factory、layout view state、profile editor | 是否新增 `OutputConfig` / `OutputPacket` union；是否需要 renderer registry；profile editor 是可编辑还是只读展示。 |
+| 新 terminal/structured table renderer | renderer view、layout preset、output mapper | 数据是否仍适合 `outputPacket`；是否有最大行数/最大记录数；是否需要排序、过滤或列配置。 |
+| output renderer metadata | renderer 扩展平台、profile editor | metadata 是否只用于注册和展示，还是会影响协议和 schema；避免把 renderer 内部状态暴露成公共 API。 |
+| Layout 可视化编辑 | profile editor 或独立 layout editor、layout store、Webview bridge | 是否与 profile editor 共用 store；是否需要 preview；Save/Save As 语义是否仍只写 layout preset。 |
+| Profile 导入/导出 | Extension Host、profile store、profile editor | 文件选择、冲突命名、schema validation、错误展示应在 Host 和 editor store 间如何分工。 |
+| 记录和导出 | session/capture 层、Extension Host、可选 export preview renderer | capture buffer 放在哪里；导出 raw、parsed 还是 packet；是否需要独立记录状态而不是复用连接状态。 |
+| 离线回放 | session/replay 层、monitor store、renderer views | 是否复用 `outputPacket`；回放时间轴和串口连接状态必须分离；renderer 能否无串口连接运行。 |
+| 暂停/继续渲染 | monitor store、renderer controller、session buffer | 暂停时继续接收的数据是缓存、丢弃还是只暂停绘制；高频路径不能因暂停 UI 变慢。 |
+| 常用命令和发送历史 | monitor store、profile schema、Extension Host persistence | 哪些命令写入 profile，哪些只是 window/session 历史；行尾规则仍由 codec/send 配置统一处理。 |
+| 多 Webview 协调 | Extension Host、shared protocol | 不依赖 Webview 内状态共享；跨 panel/sidebar 同步通过 Host 和消息协议完成。 |
+
+## 7. 数据记录、导出与回放工作流
 
 记录、导出和回放会把 UI 从纯实时 monitor 推向“实时 + 离线复盘”双模式。该方向会影响架构，但不应提前压进当前 renderer 拆分。
 
@@ -149,7 +216,7 @@ registry 的约束：
 - 导出数据不写入 layout 或 profile。
 - 回放模式尽量复用 renderer，但不要复用串口连接状态。
 
-## 7. 测试策略
+## 8. 测试策略
 
 UI 重构期间，测试策略应以行为和架构约束为准，而不是以旧测试文件不变为准。
 
