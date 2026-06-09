@@ -16,7 +16,7 @@ import {
   type ToWebviewMessage,
 } from "../../../src/shared/protocol";
 import { isBaudRateInputValid, parseBaudRateInput } from "../baudRate";
-import { MonitorOutputController } from "../monitorOutputs";
+import { MonitorOutputController } from "../monitor-outputs/controller";
 
 export interface VsCodeApi<State> {
   getState(): State | undefined;

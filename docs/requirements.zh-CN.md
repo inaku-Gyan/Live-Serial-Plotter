@@ -90,7 +90,7 @@
 - uPlot 只在通道结构或结构性配置变化时重建；普通追加用 `setData()`，可见性切换用 `setSeries()`，尺寸变化用 `setSize()`。
 - 持续运行场景必须保留最大点数和最大日志行数限制。
 - 修改 parser、串口读取、缓冲、批处理或图表数据变换时优先补充 Vitest 单元测试。
-- 涉及监视器 Vue 外壳时补充 store 和 Vue 组件测试；涉及命令式 output renderer 时补充 `monitorOutputs` 测试。
+- 涉及监视器 Vue 外壳时补充 store 和 Vue 组件测试；涉及命令式 output renderer 时补充 `monitor-outputs` 测试。
 
 ## 已发现并处理的冲突
 

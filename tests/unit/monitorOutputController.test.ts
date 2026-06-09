@@ -8,7 +8,7 @@ import type {
   TimeSeriesLineOutputConfig,
   ToExtensionMessage,
 } from "../../src/shared/protocol";
-import { MonitorOutputController } from "../../webview/src/monitorOutputs";
+import { MonitorOutputController } from "../../webview/src/monitor-outputs/controller";
 
 const uPlotPathCacheKey = "_paths";
 
