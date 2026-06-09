@@ -1,4 +1,8 @@
-import type { LayoutConfig, OutputConfig, OutputLayoutConfig } from "../../../src/shared/protocol";
+import type {
+  LayoutConfig,
+  OutputConfig,
+  OutputLayoutConfig,
+} from "../../../../../src/shared/protocol";
 
 export function sortOutputsByLayout(
   outputs: readonly OutputConfig[],

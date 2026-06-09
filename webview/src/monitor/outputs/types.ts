@@ -4,7 +4,7 @@ import type {
   OutputPacket,
   TimeSeriesViewLayoutConfig,
   ToExtensionMessage,
-} from "../../../src/shared/protocol";
+} from "../../../../src/shared/protocol";
 
 export type PostMessage = (message: ToExtensionMessage) => void;
 

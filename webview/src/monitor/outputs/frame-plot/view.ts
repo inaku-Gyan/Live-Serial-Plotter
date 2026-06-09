@@ -4,8 +4,8 @@ import type {
   FramePlot2dViewLayoutConfig,
   OutputLayoutConfig,
   OutputPacket,
-} from "../../../src/shared/protocol";
-import { createPanelHeader } from "./panelChrome";
+} from "../../../../../src/shared/protocol";
+import { createPanelHeader } from "../panel/chrome";
 import {
   drawCenterAxes,
   getCanvasContext,
@@ -13,8 +13,8 @@ import {
   inferBounds,
   readCssColor,
   scaleLinear,
-} from "./canvasUtils";
-import type { OutputView } from "./types";
+} from "./canvas";
+import type { OutputView } from "../types";
 
 export class FramePlot2dView implements OutputView {
   readonly outputId: string;

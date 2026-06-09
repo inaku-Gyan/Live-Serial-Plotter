@@ -4,9 +4,9 @@ import type {
   TerminalFrameOutputConfig,
   TerminalFramePacket,
   TerminalViewLayoutConfig,
-} from "../../../src/shared/protocol";
-import { createPanelHeader } from "./panelChrome";
-import type { OutputView } from "./types";
+} from "../../../../../src/shared/protocol";
+import { createPanelHeader } from "../panel/chrome";
+import type { OutputView } from "../types";
 
 export class TerminalFrameView implements OutputView {
   readonly outputId: string;

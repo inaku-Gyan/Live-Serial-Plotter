@@ -142,7 +142,7 @@ Live Serial Plotter 优先做成 VS Code 内的轻量实时串口可视化工具
 
 ### 架构演进方向
 
-- [x] 模块化 monitor output renderer，降低命令式输出区复杂度。
+- [x] 细分 monitor output renderer 目录，降低命令式输出区复杂度。
 - [ ] 模块化 profile editor 表单，让 profile/layout 可视化配置继续扩展。
 - [ ] 整理 Webview Host 与 bridge 边界，减少 HTML/CSP/asset helper 重复。
 - [ ] 在 output 类型继续增加后，再评估轻量 renderer registry。

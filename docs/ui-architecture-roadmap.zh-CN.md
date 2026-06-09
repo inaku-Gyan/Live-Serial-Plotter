@@ -92,10 +92,10 @@ Extension Host profile/layout stores
 
 已完成：
 
-- `MonitorOutputController` 和各 renderer 已迁移到 `webview/src/monitor-outputs/`，旧 `monitorOutputs.ts` 入口已移除。
-- `terminalAppend`、`terminalFrame`、`timeSeriesLine`、`framePlot2d` 已拆成独立 renderer view 文件，并通过局部 `createOutputView()` factory 创建；当前没有引入 registry。
-- panel header、panel layout、time-series plot helper 和 canvas helper 已按职责拆出，renderer 仍各自持有自己的命令式 DOM、uPlot/canvas 实例和 runtime view state。
-- monitor store 和测试直接导入 `webview/src/monitor-outputs/controller.ts`；高频 `outputPacket` 路由、layout capture/reset、profile 切换清理和 time-series follow/zoom 行为已由现有测试覆盖。
+- `MonitorOutputController` 和各 renderer 已迁移到 `webview/src/monitor/outputs/`，旧 `monitorOutputs.ts` 和旧顶层 `monitor-outputs` 入口均已移除。
+- `terminalAppend`、`terminalFrame`、`timeSeriesLine`、`framePlot2d` 已拆成独立 renderer view 文件，并通过局部 `factory.ts` 创建；当前没有引入 registry。
+- panel header、panel layout、terminal、frame plot、time-series interaction/data/legend/scale helper 和 canvas helper 已按职责拆出，renderer 仍各自持有自己的命令式 DOM、uPlot/canvas 实例和 runtime view state。
+- monitor store 和测试直接导入 `webview/src/monitor/outputs/controller.ts`；高频 `outputPacket` 路由、layout capture/reset、profile 切换清理和 time-series follow/zoom 行为已由现有测试覆盖。
 
 后续阶段开工前必须重新设计和检查：
 

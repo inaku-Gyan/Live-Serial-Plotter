@@ -1,4 +1,4 @@
-import type { FramePlot2dPacket } from "../../../src/shared/protocol";
+import type { FramePlot2dPacket } from "../../../../../src/shared/protocol";
 
 export function getCanvasContext(canvas: HTMLCanvasElement): CanvasRenderingContext2D | undefined {
   try {

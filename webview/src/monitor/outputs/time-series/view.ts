@@ -5,42 +5,38 @@ import type {
   TimeSeriesLineOutputConfig,
   TimeSeriesSample,
   TimeSeriesViewLayoutConfig,
-  TimeSeriesWindowConfig,
-} from "../../../src/shared/protocol";
+} from "../../../../../src/shared/protocol";
 import {
   createTimeSeriesInteractionPlugins,
   defaultTimeSeriesInteractionConfig,
-} from "../monitor/uplotInteractions";
-import { appendPanelHeaderButton, createPanelHeader } from "./panelChrome";
+} from "./interactions";
+import { appendPanelHeaderButton, createPanelHeader } from "../panel/chrome";
+import { TimeSeriesDataBuffer } from "./dataBuffer";
+import { renderTimeSeriesLegend } from "./legend";
+import { invalidatePlotPaths } from "./pathCache";
+import { getUnitScaleKey, getXAxisTickSpace, getYAxisTickSpace, hasScaleRange } from "./scales";
 import {
-  colors,
-  defaultDurationSeconds,
-  defaultMaxPlotPoints,
-  defaultValueUnit,
-  defaultVisiblePlotPoints,
-  getUnitScaleKey,
-  getXAxisTickSpace,
-  getYAxisTickSpace,
-  hasScaleRange,
-  invalidatePlotPaths,
-  pickConfiguredValues,
-  positiveNumberOrDefault,
-} from "./timeSeriesPlotUtils";
+  getSeriesColor,
+  getSeriesLabel,
+  getSeriesVisible,
+  getSeriesWidth,
+  getTimeAxisLabel,
+  getUnitGroupIndex,
+  getUnitGroups,
+  getYAxisLabel,
+} from "./seriesConfig";
 import type {
   OutputView,
   PlotRebuildOptions,
   PlotScaleRanges,
-  PlotWindowConfig,
   TimeSeriesFollowMode,
-  UnitGroup,
-} from "./types";
+} from "../types";
 
 export class TimeSeriesLineView implements OutputView {
   readonly outputId: string;
   readonly kind = "timeSeriesLine" as const;
 
-  private readonly timeValues: number[] = [];
-  private readonly seriesData = new Map<string, Array<number | null>>();
+  private readonly dataBuffer: TimeSeriesDataBuffer;
   private readonly seriesVisibility = new Map<string, boolean>();
   private readonly chartElement: HTMLElement;
   private followButton: HTMLButtonElement | undefined;
@@ -60,6 +56,7 @@ export class TimeSeriesLineView implements OutputView {
     viewLayout: OutputLayoutConfig["view"] | undefined,
   ) {
     this.outputId = config.id;
+    this.dataBuffer = new TimeSeriesDataBuffer(config);
     this.applyViewLayout(viewLayout);
     this.chartElement = document.createElement("div");
     this.chartElement.className = "output-chart";
@@ -97,36 +94,13 @@ export class TimeSeriesLineView implements OutputView {
   }
 
   appendSamples(samples: readonly TimeSeriesSample[]): void {
-    const isAutoSeries = Object.keys(this.config.series).length === 0;
-    let needsRebuild = false;
+    const result = this.dataBuffer.appendSamples(samples);
 
-    for (const sample of samples) {
-      const sampleValues = isAutoSeries
-        ? sample.values
-        : pickConfiguredValues(sample.values, this.config);
-
-      for (const channelName of Object.keys(sampleValues)) {
-        if (!this.seriesData.has(channelName)) {
-          this.seriesData.set(
-            channelName,
-            Array.from({ length: this.timeValues.length }, () => null),
-          );
-          this.seriesVisibility.set(channelName, this.getSeriesVisible(channelName));
-          needsRebuild = true;
-        }
-      }
-
-      this.timeValues.push(sample.time);
-
-      for (const [channelName, values] of this.seriesData.entries()) {
-        const value = sampleValues[channelName];
-        values.push(typeof value === "number" && Number.isFinite(value) ? value : null);
-      }
+    for (const channelName of result.discoveredChannelNames) {
+      this.seriesVisibility.set(channelName, this.getSeriesVisible(channelName));
     }
 
-    this.trimPlotData();
-
-    if (needsRebuild) {
+    if (result.discoveredChannelNames.length > 0) {
       this.rebuildPlot({ applyViewDefaults: false });
       return;
     }
@@ -139,8 +113,7 @@ export class TimeSeriesLineView implements OutputView {
     this.followMode = this.getDefaultFollowMode();
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();
     this.shouldPreserveScaleWhileFollowing = false;
-    this.timeValues.length = 0;
-    this.seriesData.clear();
+    this.dataBuffer.clear();
     this.seriesVisibility.clear();
     this.initializeConfiguredSeries();
     this.updateFollowButton();
@@ -164,12 +137,12 @@ export class TimeSeriesLineView implements OutputView {
 
   resetView(): void {
     this.applyViewLayout(this.viewLayout);
-    for (const channelName of this.seriesData.keys()) {
+    for (const channelName of this.dataBuffer.getChannelNames()) {
       const visible = this.getSeriesVisible(channelName);
       this.seriesVisibility.set(channelName, visible);
     }
     this.applyViewDefaults();
-    this.renderLegend([...this.seriesData.keys()]);
+    this.renderLegend(this.dataBuffer.getChannelNames());
     this.syncSeriesVisibility();
     this.updateFollowButton();
   }
@@ -194,8 +167,7 @@ export class TimeSeriesLineView implements OutputView {
   }
 
   private initializeConfiguredSeries(): void {
-    for (const channelName of Object.keys(this.config.series)) {
-      this.seriesData.set(channelName, []);
+    for (const channelName of this.dataBuffer.initializeConfiguredSeries()) {
       this.seriesVisibility.set(channelName, this.getSeriesVisible(channelName));
     }
   }
@@ -204,8 +176,8 @@ export class TimeSeriesLineView implements OutputView {
     const runtimeScaleRanges = options.applyViewDefaults ? undefined : this.captureScaleRanges();
     this.plot?.destroy();
 
-    const channelNames = [...this.seriesData.keys()];
-    const unitGroups = this.getUnitGroups(channelNames);
+    const channelNames = this.dataBuffer.getChannelNames();
+    const unitGroups = getUnitGroups(this.config, channelNames);
     const scales: uPlot.Options["scales"] = {
       x: {
         time: false,
@@ -214,7 +186,7 @@ export class TimeSeriesLineView implements OutputView {
     };
     const axes: uPlot.Axis[] = [
       {
-        label: this.getTimeAxisLabel(),
+        label: getTimeAxisLabel(this.config),
         space: getXAxisTickSpace,
         stroke: "var(--vscode-foreground)",
         grid: {
@@ -227,7 +199,7 @@ export class TimeSeriesLineView implements OutputView {
       const scaleKey = getUnitScaleKey(index);
       scales[scaleKey] = {};
       axes.push({
-        label: this.getYAxisLabel(unitGroup),
+        label: getYAxisLabel(this.config, unitGroup),
         side: index === 0 ? 3 : 1,
         space: getYAxisTickSpace,
         stroke: "var(--vscode-foreground)",
@@ -249,7 +221,7 @@ export class TimeSeriesLineView implements OutputView {
         stroke: this.getSeriesColor(channelName, index),
         width: this.getSeriesWidth(channelName),
         show: this.seriesVisibility.get(channelName) ?? this.getSeriesVisible(channelName),
-        scale: getUnitScaleKey(this.getUnitGroupIndex(unitGroups, channelName)),
+        scale: getUnitScaleKey(getUnitGroupIndex(this.config, unitGroups, channelName)),
       })),
     ];
 
@@ -271,7 +243,7 @@ export class TimeSeriesLineView implements OutputView {
         }),
         series,
       },
-      this.getPlotData(),
+      this.dataBuffer.getPlotData(),
       this.chartElement,
     );
 
@@ -293,7 +265,7 @@ export class TimeSeriesLineView implements OutputView {
     try {
       invalidatePlotPaths(this.plot);
       this.plot.setData(
-        this.getPlotData(),
+        this.dataBuffer.getPlotData(),
         this.isAutoFollowEnabled && !this.shouldPreserveScaleWhileFollowing,
       );
 
@@ -337,236 +309,39 @@ export class TimeSeriesLineView implements OutputView {
     }
   }
 
-  private getPlotData(): uPlot.AlignedData {
-    return [this.timeValues, ...this.seriesData.values()];
-  }
-
-  private trimPlotData(): void {
-    const windowConfig = this.getWindowConfig();
-
-    if (windowConfig.mode === "points") {
-      this.trimPlotDataByPoints(windowConfig.maxPoints);
-    } else {
-      this.trimPlotDataByDuration(windowConfig.seconds);
-    }
-  }
-
-  private trimPlotDataByPoints(maxPoints: number): void {
-    if (this.timeValues.length <= maxPoints) {
-      return;
-    }
-
-    this.removeLeadingPlotPoints(this.timeValues.length - maxPoints);
-  }
-
-  private trimPlotDataByDuration(seconds: number): void {
-    const latestTime = this.timeValues.at(-1);
-
-    if (latestTime === undefined) {
-      return;
-    }
-
-    const minTime = latestTime - seconds;
-    const removeCount = this.timeValues.findIndex((time) => time >= minTime);
-
-    if (removeCount <= 0) {
-      return;
-    }
-
-    this.removeLeadingPlotPoints(removeCount);
-  }
-
-  private removeLeadingPlotPoints(removeCount: number): void {
-    this.timeValues.splice(0, removeCount);
-
-    for (const values of this.seriesData.values()) {
-      values.splice(0, removeCount);
-    }
-  }
-
-  private getWindowConfig(): PlotWindowConfig {
-    const windowConfig: TimeSeriesWindowConfig | undefined = this.config.window;
-
-    if (windowConfig?.mode === "duration") {
-      return {
-        mode: "duration",
-        seconds: positiveNumberOrDefault(windowConfig.seconds, defaultDurationSeconds),
-      };
-    }
-
-    return {
-      mode: "points",
-      maxPoints: positiveNumberOrDefault(windowConfig?.maxPoints, defaultMaxPlotPoints),
-    };
-  }
-
   private getXWindowRange(): { min?: number; max?: number } {
-    const latestTime = this.timeValues.at(-1);
-
-    if (latestTime === undefined) {
-      return {};
-    }
-
-    const windowConfig = this.getWindowConfig();
-
-    if (windowConfig.mode === "duration") {
-      return {
-        min: latestTime - windowConfig.seconds,
-        max: latestTime,
-      };
-    }
-
-    const max = latestTime;
-    const visiblePointCount = Math.min(windowConfig.maxPoints, defaultVisiblePlotPoints);
-    const min = latestTime - this.getPointWindowSpan(visiblePointCount);
-
-    if (min === max) {
-      return {
-        min: min - 0.5,
-        max: max + 0.5,
-      };
-    }
-
-    return { min, max };
-  }
-
-  private getPointWindowSpan(maxPoints: number): number {
-    return Math.max(1, maxPoints - 1) * this.getPointWindowStep();
-  }
-
-  private getPointWindowStep(): number {
-    if (this.config.time.source === "sequence") {
-      return 1;
-    }
-
-    if (this.config.time.source === "fixedInterval") {
-      return this.config.time.intervalMs / 1000;
-    }
-
-    for (let index = this.timeValues.length - 1; index > 0; index -= 1) {
-      const current = this.timeValues[index];
-      const previous = this.timeValues[index - 1];
-
-      if (current === undefined || previous === undefined) {
-        continue;
-      }
-
-      const delta = current - previous;
-
-      if (Number.isFinite(delta) && delta > 0) {
-        return delta;
-      }
-    }
-
-    return 1;
+    return this.dataBuffer.getXWindowRange();
   }
 
   private getSeriesLabel(channelName: string): string {
-    const series = this.config.series[channelName];
-    const unit = series?.unit;
-    const label = series?.label ?? channelName;
-    return unit === undefined ? label : `${label} (${unit})`;
+    return getSeriesLabel(this.config, channelName);
   }
 
   private getSeriesColor(channelName: string, index: number): string {
-    return this.config.series[channelName]?.color ?? colors[index % colors.length] ?? colors[0];
+    return getSeriesColor(this.config, channelName, index);
   }
 
   private getSeriesWidth(channelName: string): number {
-    return this.config.series[channelName]?.line?.width ?? 2;
+    return getSeriesWidth(this.config, channelName);
   }
 
   private getSeriesVisible(channelName: string): boolean {
-    return this.config.series[channelName]?.visible ?? true;
-  }
-
-  private getSeriesUnit(channelName: string): string {
-    return this.config.series[channelName]?.unit ?? defaultValueUnit;
-  }
-
-  private getUnitGroups(channelNames: readonly string[]): UnitGroup[] {
-    const unitGroups: UnitGroup[] = [];
-
-    for (const channelName of channelNames) {
-      const unit = this.getSeriesUnit(channelName);
-      const unitGroup = unitGroups.find((group) => group.unit === unit);
-
-      if (unitGroup === undefined) {
-        unitGroups.push({ unit, channelNames: [channelName] });
-      } else {
-        unitGroup.channelNames.push(channelName);
-      }
-    }
-
-    return unitGroups.length === 0 ? [{ unit: defaultValueUnit, channelNames: [] }] : unitGroups;
-  }
-
-  private getUnitGroupIndex(unitGroups: readonly UnitGroup[], channelName: string): number {
-    return Math.max(
-      0,
-      unitGroups.findIndex((group) => group.unit === this.getSeriesUnit(channelName)),
-    );
-  }
-
-  private getTimeAxisLabel(): string {
-    if (this.config.time.source === "sequence") {
-      return "Sequence";
-    }
-
-    return "Time (s)";
-  }
-
-  private getYAxisLabel(unitGroup: UnitGroup): string {
-    if (unitGroup.unit === defaultValueUnit) {
-      return defaultValueUnit;
-    }
-
-    if (unitGroup.channelNames.length === 1) {
-      const channelName = unitGroup.channelNames[0];
-      const label =
-        channelName === undefined
-          ? unitGroup.unit
-          : (this.config.series[channelName]?.label ?? channelName);
-      return `${label} (${unitGroup.unit})`;
-    }
-
-    return unitGroup.unit;
+    return getSeriesVisible(this.config, channelName);
   }
 
   private renderLegend(channelNames: string[]): void {
-    this.legendElement.replaceChildren();
-    this.legendElement.hidden = !this.getShowLegend();
-
-    if (channelNames.length === 0) {
-      const empty = document.createElement("span");
-      empty.className = "legend-empty";
-      empty.textContent = "Waiting for numeric data";
-      this.legendElement.append(empty);
-      return;
-    }
-
-    for (const [index, channelName] of channelNames.entries()) {
-      const label = document.createElement("label");
-      label.className = "legend-item";
-
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.checked = this.seriesVisibility.get(channelName) ?? true;
-      checkbox.addEventListener("change", () => {
-        this.seriesVisibility.set(channelName, checkbox.checked);
-        this.plot?.setSeries(index + 1, { show: checkbox.checked });
-      });
-
-      const swatch = document.createElement("span");
-      swatch.className = "legend-swatch";
-      swatch.style.backgroundColor = this.getSeriesColor(channelName, index);
-
-      const text = document.createElement("span");
-      text.textContent = this.getSeriesLabel(channelName);
-
-      label.append(checkbox, swatch, text);
-      this.legendElement.append(label);
-    }
+    renderTimeSeriesLegend({
+      legendElement: this.legendElement,
+      channelNames,
+      showLegend: this.getShowLegend(),
+      getChecked: (channelName) => this.seriesVisibility.get(channelName) ?? true,
+      getColor: (channelName, index) => this.getSeriesColor(channelName, index),
+      getLabel: (channelName) => this.getSeriesLabel(channelName),
+      onVisibilityChange: (channelName, index, visible) => {
+        this.seriesVisibility.set(channelName, visible);
+        this.plot?.setSeries(index + 1, { show: visible });
+      },
+    });
   }
 
   private syncSeriesVisibility(): void {
@@ -574,7 +349,7 @@ export class TimeSeriesLineView implements OutputView {
       return;
     }
 
-    for (const [index, channelName] of [...this.seriesData.keys()].entries()) {
+    for (const [index, channelName] of this.dataBuffer.getChannelNames().entries()) {
       this.plot.setSeries(index + 1, {
         show: this.seriesVisibility.get(channelName) ?? this.getSeriesVisible(channelName),
       });
@@ -766,7 +541,7 @@ export class TimeSeriesLineView implements OutputView {
   }
 
   private getPreservedXWindowRange(): { min?: number; max?: number } {
-    const latestTime = this.timeValues.at(-1);
+    const latestTime = this.dataBuffer.getLatestTime();
     const xScale = this.plot?.scales.x;
     const currentMin = xScale?.min;
     const currentMax = xScale?.max;

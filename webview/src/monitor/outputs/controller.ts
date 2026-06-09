@@ -1,14 +1,14 @@
-import { defaultLayout } from "../../../src/profiles/defaultLayout";
+import { defaultLayout } from "../../../../src/profiles/defaultLayout";
 import type {
   LayoutConfig,
   OutputConfig,
   OutputLayoutConfig,
   OutputPacket,
-} from "../../../src/shared/protocol";
-import { createOutputView } from "./createOutputView";
-import { applyPanelLayout, cssEscape, sortOutputsByLayout } from "./panelLayout";
-import { TerminalAppendView } from "./terminalAppendView";
-import { TimeSeriesLineView } from "./timeSeriesLineView";
+} from "../../../../src/shared/protocol";
+import { createOutputView } from "./factory";
+import { applyPanelLayout, cssEscape, sortOutputsByLayout } from "./panel/layout";
+import { TerminalAppendView } from "./terminal/appendView";
+import { TimeSeriesLineView } from "./time-series/view";
 import type { MonitorOutputControllerOptions, OutputView, PostMessage } from "./types";
 
 export class MonitorOutputController {

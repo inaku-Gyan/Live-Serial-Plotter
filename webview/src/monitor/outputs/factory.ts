@@ -1,9 +1,9 @@
-import type { OutputConfig, OutputLayoutConfig } from "../../../src/shared/protocol";
-import { FramePlot2dView } from "./framePlot2dView";
-import { applyPanelLayout } from "./panelLayout";
-import { TerminalAppendView } from "./terminalAppendView";
-import { TerminalFrameView } from "./terminalFrameView";
-import { TimeSeriesLineView } from "./timeSeriesLineView";
+import type { OutputConfig, OutputLayoutConfig } from "../../../../src/shared/protocol";
+import { FramePlot2dView } from "./frame-plot/view";
+import { applyPanelLayout } from "./panel/layout";
+import { TerminalAppendView } from "./terminal/appendView";
+import { TerminalFrameView } from "./terminal/frameView";
+import { TimeSeriesLineView } from "./time-series/view";
 import type { OutputView, PostMessage } from "./types";
 
 export function createOutputView(

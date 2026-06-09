@@ -4,9 +4,9 @@ import type {
   TerminalAppendOutputConfig,
   TerminalAppendPacket,
   TerminalViewLayoutConfig,
-} from "../../../src/shared/protocol";
-import { appendPanelHeaderButton, createPanelHeader } from "./panelChrome";
-import type { OutputView, PostMessage } from "./types";
+} from "../../../../../src/shared/protocol";
+import { appendPanelHeaderButton, createPanelHeader } from "../panel/chrome";
+import type { OutputView, PostMessage } from "../types";
 
 const defaultMaxRawLines = 500;
 

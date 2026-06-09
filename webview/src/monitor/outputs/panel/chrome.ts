@@ -1,4 +1,4 @@
-import type { OutputConfig } from "../../../src/shared/protocol";
+import type { OutputConfig } from "../../../../../src/shared/protocol";
 
 export function createPanelHeader(
   config: OutputConfig,
