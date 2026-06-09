@@ -67,17 +67,17 @@ Extension Host profile/layout stores
 
 后续新增 UI 状态时，先按以下规则判断归属：
 
-| 状态或职责 | 归属层 | 说明 |
-| --- | --- | --- |
-| 串口连接、端口枚举、profile/layout 文件读写、script parser trust | Extension Host | 涉及 VS Code API、Node 能力、文件系统或跨 Webview 协调。 |
-| Extension Host 与 Webview 的消息形状 | `src/shared/protocol.ts` | 先改 discriminated union，再同步两端处理。 |
-| profile/layout 配置语义和 schema 类型 | `src/shared/protocol.ts`、`src/profiles/` | 配置语义属于共享协议和 profile/layout store，不属于 Vue 组件。 |
-| monitor 低频 UI 状态 | monitor store | profile/port/baud/parser 选择、连接状态、toast、layout 控制等。 |
-| profile editor 页面状态 | profile editor store | selected profile、view、menu、status、autosave debounce。 |
-| editable profile 表单 patch | `profileEditorModel.ts` | 负责 `ProfileConfig` 与表单字符串/checkbox/select 状态互转。 |
-| uPlot 实例、plot 数据数组、series visibility、canvas frame、terminal buffer | 命令式 renderer | 不进入 Vue 深层响应式状态，也不通过组件树逐点更新。 |
-| renderer view state capture/reset | renderer view + layout config | runtime 状态由 renderer 持有，显式保存时转成 layout view config。 |
-| 纯展示格式化和局部 DOM 交互 | Vue component 或 renderer 内部 helper | 只影响本组件或本 renderer，不上升到 store。 |
+| 状态或职责                                                                  | 归属层                                    | 说明                                                              |
+| --------------------------------------------------------------------------- | ----------------------------------------- | ----------------------------------------------------------------- |
+| 串口连接、端口枚举、profile/layout 文件读写、script parser trust            | Extension Host                            | 涉及 VS Code API、Node 能力、文件系统或跨 Webview 协调。          |
+| Extension Host 与 Webview 的消息形状                                        | `src/shared/protocol.ts`                  | 先改 discriminated union，再同步两端处理。                        |
+| profile/layout 配置语义和 schema 类型                                       | `src/shared/protocol.ts`、`src/profiles/` | 配置语义属于共享协议和 profile/layout store，不属于 Vue 组件。    |
+| monitor 低频 UI 状态                                                        | monitor store                             | profile/port/baud/parser 选择、连接状态、toast、layout 控制等。   |
+| profile editor 页面状态                                                     | profile editor store                      | selected profile、view、menu、status、autosave debounce。         |
+| editable profile 表单 patch                                                 | `profileEditorModel.ts`                   | 负责 `ProfileConfig` 与表单字符串/checkbox/select 状态互转。      |
+| uPlot 实例、plot 数据数组、series visibility、canvas frame、terminal buffer | 命令式 renderer                           | 不进入 Vue 深层响应式状态，也不通过组件树逐点更新。               |
+| renderer view state capture/reset                                           | renderer view + layout config             | runtime 状态由 renderer 持有，显式保存时转成 layout view config。 |
+| 纯展示格式化和局部 DOM 交互                                                 | Vue component 或 renderer 内部 helper     | 只影响本组件或本 renderer，不上升到 store。                       |
 
 ## 2. Monitor Output Renderer 层
 
@@ -184,18 +184,18 @@ registry 的约束：
 
 下表用于后续新增能力时快速判断需要重新设计的架构层。它不是实现清单；每个能力开工前仍需重新分析。
 
-| 未来能力 | 主要影响层 | 开工前重点判断 |
-| --- | --- | --- |
-| 新 chart renderer，例如 histogram、scatter、gauge | protocol、renderer factory、layout view state、profile editor | 是否新增 `OutputConfig` / `OutputPacket` union；是否需要 renderer registry；profile editor 是可编辑还是只读展示。 |
-| 新 terminal/structured table renderer | renderer view、layout preset、output mapper | 数据是否仍适合 `outputPacket`；是否有最大行数/最大记录数；是否需要排序、过滤或列配置。 |
-| output renderer metadata | renderer 扩展平台、profile editor | metadata 是否只用于注册和展示，还是会影响协议和 schema；避免把 renderer 内部状态暴露成公共 API。 |
-| Layout 可视化编辑 | profile editor 或独立 layout editor、layout store、Webview bridge | 是否与 profile editor 共用 store；是否需要 preview；Save/Save As 语义是否仍只写 layout preset。 |
-| Profile 导入/导出 | Extension Host、profile store、profile editor | 文件选择、冲突命名、schema validation、错误展示应在 Host 和 editor store 间如何分工。 |
-| 记录和导出 | session/capture 层、Extension Host、可选 export preview renderer | capture buffer 放在哪里；导出 raw、parsed 还是 packet；是否需要独立记录状态而不是复用连接状态。 |
-| 离线回放 | session/replay 层、monitor store、renderer views | 是否复用 `outputPacket`；回放时间轴和串口连接状态必须分离；renderer 能否无串口连接运行。 |
-| 暂停/继续渲染 | monitor store、renderer controller、session buffer | 暂停时继续接收的数据是缓存、丢弃还是只暂停绘制；高频路径不能因暂停 UI 变慢。 |
-| 常用命令和发送历史 | monitor store、profile schema、Extension Host persistence | 哪些命令写入 profile，哪些只是 window/session 历史；行尾规则仍由 codec/send 配置统一处理。 |
-| 多 Webview 协调 | Extension Host、shared protocol | 不依赖 Webview 内状态共享；跨 panel/sidebar 同步通过 Host 和消息协议完成。 |
+| 未来能力                                          | 主要影响层                                                        | 开工前重点判断                                                                                                    |
+| ------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| 新 chart renderer，例如 histogram、scatter、gauge | protocol、renderer factory、layout view state、profile editor     | 是否新增 `OutputConfig` / `OutputPacket` union；是否需要 renderer registry；profile editor 是可编辑还是只读展示。 |
+| 新 terminal/structured table renderer             | renderer view、layout preset、output mapper                       | 数据是否仍适合 `outputPacket`；是否有最大行数/最大记录数；是否需要排序、过滤或列配置。                            |
+| output renderer metadata                          | renderer 扩展平台、profile editor                                 | metadata 是否只用于注册和展示，还是会影响协议和 schema；避免把 renderer 内部状态暴露成公共 API。                  |
+| Layout 可视化编辑                                 | profile editor 或独立 layout editor、layout store、Webview bridge | 是否与 profile editor 共用 store；是否需要 preview；Save/Save As 语义是否仍只写 layout preset。                   |
+| Profile 导入/导出                                 | Extension Host、profile store、profile editor                     | 文件选择、冲突命名、schema validation、错误展示应在 Host 和 editor store 间如何分工。                             |
+| 记录和导出                                        | session/capture 层、Extension Host、可选 export preview renderer  | capture buffer 放在哪里；导出 raw、parsed 还是 packet；是否需要独立记录状态而不是复用连接状态。                   |
+| 离线回放                                          | session/replay 层、monitor store、renderer views                  | 是否复用 `outputPacket`；回放时间轴和串口连接状态必须分离；renderer 能否无串口连接运行。                          |
+| 暂停/继续渲染                                     | monitor store、renderer controller、session buffer                | 暂停时继续接收的数据是缓存、丢弃还是只暂停绘制；高频路径不能因暂停 UI 变慢。                                      |
+| 常用命令和发送历史                                | monitor store、profile schema、Extension Host persistence         | 哪些命令写入 profile，哪些只是 window/session 历史；行尾规则仍由 codec/send 配置统一处理。                        |
+| 多 Webview 协调                                   | Extension Host、shared protocol                                   | 不依赖 Webview 内状态共享；跨 panel/sidebar 同步通过 Host 和消息协议完成。                                        |
 
 ## 7. 数据记录、导出与回放工作流
 
