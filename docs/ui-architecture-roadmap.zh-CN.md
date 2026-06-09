@@ -90,6 +90,13 @@ Extension Host profile/layout stores
 - 每种 renderer 独立管理自己的 DOM、数据缓冲和 view state。
 - `OutputWorkspace.vue` 继续只提供 workspace 容器，不接管高频输出渲染。
 
+已完成：
+
+- `monitorOutputs.ts` 已收敛为兼容导出入口，`MonitorOutputController` 实现迁移到 `webview/src/monitor-outputs/controller.ts`。
+- `terminalAppend`、`terminalFrame`、`timeSeriesLine`、`framePlot2d` 已拆成独立 renderer view 文件，并通过局部 `createOutputView()` factory 创建；当前没有引入 registry。
+- panel header、panel layout、time-series plot helper 和 canvas helper 已按职责拆出，renderer 仍各自持有自己的命令式 DOM、uPlot/canvas 实例和 runtime view state。
+- monitor store 和测试仍通过 `MonitorOutputController` 入口交互；高频 `outputPacket` 路由、layout capture/reset、profile 切换清理和 time-series follow/zoom 行为已由现有测试覆盖。
+
 后续阶段开工前必须重新设计和检查：
 
 - 新增 output 类型是否已经足够多，是否需要 `kind -> renderer factory` registry。
