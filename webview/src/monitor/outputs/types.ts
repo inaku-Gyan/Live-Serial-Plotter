@@ -13,14 +13,25 @@ export interface MonitorOutputControllerOptions {
   postMessage: PostMessage;
 }
 
+/**
+ * Common adapter used by the monitor controller to drive one output renderer.
+ */
 export interface OutputView {
+  /** Profile output id used for packet routing and layout snapshots. */
   readonly outputId: string;
+  /** Renderer kind declared by the output profile config. */
   readonly kind: OutputConfig["kind"];
+  /** Append runtime data; implementations ignore packets for other output kinds. */
   appendPacket(packet: OutputPacket): void;
+  /** Apply renderer-specific view layout, not the outer panel grid layout. */
   applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void;
+  /** Reset interaction/view state without clearing runtime data. */
   resetView(): void;
+  /** Capture renderer-specific view state that can be saved into a layout profile. */
   captureViewLayout(): OutputLayoutConfig["view"] | undefined;
+  /** Clear runtime data currently displayed by this output. */
   clear(): void;
+  /** Release observers, chart instances, and other renderer-owned resources. */
   dispose(): void;
 }
 
