@@ -48,7 +48,7 @@ export class FramePlot2dView implements OutputView {
     }
   }
 
-  appendPacket(packet: OutputPacket): void {
+  updateData(packet: OutputPacket): void {
     if (packet.kind !== "framePlot2d") {
       return;
     }
@@ -57,7 +57,7 @@ export class FramePlot2dView implements OutputView {
     this.draw();
   }
 
-  clear(): void {
+  clearData(): void {
     this.latestPacket = undefined;
     this.draw();
   }

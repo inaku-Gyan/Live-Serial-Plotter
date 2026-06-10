@@ -115,6 +115,18 @@ describe("ProfileStore", () => {
     expect("$schema" in normalized).toBe(false);
   });
 
+  test("rejects duplicate output ids within a profile", () => {
+    expect(() =>
+      normalizeProfileConfig({
+        ...defaultProfile,
+        outputs: [
+          { id: "raw", kind: "terminalAppend", source: "raw" },
+          { id: "raw", kind: "timeSeriesLine", time: { source: "sequence" }, series: {} },
+        ],
+      }),
+    ).toThrow('profile output id "raw" is duplicated.');
+  });
+
   test("collects invalid profile errors without dropping builtin profile", async () => {
     const workspaceRoot = await mkdtemp(path.join(tmpdir(), "lsp-profile-invalid-"));
     const profilesDirectory = getWorkspaceProfilesDirectory(workspaceRoot);

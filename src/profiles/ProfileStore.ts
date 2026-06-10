@@ -490,10 +490,18 @@ function normalizeOutputs(value: unknown, source: string): OutputConfig[] {
     throw new Error(`${source} must define at least one output.`);
   }
 
+  const outputIds = new Set<string>();
+
   return value.map((output, index) => {
     if (!isOutputConfig(output)) {
       throw new Error(`${source} output at index ${index} is invalid.`);
     }
+
+    if (outputIds.has(output.id)) {
+      throw new Error(`${source} output id "${output.id}" is duplicated.`);
+    }
+
+    outputIds.add(output.id);
 
     return output;
   });

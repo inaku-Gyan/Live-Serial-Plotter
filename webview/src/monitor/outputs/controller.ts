@@ -38,7 +38,7 @@ export class MonitorOutputController {
   }
 
   appendPacket(packet: OutputPacket): void {
-    this.views.get(packet.outputId)?.appendPacket(packet);
+    this.views.get(packet.outputId)?.updateData(packet);
   }
 
   appendLegacyRawLine(line: string, timestamp: number): void {
@@ -59,7 +59,7 @@ export class MonitorOutputController {
 
   clearAll(): void {
     for (const view of this.views.values()) {
-      view.clear();
+      view.clearData();
     }
   }
 

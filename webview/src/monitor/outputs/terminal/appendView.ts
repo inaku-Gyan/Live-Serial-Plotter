@@ -32,7 +32,7 @@ export class TerminalAppendView implements OutputView {
       header,
       "Clear",
       () => {
-        this.clear();
+        this.clearData();
         this.postMessage({ type: "clearLog" });
       },
       "output-clear-button",
@@ -45,7 +45,7 @@ export class TerminalAppendView implements OutputView {
     parent.append(header, this.pre);
   }
 
-  appendPacket(packet: OutputPacket): void {
+  updateData(packet: OutputPacket): void {
     if (packet.kind !== "terminalAppend") {
       return;
     }
@@ -86,7 +86,7 @@ export class TerminalAppendView implements OutputView {
     };
   }
 
-  clear(): void {
+  clearData(): void {
     this.lines.length = 0;
     this.pre.classList.add("output-standby");
     this.pre.textContent = "Waiting for serial text";

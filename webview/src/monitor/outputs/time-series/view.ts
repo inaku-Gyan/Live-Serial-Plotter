@@ -85,7 +85,7 @@ export class TimeSeriesLineView implements OutputView {
     }
   }
 
-  appendPacket(packet: OutputPacket): void {
+  updateData(packet: OutputPacket): void {
     if (packet.kind !== "timeSeriesAppend") {
       return;
     }
@@ -108,7 +108,7 @@ export class TimeSeriesLineView implements OutputView {
     this.updatePlotData();
   }
 
-  clear(): void {
+  clearData(): void {
     this.clearLockedFollowResumeTimer();
     this.followMode = this.getDefaultFollowMode();
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();

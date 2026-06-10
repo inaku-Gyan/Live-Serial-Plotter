@@ -33,7 +33,7 @@ export class TerminalFrameView implements OutputView {
     );
   }
 
-  appendPacket(packet: OutputPacket): void {
+  updateData(packet: OutputPacket): void {
     if (packet.kind !== "terminalFrame") {
       return;
     }
@@ -64,7 +64,7 @@ export class TerminalFrameView implements OutputView {
     };
   }
 
-  clear(): void {
+  clearData(): void {
     this.frames.clear();
     this.pre.classList.add("output-standby");
     this.pre.textContent = "Waiting for frame data";

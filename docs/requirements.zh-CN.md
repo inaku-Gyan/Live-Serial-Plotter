@@ -81,6 +81,7 @@
 
 - 具体串口端口和当前波特率属于运行时连接设置，不写入 profile。
 - `serialDefaults.baudRate` 只作为 profile 选择后的默认提示；用户手动改过 baud 后，不应被 profile 切换覆盖。
+- profile 的 `outputs[].id` 必须在同一个 profile 内唯一；重复 id 会导致输出视图、packet 路由和 layout 关联互相覆盖，加载或保存 profile 时应拒绝。
 - 修改 Extension Host 和 Webview 协议时，先改 `src/shared/protocol.ts` 的 discriminated union，再同步两端处理。
 - layout preset 架构要求修改 profile schema、layout schema 和 Extension Host/Webview 消息协议；高频 `outputPacket` 协议保持不变。
 
