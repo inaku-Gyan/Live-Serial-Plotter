@@ -99,10 +99,18 @@ export class MonitorOutputController {
     const outputs: Record<string, OutputLayoutConfig> = {};
 
     for (const [outputId, view] of this.views.entries()) {
-      outputs[outputId] = {
+      const outputLayout: OutputLayoutConfig = {
         ...baseLayout.outputs[outputId],
-        view: view.captureViewLayout(),
       };
+      const viewLayout = view.captureViewLayout();
+
+      if (viewLayout !== undefined) {
+        outputLayout.view = viewLayout;
+      } else {
+        delete outputLayout.view;
+      }
+
+      outputs[outputId] = outputLayout;
     }
 
     return {

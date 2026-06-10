@@ -421,15 +421,20 @@ function createPinchState(
     return undefined;
   }
 
-  return {
+  const pinchState: PinchState = {
     firstPointerId: firstPointer[0],
     secondPointerId: secondPointer[0],
-    xAnchorValue: xScale === undefined ? undefined : plot.posToVal(centerLeft, "x"),
-    xStartRange: xScale === undefined ? undefined : xScale.max - xScale.min,
     yAnchorValues,
     yStartRanges,
     startDistance: distance,
   };
+
+  if (xScale !== undefined) {
+    pinchState.xAnchorValue = plot.posToVal(centerLeft, "x");
+    pinchState.xStartRange = xScale.max - xScale.min;
+  }
+
+  return pinchState;
 }
 
 function applyPinch(
@@ -513,13 +518,18 @@ function createPanState(plot: uPlot, event: PointerEvent): PanState | undefined 
     return undefined;
   }
 
-  return {
+  const panState: PanState = {
     pointerId: event.pointerId,
     startClientX: event.clientX,
     startClientY: event.clientY,
-    xRange,
     yRanges,
   };
+
+  if (xRange !== undefined) {
+    panState.xRange = xRange;
+  }
+
+  return panState;
 }
 
 function applyPan(plot: uPlot, panState: PanState, event: PointerEvent): boolean {

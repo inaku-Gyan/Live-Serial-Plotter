@@ -1,10 +1,12 @@
 import type {
+  BuiltinParserConfig,
   JsonObject,
   LineEnding,
   ParserMode,
   ProfileConfig,
   TerminalAppendOutputConfig,
   TimeAxisConfig,
+  TimeSeriesConfig,
   TimeSeriesLineOutputConfig,
 } from "../../src/shared/protocol";
 import { parseBaudRateInput } from "./baudRate";
@@ -151,29 +153,25 @@ export function applyProfileEditorPatch(
   profile: ProfileConfig,
   patch: ProfileEditorPatch,
 ): ProfileConfig {
-  return {
-    ...profile,
+  const { serialDefaults: _serialDefaults, ...profileBase } = profile;
+  const { maxFrameBytes: _maxFrameBytes, ...framingBase } = profile.framing;
+  const serialDefaults = createSerialDefaults(patch);
+  const framing: ProfileConfig["framing"] = {
+    ...framingBase,
+    delimiter: patch.framing.delimiter,
+    trim: patch.framing.trim,
+  };
+  const maxFrameBytes = parseOptionalNumber(patch.framing.maxFrameBytes);
+  const nextProfile: ProfileConfig = {
+    ...profileBase,
     id: nonEmptyOr(patch.id, profile.id),
     name: nonEmptyOr(patch.name, profile.name),
-    serialDefaults: createSerialDefaults(patch),
     codec: {
       ...profile.codec,
       sendLineEnding: patch.codec.sendLineEnding,
     },
-    framing: {
-      ...profile.framing,
-      delimiter: patch.framing.delimiter,
-      trim: patch.framing.trim,
-      maxFrameBytes: parseOptionalNumber(patch.framing.maxFrameBytes),
-    },
-    parser:
-      profile.parser.kind === "builtin" && patch.builtinParser !== undefined
-        ? {
-            ...profile.parser,
-            mode: patch.builtinParser.mode,
-            options: parseJsonObjectOrUndefined(patch.builtinParser.optionsJson),
-          }
-        : profile.parser,
+    framing,
+    parser: createParserConfig(profile, patch),
     outputs: profile.outputs.map((output) => {
       if (output.kind === "terminalAppend") {
         return applyTerminalAppendPatch(output, patch.terminalAppendOutputs);
@@ -186,6 +184,16 @@ export function applyProfileEditorPatch(
       return output;
     }),
   };
+
+  if (serialDefaults !== undefined) {
+    nextProfile.serialDefaults = serialDefaults;
+  }
+
+  if (maxFrameBytes !== undefined) {
+    framing.maxFrameBytes = maxFrameBytes;
+  }
+
+  return nextProfile;
 }
 
 function applyTerminalAppendPatch(
@@ -198,19 +206,60 @@ function applyTerminalAppendPatch(
     return output;
   }
 
-  return {
-    ...output,
+  const { title: _title, template: _template, maxLines: _maxLines, ...baseOutput } = output;
+  const nextOutput: TerminalAppendOutputConfig = {
+    ...baseOutput,
     id: nonEmptyOr(patch.id, output.id),
-    title: emptyToUndefined(patch.title),
     source: patch.source,
-    template: patch.source === "template" ? patch.template : undefined,
-    maxLines: parseOptionalNumber(patch.maxLines),
     autoScroll: patch.autoScroll,
   };
+  const title = emptyToUndefined(patch.title);
+  const maxLines = parseOptionalNumber(patch.maxLines);
+
+  if (title !== undefined) {
+    nextOutput.title = title;
+  }
+
+  if (patch.source === "template") {
+    nextOutput.template = patch.template;
+  }
+
+  if (maxLines !== undefined) {
+    nextOutput.maxLines = maxLines;
+  }
+
+  return nextOutput;
 }
 
 function createSerialDefaults(patch: ProfileEditorPatch): ProfileConfig["serialDefaults"] {
-  return { baudRate: parseBaudRateInput(patch.serialDefaults.baudRate) };
+  const baudRateText = inputValueToString(patch.serialDefaults.baudRate).trim();
+
+  if (baudRateText.length === 0) {
+    return undefined;
+  }
+
+  return { baudRate: parseBaudRateInput(baudRateText) };
+}
+
+function createParserConfig(
+  profile: ProfileConfig,
+  patch: ProfileEditorPatch,
+): ProfileConfig["parser"] {
+  if (profile.parser.kind !== "builtin" || patch.builtinParser === undefined) {
+    return profile.parser;
+  }
+
+  const parser: BuiltinParserConfig = {
+    kind: "builtin",
+    mode: patch.builtinParser.mode,
+  };
+  const options = parseJsonObjectOrUndefined(patch.builtinParser.optionsJson);
+
+  if (options !== undefined) {
+    parser.options = options;
+  }
+
+  return parser;
 }
 
 function applyTimeSeriesPatch(
@@ -223,12 +272,12 @@ function applyTimeSeriesPatch(
     return output;
   }
 
-  return {
-    ...output,
+  const { title: _title, window: _window, ...baseOutput } = output;
+  const windowConfig = createTimeSeriesWindowConfig(output.window, patch.maxPoints);
+  const nextOutput: TimeSeriesLineOutputConfig = {
+    ...baseOutput,
     id: nonEmptyOr(patch.id, output.id),
-    title: emptyToUndefined(patch.title),
     time: createTimeAxisConfig(patch.time, output.time),
-    window: createTimeSeriesWindowConfig(output.window, patch.maxPoints),
     series: Object.fromEntries(
       patch.series
         .filter((series) => series.key.trim().length > 0 && series.field.trim().length > 0)
@@ -236,29 +285,21 @@ function applyTimeSeriesPatch(
           const key = series.key.trim();
           const existingSeries = output.series[key];
 
-          return [
-            key,
-            {
-              ...existingSeries,
-              field: series.field.trim(),
-              label: emptyToUndefined(series.label),
-              unit: emptyToUndefined(series.unit),
-              color: emptyToUndefined(series.color),
-              visible: series.visible,
-              scale: parseOptionalNumber(series.scale),
-              line: {
-                ...existingSeries?.line,
-                width: parseOptionalNumber(series.lineWidth),
-              },
-              format: {
-                ...existingSeries?.format,
-                decimals: parseOptionalNumber(series.decimals),
-              },
-            },
-          ];
+          return [key, createTimeSeriesConfig(series, existingSeries)];
         }),
     ),
   };
+  const title = emptyToUndefined(patch.title);
+
+  if (title !== undefined) {
+    nextOutput.title = title;
+  }
+
+  if (windowConfig !== undefined) {
+    nextOutput.window = windowConfig;
+  }
+
+  return nextOutput;
 }
 
 function createTimeSeriesWindowConfig(
@@ -271,10 +312,65 @@ function createTimeSeriesWindowConfig(
     return current;
   }
 
-  return {
+  const config: NonNullable<TimeSeriesLineOutputConfig["window"]> = {
     mode: "points",
-    maxPoints,
   };
+
+  if (maxPoints !== undefined) {
+    config.maxPoints = maxPoints;
+  }
+
+  return config;
+}
+
+function createTimeSeriesConfig(
+  patch: TimeSeriesPatch,
+  existingSeries: TimeSeriesConfig | undefined,
+): TimeSeriesConfig {
+  const config: TimeSeriesConfig = {
+    field: patch.field.trim(),
+    visible: patch.visible,
+  };
+  const label = emptyToUndefined(patch.label);
+  const unit = emptyToUndefined(patch.unit);
+  const color = emptyToUndefined(patch.color);
+  const scale = parseOptionalNumber(patch.scale);
+  const lineWidth = parseOptionalNumber(patch.lineWidth);
+  const decimals = parseOptionalNumber(patch.decimals);
+
+  if (label !== undefined) {
+    config.label = label;
+  }
+
+  if (unit !== undefined) {
+    config.unit = unit;
+  }
+
+  if (color !== undefined) {
+    config.color = color;
+  }
+
+  if (scale !== undefined) {
+    config.scale = scale;
+  }
+
+  if (existingSeries?.line?.dash !== undefined || lineWidth !== undefined) {
+    config.line = {};
+
+    if (existingSeries?.line?.dash !== undefined) {
+      config.line.dash = existingSeries.line.dash;
+    }
+
+    if (lineWidth !== undefined) {
+      config.line.width = lineWidth;
+    }
+  }
+
+  if (decimals !== undefined) {
+    config.format = { decimals };
+  }
+
+  return config;
 }
 
 function createTimeAxisConfig(patch: TimeAxisPatch, fallback: TimeAxisConfig): TimeAxisConfig {
@@ -395,8 +491,8 @@ function emptyToUndefined(value: string): string | undefined {
   return trimmed.length === 0 ? undefined : trimmed;
 }
 
-function parseOptionalNumber(value: string): number | undefined {
-  const trimmed = value.trim();
+function parseOptionalNumber(value: string | number): number | undefined {
+  const trimmed = inputValueToString(value).trim();
 
   if (trimmed.length === 0) {
     return undefined;
@@ -408,6 +504,10 @@ function parseOptionalNumber(value: string): number | undefined {
 
 function parseNumberOr(value: string, fallback: number): number {
   return parseOptionalNumber(value) ?? fallback;
+}
+
+function inputValueToString(value: unknown): string {
+  return typeof value === "string" ? value : String(value);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

@@ -334,14 +334,28 @@ function createEditorState(options: {
 }): ProfileEditorState {
   const sourceScope = options.sourceScope ?? "builtin";
   const selectedKey = `${sourceScope}:${options.selectedProfile.id}`;
-  const selectedSummary = {
+  const selectedSummary: ProfileEditorState["profiles"][number] = {
     key: selectedKey,
     ref: { scope: sourceScope, id: options.selectedProfile.id },
     id: options.selectedProfile.id,
     name: options.selectedProfile.name,
     scope: sourceScope,
-    workspaceName: sourceScope === "workspace" ? "workspace" : undefined,
   };
+  const selectedSource: ProfileEditorState["selectedSource"] = {
+    key: selectedKey,
+    ref: { scope: sourceScope, id: options.selectedProfile.id },
+    scope: sourceScope,
+  };
+
+  if (sourceScope === "workspace") {
+    selectedSummary.workspaceName = "workspace";
+    selectedSource.workspaceFolderUri = "file:///workspace";
+    selectedSource.workspaceName = "workspace";
+  }
+
+  if (sourceScope !== "builtin") {
+    selectedSource.filePath = `/workspace/.live-serial-plotter/profiles/${options.selectedProfile.id}.jsonc`;
+  }
 
   return {
     profiles:
@@ -356,17 +370,7 @@ function createEditorState(options: {
         : [selectedSummary],
     selectedProfile: options.selectedProfile,
     selectedProfileKey: selectedKey,
-    selectedSource: {
-      key: selectedKey,
-      ref: { scope: sourceScope, id: options.selectedProfile.id },
-      scope: sourceScope,
-      filePath:
-        sourceScope === "builtin"
-          ? undefined
-          : `/workspace/.live-serial-plotter/profiles/${options.selectedProfile.id}.jsonc`,
-      workspaceFolderUri: sourceScope === "workspace" ? "file:///workspace" : undefined,
-      workspaceName: sourceScope === "workspace" ? "workspace" : undefined,
-    },
+    selectedSource,
     errors: [],
   };
 }

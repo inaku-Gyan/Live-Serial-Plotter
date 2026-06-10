@@ -11,6 +11,7 @@ import {
   getWorkspaceProfilesDirectory,
   normalizeProfileConfig,
   ProfileStore,
+  type ProfileCopyTarget,
   type WorkspaceProfilesDirectory,
 } from "../../src/profiles/ProfileStore";
 
@@ -276,8 +277,6 @@ describe("ProfileStore", () => {
       ref: { scope: "user", id: "saved-user" },
       scope: "user",
       filePath: path.join(userProfilesDirectory, "saved-user.jsonc"),
-      workspaceFolderUri: undefined,
-      workspaceName: undefined,
     });
 
     const savedText = await readFile(path.join(userProfilesDirectory, "saved-user.jsonc"), "utf8");
@@ -298,14 +297,18 @@ describe("ProfileStore", () => {
     const workspaceDirectory = createWorkspaceDirectory(workspaceRoot, "Workspace");
     const profilesDirectory = workspaceDirectory.profilesDirectory;
     const store = new ProfileStore({ workspaceProfilesDirectories: [workspaceDirectory] });
+    const target: ProfileCopyTarget = {
+      label: "Workspace: Workspace",
+      scope: "workspace",
+      workspaceFolderUri: workspaceDirectory.folderUri,
+    };
+
+    if (workspaceDirectory.folderName !== undefined) {
+      target.workspaceName = workspaceDirectory.folderName;
+    }
 
     await store.saveProfile({
-      target: {
-        label: "Workspace: Workspace",
-        scope: "workspace",
-        workspaceFolderUri: workspaceDirectory.folderUri,
-        workspaceName: workspaceDirectory.folderName,
-      },
+      target,
       profileId: "workspace-profile",
       config: {
         schemaVersion: 3,

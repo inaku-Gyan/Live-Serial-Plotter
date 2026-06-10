@@ -82,6 +82,11 @@ export function createProfileEditorStore(
   );
 
   function requestProfileEditorState(profileKey = state.selectedProfileKey): void {
+    if (profileKey === undefined) {
+      postMessage({ type: "requestProfileEditorState" });
+      return;
+    }
+
     postMessage({ type: "requestProfileEditorState", profileKey });
   }
 
@@ -161,6 +166,12 @@ export function createProfileEditorStore(
 
   function openProfileJson(profileKey?: string): void {
     state.profileMenu = undefined;
+
+    if (profileKey === undefined) {
+      postMessage({ type: "openProfileJson" });
+      return;
+    }
+
     postMessage({ type: "openProfileJson", profileKey });
   }
 
@@ -228,10 +239,15 @@ export function createProfileEditorStore(
   }
 
   function persistState(): void {
-    vscode.setState({
-      selectedProfileKey: state.selectedProfileKey,
+    const nextPersistedState: ProfileEditorPersistedState = {
       view: state.view,
-    });
+    };
+
+    if (state.selectedProfileKey !== undefined) {
+      nextPersistedState.selectedProfileKey = state.selectedProfileKey;
+    }
+
+    vscode.setState(nextPersistedState);
   }
 
   function syncProfileEditorView(): void {

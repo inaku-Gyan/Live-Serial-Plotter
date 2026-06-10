@@ -157,13 +157,19 @@ export class TimeSeriesLineView implements OutputView {
   }
 
   captureViewLayout(): OutputLayoutConfig["view"] {
-    return {
+    const layout: TimeSeriesViewLayoutConfig = {
       kind: "timeSeriesLine",
       showLegend: !this.legendElement.hidden,
       autoFollow: this.isAutoFollowEnabled,
       followMode: this.followMode,
-      zoom: this.captureZoom(),
     };
+    const zoom = this.captureZoom();
+
+    if (zoom !== undefined) {
+      layout.zoom = zoom;
+    }
+
+    return layout;
   }
 
   private initializeConfiguredSeries(): void {

@@ -2,7 +2,12 @@ import { createApp } from "vue";
 import "uplot/dist/uPlot.min.css";
 import "./styles.css";
 import MonitorApp from "./monitor/MonitorApp.vue";
-import { createMonitorStore, type MonitorPersistedState, type VsCodeApi } from "./monitor/store";
+import {
+  createMonitorStore,
+  type MonitorPersistedState,
+  type MonitorStoreOptions,
+  type VsCodeApi,
+} from "./monitor/store";
 
 declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
 
@@ -14,7 +19,13 @@ if (root === null) {
 
 const vscode = acquireVsCodeApi<MonitorPersistedState>();
 const initialProfileKey = nonEmptyString(document.body.dataset.initialProfileKey);
-const store = createMonitorStore(vscode, { initialProfileKey });
+const storeOptions: MonitorStoreOptions = {};
+
+if (initialProfileKey !== undefined) {
+  storeOptions.initialProfileKey = initialProfileKey;
+}
+
+const store = createMonitorStore(vscode, storeOptions);
 
 createApp(MonitorApp, { store }).mount(root);
 

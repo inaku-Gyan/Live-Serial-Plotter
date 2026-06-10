@@ -1,4 +1,5 @@
 import type {
+  FramePlot2dPacket,
   FramePlot2dOutputConfig,
   OutputConfig,
   OutputPacket,
@@ -155,17 +156,20 @@ class FramePlot2dMapper implements OutputMapper {
       return [];
     }
 
-    return [
-      {
-        kind: "framePlot2d",
-        outputId: this.config.id,
-        seq: record.seq,
-        receivedAt: record.receivedAt,
-        frameId: getFrameId(this.config.frameId?.field, record),
-        bounds: this.config.bounds,
-        layers: [{ kind: "points", points }],
-      },
-    ];
+    const packet: FramePlot2dPacket = {
+      kind: "framePlot2d",
+      outputId: this.config.id,
+      seq: record.seq,
+      receivedAt: record.receivedAt,
+      frameId: getFrameId(this.config.frameId?.field, record),
+      layers: [{ kind: "points", points }],
+    };
+
+    if (this.config.bounds !== undefined) {
+      packet.bounds = this.config.bounds;
+    }
+
+    return [packet];
   }
 
   reset(): void {}

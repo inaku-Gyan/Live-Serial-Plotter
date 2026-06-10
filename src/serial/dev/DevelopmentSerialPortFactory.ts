@@ -6,7 +6,11 @@ import {
   type SerialPortFactory,
   type SerialPortLike,
 } from "../SerialService";
-import { ScriptedSerialPort, type ScriptedSerialPortDefinition } from "./ScriptedSerialPort";
+import {
+  ScriptedSerialPort,
+  type ScriptedSerialPortDefinition,
+  type ScriptedSerialPortOptions,
+} from "./ScriptedSerialPort";
 import type { ConnectionSettings, SerialPortSummary } from "../../shared/protocol";
 
 const devSerialDirectory = "live-serial-plotter-dev-serial";
@@ -81,7 +85,9 @@ export class DevelopmentSerialPortFactory implements SerialPortFactory {
     );
 
     if (scriptedPort !== undefined) {
-      return new ScriptedSerialPort(scriptedPort, settings.baudRate, { log: this.log });
+      const options: ScriptedSerialPortOptions = this.log === undefined ? {} : { log: this.log };
+
+      return new ScriptedSerialPort(scriptedPort, settings.baudRate, options);
     }
 
     return this.realFactory.create(settings);

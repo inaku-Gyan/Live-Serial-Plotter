@@ -84,11 +84,11 @@ export class LayoutStore {
     const workspaceLayoutResults = await Promise.all(
       (this.options.workspaceLayoutsDirectories ?? []).map((directory) =>
         this.loadDirectoryLayouts(
-          {
+          createLayoutNamespace({
             scope: "workspace",
             workspaceFolderUri: directory.folderUri,
             workspaceName: directory.folderName,
-          },
+          }),
           directory.layoutsDirectory,
         ),
       ),
@@ -139,13 +139,18 @@ export class LayoutStore {
     const targets: LayoutSaveTarget[] = [];
 
     for (const directory of this.options.workspaceLayoutsDirectories ?? []) {
-      targets.push({
+      const target: LayoutSaveTarget = {
         label:
           directory.folderName === undefined ? "Workspace" : `Workspace: ${directory.folderName}`,
         scope: "workspace",
         workspaceFolderUri: directory.folderUri,
-        workspaceName: directory.folderName,
-      });
+      };
+
+      if (directory.folderName !== undefined) {
+        target.workspaceName = directory.folderName;
+      }
+
+      targets.push(target);
     }
 
     if (this.options.userLayoutsDirectory !== undefined) {
@@ -206,7 +211,7 @@ export class LayoutStore {
     await writeLayoutFile(filePath, config);
     const ref = createLayoutRef(config.id, request.target.scope, request.target.workspaceFolderUri);
     const source = {
-      ...createLayoutSource(ref, { filePath, workspaceName: request.target.workspaceName }),
+      ...createLayoutSource(ref, createSourceOptions(filePath, request.target.workspaceName)),
       filePath,
     };
 
@@ -304,6 +309,50 @@ export function createLayoutKey(ref: LayoutRef): string {
   return `${ref.scope}:${ref.id}`;
 }
 
+function createLayoutNamespace(namespace: {
+  scope: ProfileScope;
+  workspaceFolderUri?: string | undefined;
+  workspaceName?: string | undefined;
+}): LayoutNamespace {
+  const workspaceFolderUri = namespace.workspaceFolderUri;
+  const workspaceName = namespace.workspaceName;
+
+  if (workspaceFolderUri === undefined) {
+    if (workspaceName === undefined) {
+      return { scope: namespace.scope };
+    }
+
+    return { scope: namespace.scope, workspaceName };
+  }
+
+  if (workspaceName === undefined) {
+    return { scope: namespace.scope, workspaceFolderUri };
+  }
+
+  return {
+    scope: namespace.scope,
+    workspaceFolderUri,
+    workspaceName,
+  };
+}
+
+function createSourceOptions(
+  filePath: string | undefined,
+  workspaceName: string | undefined,
+): { filePath?: string; workspaceName?: string } {
+  const options: { filePath?: string; workspaceName?: string } = {};
+
+  if (filePath !== undefined) {
+    options.filePath = filePath;
+  }
+
+  if (workspaceName !== undefined) {
+    options.workspaceName = workspaceName;
+  }
+
+  return options;
+}
+
 export function normalizeLayoutConfig(value: unknown, source = "layout"): LayoutConfig {
   if (!isPlainObject(value)) {
     throw new Error(`${source} must contain a JSON object.`);
@@ -359,10 +408,19 @@ function normalizeOutputLayout(value: unknown): OutputLayoutConfig {
     return {};
   }
 
-  return {
-    panel: normalizePanelLayout(value.panel),
-    view: normalizeViewLayout(value.view),
-  };
+  const outputLayout: OutputLayoutConfig = {};
+  const panel = normalizePanelLayout(value.panel);
+  const view = normalizeViewLayout(value.view);
+
+  if (panel !== undefined) {
+    outputLayout.panel = panel;
+  }
+
+  if (view !== undefined) {
+    outputLayout.view = view;
+  }
+
+  return outputLayout;
 }
 
 function normalizePanelLayout(value: unknown): OutputPanelLayoutConfig | undefined {
@@ -370,13 +428,32 @@ function normalizePanelLayout(value: unknown): OutputPanelLayoutConfig | undefin
     return undefined;
   }
 
-  return {
-    order: getFiniteNumber(value.order),
-    columnSpan: getPositiveInteger(value.columnSpan),
-    minHeight: getPositiveInteger(value.minHeight),
-    collapsed: typeof value.collapsed === "boolean" ? value.collapsed : undefined,
-    maximized: typeof value.maximized === "boolean" ? value.maximized : undefined,
-  };
+  const panel: OutputPanelLayoutConfig = {};
+  const order = getFiniteNumber(value.order);
+  const columnSpan = getPositiveInteger(value.columnSpan);
+  const minHeight = getPositiveInteger(value.minHeight);
+
+  if (order !== undefined) {
+    panel.order = order;
+  }
+
+  if (columnSpan !== undefined) {
+    panel.columnSpan = columnSpan;
+  }
+
+  if (minHeight !== undefined) {
+    panel.minHeight = minHeight;
+  }
+
+  if (typeof value.collapsed === "boolean") {
+    panel.collapsed = value.collapsed;
+  }
+
+  if (typeof value.maximized === "boolean") {
+    panel.maximized = value.maximized;
+  }
+
+  return panel;
 }
 
 function normalizeViewLayout(value: unknown): OutputViewLayoutConfig | undefined {
@@ -400,32 +477,55 @@ function normalizeViewLayout(value: unknown): OutputViewLayoutConfig | undefined
 }
 
 function normalizeTimeSeriesViewLayout(value: Record<string, unknown>): TimeSeriesViewLayoutConfig {
-  return {
+  const layout: TimeSeriesViewLayoutConfig = {
     kind: "timeSeriesLine",
-    showLegend: typeof value.showLegend === "boolean" ? value.showLegend : undefined,
-    autoFollow: typeof value.autoFollow === "boolean" ? value.autoFollow : undefined,
-    followMode:
-      value.followMode === "locked" || value.followMode === "unlocked"
-        ? value.followMode
-        : undefined,
-    zoom: normalizeAxisRange(value.zoom),
   };
+  const zoom = normalizeAxisRange(value.zoom);
+
+  if (typeof value.showLegend === "boolean") {
+    layout.showLegend = value.showLegend;
+  }
+
+  if (typeof value.autoFollow === "boolean") {
+    layout.autoFollow = value.autoFollow;
+  }
+
+  if (value.followMode === "locked" || value.followMode === "unlocked") {
+    layout.followMode = value.followMode;
+  }
+
+  if (zoom !== undefined) {
+    layout.zoom = zoom;
+  }
+
+  return layout;
 }
 
 function normalizeTerminalViewLayout(value: Record<string, unknown>): TerminalViewLayoutConfig {
-  return {
+  const layout: TerminalViewLayoutConfig = {
     kind: value.kind === "terminalFrame" ? "terminalFrame" : "terminalAppend",
-    autoScroll: typeof value.autoScroll === "boolean" ? value.autoScroll : undefined,
   };
+
+  if (typeof value.autoScroll === "boolean") {
+    layout.autoScroll = value.autoScroll;
+  }
+
+  return layout;
 }
 
 function normalizeFramePlot2dViewLayout(
   value: Record<string, unknown>,
 ): FramePlot2dViewLayoutConfig {
-  return {
+  const layout: FramePlot2dViewLayoutConfig = {
     kind: "framePlot2d",
-    bounds: normalizeBounds(value.bounds),
   };
+  const bounds = normalizeBounds(value.bounds);
+
+  if (bounds !== undefined) {
+    layout.bounds = bounds;
+  }
+
+  return layout;
 }
 
 function normalizeAxisRange(value: unknown): TimeSeriesViewLayoutConfig["zoom"] {
@@ -445,7 +545,21 @@ function normalizeAxisRange(value: unknown): TimeSeriesViewLayoutConfig["zoom"] 
         )
       : undefined;
 
-  return x === undefined && y === undefined ? undefined : { x, y };
+  if (x === undefined && y === undefined) {
+    return undefined;
+  }
+
+  const range: NonNullable<TimeSeriesViewLayoutConfig["zoom"]> = {};
+
+  if (x !== undefined) {
+    range.x = x;
+  }
+
+  if (y !== undefined) {
+    range.y = y;
+  }
+
+  return range;
 }
 
 function normalizeRange(value: unknown): { min: number; max: number } | undefined {
@@ -480,53 +594,69 @@ function createLoadedLayout(
   options: { filePath?: string } = {},
 ): LoadedLayout {
   const ref = createLayoutRef(config.id, namespace.scope, namespace.workspaceFolderUri);
-  const source = createLayoutSource(ref, {
-    filePath: options.filePath,
-    workspaceName: namespace.workspaceName,
-  });
+  const source = createLayoutSource(
+    ref,
+    createSourceOptions(options.filePath, namespace.workspaceName),
+  );
+  const summary: LayoutSummary = {
+    key: source.key,
+    ref,
+    id: config.id,
+    name: config.name,
+    scope: namespace.scope,
+  };
+
+  if (namespace.workspaceName !== undefined) {
+    summary.workspaceName = namespace.workspaceName;
+  }
 
   return {
-    summary: {
-      key: source.key,
-      ref,
-      id: config.id,
-      name: config.name,
-      scope: namespace.scope,
-      workspaceName: namespace.workspaceName,
-    },
+    summary,
     config,
     source,
   };
 }
 
 function createLayoutRef(id: string, scope: ProfileScope, workspaceFolderUri?: string): LayoutRef {
-  return scope === "workspace"
-    ? { scope, id, workspaceFolderUri }
-    : {
-        scope,
-        id,
-      };
+  const ref: LayoutRef = { scope, id };
+
+  if (scope === "workspace" && workspaceFolderUri !== undefined) {
+    ref.workspaceFolderUri = workspaceFolderUri;
+  }
+
+  return ref;
 }
 
 function createLayoutSource(
   ref: LayoutRef,
   options: { filePath?: string; workspaceName?: string } = {},
 ): LayoutSource {
-  return {
+  const source: LayoutSource = {
     key: createLayoutKey(ref),
     ref,
     scope: ref.scope,
-    filePath: options.filePath,
-    workspaceFolderUri: ref.workspaceFolderUri,
-    workspaceName: options.workspaceName,
   };
+
+  if (options.filePath !== undefined) {
+    source.filePath = options.filePath;
+  }
+
+  if (ref.workspaceFolderUri !== undefined) {
+    source.workspaceFolderUri = ref.workspaceFolderUri;
+  }
+
+  if (options.workspaceName !== undefined) {
+    source.workspaceName = options.workspaceName;
+  }
+
+  return source;
 }
 
-function isColumns(value: unknown): value is MonitorPageLayoutConfig["columns"] {
+function isColumns(value: unknown): value is NonNullable<MonitorPageLayoutConfig["columns"]> {
   return value === "auto" || value === "single" || value === "two";
 }
 
-function isDensity(value: unknown): value is MonitorPageLayoutConfig["density"] {
+function isDensity(value: unknown): value is NonNullable<MonitorPageLayoutConfig["density"]> {
   return value === "compact" || value === "normal" || value === "comfortable";
 }
 

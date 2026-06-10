@@ -58,10 +58,15 @@ export class TerminalFrameView implements OutputView {
   }
 
   captureViewLayout(): OutputLayoutConfig["view"] {
-    return {
+    const layout: TerminalViewLayoutConfig = {
       kind: "terminalFrame",
-      autoScroll: this.viewLayout?.autoScroll,
     };
+
+    if (this.viewLayout?.autoScroll !== undefined) {
+      layout.autoScroll = this.viewLayout.autoScroll;
+    }
+
+    return layout;
   }
 
   clearData(): void {

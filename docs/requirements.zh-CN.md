@@ -93,6 +93,10 @@
 - 修改 parser、串口读取、缓冲、批处理或图表数据变换时优先补充 Vitest 单元测试。
 - 涉及监视器 Vue 外壳时补充 store 和 Vue 组件测试；涉及命令式 output renderer 时补充 `tests/unit/monitor-outputs` 测试。
 
+### TypeScript 工程约束
+
+- TypeScript 编译配置必须开启 `strict: true` 和 `exactOptionalPropertyTypes: true`。
+
 ## 已发现并处理的冲突
 
 - 旧约束写着“监控页继续使用 Vanilla TypeScript”；现需求和实现已改为“监视器页面使用 Vue 3 外壳，uPlot/canvas 保持命令式高性能路径”。`AGENTS.md` 应以新架构为准。

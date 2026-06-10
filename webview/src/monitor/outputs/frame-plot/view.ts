@@ -76,10 +76,15 @@ export class FramePlot2dView implements OutputView {
   }
 
   captureViewLayout(): OutputLayoutConfig["view"] {
-    return {
+    const layout: FramePlot2dViewLayoutConfig = {
       kind: "framePlot2d",
-      bounds: this.viewLayout?.bounds,
     };
+
+    if (this.viewLayout?.bounds !== undefined) {
+      layout.bounds = this.viewLayout.bounds;
+    }
+
+    return layout;
   }
 
   private draw(): void {

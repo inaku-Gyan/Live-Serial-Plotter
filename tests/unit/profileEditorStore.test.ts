@@ -171,6 +171,15 @@ function createEditorState(
   const profile = options.profile ?? defaultProfile;
   const sourceScope = options.sourceScope ?? "builtin";
   const key = `${sourceScope}:${profile.id}`;
+  const selectedSource: ProfileEditorState["selectedSource"] = {
+    key,
+    ref: { scope: sourceScope, id: profile.id },
+    scope: sourceScope,
+  };
+
+  if (sourceScope !== "builtin") {
+    selectedSource.filePath = `/workspace/.live-serial-plotter/profiles/${profile.id}.jsonc`;
+  }
 
   return {
     profiles: [
@@ -184,15 +193,7 @@ function createEditorState(
     ],
     selectedProfile: profile,
     selectedProfileKey: key,
-    selectedSource: {
-      key,
-      ref: { scope: sourceScope, id: profile.id },
-      scope: sourceScope,
-      filePath:
-        sourceScope === "builtin"
-          ? undefined
-          : `/workspace/.live-serial-plotter/profiles/${profile.id}.jsonc`,
-    },
+    selectedSource,
     errors: [],
   };
 }

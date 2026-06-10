@@ -1,6 +1,10 @@
 import type { EventEmitter } from "node:events";
 import { SerialPort } from "serialport";
-import { PipelineRunner, type AsyncScriptParserLoader } from "../pipeline/PipelineRunner";
+import {
+  PipelineRunner,
+  type AsyncScriptParserLoader,
+  type PipelineRunnerOptions,
+} from "../pipeline/PipelineRunner";
 import { defaultProfile } from "../profiles/defaultProfile";
 import type {
   ConnectionSettings,
@@ -237,16 +241,23 @@ export class SerialService {
 
   private async createPipelineRunner(settings: ConnectionSettings): Promise<PipelineRunner> {
     const profile = this.createRuntimeProfile(settings);
-
-    return PipelineRunner.create({
+    const baseOptions: Omit<PipelineRunnerOptions, "scriptParserLoader"> = {
       codec: profile.codec,
       framing: profile.framing,
       parser: profile.parser,
       outputs: profile.outputs,
-      scriptParserLoader: this.options.scriptParserLoader,
       onPacket: (packet) => this.handleOutputPacket(packet),
       onError: (message) => this.events.onError?.(message),
-    });
+    };
+    const options: PipelineRunnerOptions =
+      this.options.scriptParserLoader === undefined
+        ? baseOptions
+        : {
+            ...baseOptions,
+            scriptParserLoader: this.options.scriptParserLoader,
+          };
+
+    return PipelineRunner.create(options);
   }
 
   private async recreatePipelineRunner(): Promise<void> {

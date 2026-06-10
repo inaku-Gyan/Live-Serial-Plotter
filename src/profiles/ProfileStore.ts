@@ -5,6 +5,7 @@ import { builtinProfiles, defaultProfile } from "./defaultProfile";
 import { parseJsonc } from "./jsonc";
 import {
   isParserMode,
+  type BuiltinParserConfig,
   type CodecConfig,
   type JsonObject,
   type LineEnding,
@@ -17,6 +18,7 @@ import {
   type ProfileSummary,
   type ProfileSourceMetadata,
   type SerialDefaultsConfig,
+  type ScriptParserConfig,
 } from "../shared/protocol";
 
 export interface LoadedProfile {
@@ -90,11 +92,11 @@ export class ProfileStore {
     const workspaceProfileResults = await Promise.all(
       (this.options.workspaceProfilesDirectories ?? []).map((directory) =>
         this.loadDirectoryProfiles(
-          {
+          createProfileNamespace({
             scope: "workspace",
             workspaceFolderUri: directory.folderUri,
             workspaceName: directory.folderName,
-          },
+          }),
           directory.profilesDirectory,
         ),
       ),
@@ -140,13 +142,18 @@ export class ProfileStore {
     const targets: ProfileCopyTarget[] = [];
 
     for (const directory of this.options.workspaceProfilesDirectories ?? []) {
-      targets.push({
+      const target: ProfileCopyTarget = {
         label:
           directory.folderName === undefined ? "Workspace" : `Workspace: ${directory.folderName}`,
         scope: "workspace",
         workspaceFolderUri: directory.folderUri,
-        workspaceName: directory.folderName,
-      });
+      };
+
+      if (directory.folderName !== undefined) {
+        target.workspaceName = directory.folderName;
+      }
+
+      targets.push(target);
     }
 
     if (this.options.userProfilesDirectory !== undefined) {
@@ -180,10 +187,7 @@ export class ProfileStore {
     const source = {
       ...createProfileSource(
         createProfileRef(config.id, request.target.scope, request.target.workspaceFolderUri),
-        {
-          filePath,
-          workspaceName: request.target.workspaceName,
-        },
+        createSourceOptions(filePath, request.target.workspaceName),
       ),
       filePath,
     };
@@ -306,26 +310,74 @@ export function createProfileKey(ref: ProfileRef): string {
   return `${ref.scope}:${ref.id}`;
 }
 
+function createProfileNamespace(namespace: {
+  scope: ProfileScope;
+  workspaceFolderUri?: string | undefined;
+  workspaceName?: string | undefined;
+}): ProfileNamespace {
+  const workspaceFolderUri = namespace.workspaceFolderUri;
+  const workspaceName = namespace.workspaceName;
+
+  if (workspaceFolderUri === undefined) {
+    if (workspaceName === undefined) {
+      return { scope: namespace.scope };
+    }
+
+    return { scope: namespace.scope, workspaceName };
+  }
+
+  if (workspaceName === undefined) {
+    return { scope: namespace.scope, workspaceFolderUri };
+  }
+
+  return {
+    scope: namespace.scope,
+    workspaceFolderUri,
+    workspaceName,
+  };
+}
+
+function createSourceOptions(
+  filePath: string | undefined,
+  workspaceName: string | undefined,
+): { filePath?: string; workspaceName?: string } {
+  const options: { filePath?: string; workspaceName?: string } = {};
+
+  if (filePath !== undefined) {
+    options.filePath = filePath;
+  }
+
+  if (workspaceName !== undefined) {
+    options.workspaceName = workspaceName;
+  }
+
+  return options;
+}
+
 function createLoadedProfile(
   config: ProfileConfig,
   namespace: ProfileNamespace,
   options: { filePath?: string } = {},
 ): LoadedProfile {
   const ref = createProfileRef(config.id, namespace.scope, namespace.workspaceFolderUri);
-  const source = createProfileSource(ref, {
-    filePath: options.filePath,
-    workspaceName: namespace.workspaceName,
-  });
+  const source = createProfileSource(
+    ref,
+    createSourceOptions(options.filePath, namespace.workspaceName),
+  );
+  const summary: ProfileSummary = {
+    key: source.key,
+    ref,
+    id: config.id,
+    name: config.name,
+    scope: namespace.scope,
+  };
+
+  if (namespace.workspaceName !== undefined) {
+    summary.workspaceName = namespace.workspaceName;
+  }
 
   return {
-    summary: {
-      key: source.key,
-      ref,
-      id: config.id,
-      name: config.name,
-      scope: namespace.scope,
-      workspaceName: namespace.workspaceName,
-    },
+    summary,
     config,
     source,
   };
@@ -336,26 +388,38 @@ function createProfileRef(
   scope: ProfileScope,
   workspaceFolderUri?: string,
 ): ProfileRef {
-  return scope === "workspace"
-    ? { scope, id, workspaceFolderUri }
-    : {
-        scope,
-        id,
-      };
+  const ref: ProfileRef = { scope, id };
+
+  if (scope === "workspace" && workspaceFolderUri !== undefined) {
+    ref.workspaceFolderUri = workspaceFolderUri;
+  }
+
+  return ref;
 }
 
 function createProfileSource(
   ref: ProfileRef,
   options: { filePath?: string; workspaceName?: string } = {},
 ): ProfileSource {
-  return {
+  const source: ProfileSource = {
     key: createProfileKey(ref),
     ref,
     scope: ref.scope,
-    filePath: options.filePath,
-    workspaceFolderUri: ref.workspaceFolderUri,
-    workspaceName: options.workspaceName,
   };
+
+  if (options.filePath !== undefined) {
+    source.filePath = options.filePath;
+  }
+
+  if (ref.workspaceFolderUri !== undefined) {
+    source.workspaceFolderUri = ref.workspaceFolderUri;
+  }
+
+  if (options.workspaceName !== undefined) {
+    source.workspaceName = options.workspaceName;
+  }
+
+  return source;
 }
 
 export function normalizeProfileConfig(value: unknown, source = "profile"): ProfileConfig {
@@ -381,19 +445,28 @@ export function normalizeProfileConfig(value: unknown, source = "profile"): Prof
   const framing = normalizeFraming(value.framing, source);
   const parser = normalizeParser(value.parser, source);
   const outputs = normalizeOutputs(value.outputs, source);
+  const exportConfig = normalizeExport(value.export);
 
-  return {
+  const config: ProfileConfig = {
     schemaVersion: 3,
     id: value.id,
     name: value.name,
-    serialDefaults,
     layout,
     codec,
     framing,
     parser,
     outputs,
-    export: normalizeExport(value.export),
   };
+
+  if (serialDefaults !== undefined) {
+    config.serialDefaults = serialDefaults;
+  }
+
+  if (exportConfig !== undefined) {
+    config.export = exportConfig;
+  }
+
+  return config;
 }
 
 function normalizeProfileLayout(value: unknown, source: string): ProfileLayoutConfig {
@@ -449,12 +522,20 @@ function normalizeFraming(value: unknown, source: string): ProfileConfig["framin
     throw new Error(`${source} only supports line framing.`);
   }
 
-  return {
+  const framing: ProfileConfig["framing"] = {
     kind: "line",
     delimiter: isDelimiter(value.delimiter) ? value.delimiter : "auto",
-    trim: typeof value.trim === "boolean" ? value.trim : undefined,
-    maxFrameBytes: typeof value.maxFrameBytes === "number" ? value.maxFrameBytes : undefined,
   };
+
+  if (typeof value.trim === "boolean") {
+    framing.trim = value.trim;
+  }
+
+  if (typeof value.maxFrameBytes === "number") {
+    framing.maxFrameBytes = value.maxFrameBytes;
+  }
+
+  return framing;
 }
 
 function normalizeParser(value: unknown, source: string): ParserConfig {
@@ -467,22 +548,32 @@ function normalizeParser(value: unknown, source: string): ParserConfig {
       throw new Error(`${source} script parser must define path.`);
     }
 
-    return {
+    const config: ScriptParserConfig = {
       kind: "script",
       path: value.path,
-      options: isJsonObject(value.options) ? value.options : undefined,
     };
+
+    if (isJsonObject(value.options)) {
+      config.options = value.options;
+    }
+
+    return config;
   }
 
   if (value.kind !== "builtin" || typeof value.mode !== "string" || !isParserMode(value.mode)) {
     throw new Error(`${source} builtin parser must define a valid mode.`);
   }
 
-  return {
+  const config: BuiltinParserConfig = {
     kind: "builtin",
     mode: value.mode,
-    options: isJsonObject(value.options) ? value.options : undefined,
   };
+
+  if (isJsonObject(value.options)) {
+    config.options = value.options;
+  }
+
+  return config;
 }
 
 function normalizeOutputs(value: unknown, source: string): OutputConfig[] {
@@ -540,12 +631,16 @@ function normalizeExport(value: unknown): ProfileConfig["export"] {
     (value.mode === "raw" || value.mode === "parsed" || value.mode === "packets") &&
     (value.format === "txt" || value.format === "csv" || value.format === "jsonl")
   ) {
-    return {
+    const config: NonNullable<ProfileConfig["export"]> = {
       mode: value.mode,
       format: value.format,
-      includeMetadata:
-        typeof value.includeMetadata === "boolean" ? value.includeMetadata : undefined,
     };
+
+    if (typeof value.includeMetadata === "boolean") {
+      config.includeMetadata = value.includeMetadata;
+    }
+
+    return config;
   }
 
   return undefined;

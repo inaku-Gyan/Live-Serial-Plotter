@@ -3,6 +3,7 @@ import { defaultLayout } from "../../../src/profiles/defaultLayout";
 import { defaultProfile } from "../../../src/profiles/defaultProfile";
 import {
   isParserMode,
+  type ConnectionSettings,
   type LayoutConfig,
   type LayoutSaveTarget,
   type LayoutSummary,
@@ -187,14 +188,16 @@ export function createMonitorStore(
       return;
     }
 
-    postMessage({
-      type: "connect",
-      settings: {
-        path: state.selectedPath,
-        baudRate: state.baudRate,
-        parserMode: state.activeProfile.parser.kind === "builtin" ? state.parserMode : undefined,
-      },
-    });
+    const settings: ConnectionSettings = {
+      path: state.selectedPath,
+      baudRate: state.baudRate,
+    };
+
+    if (state.activeProfile.parser.kind === "builtin") {
+      settings.parserMode = state.parserMode;
+    }
+
+    postMessage({ type: "connect", settings });
   }
 
   function sendText(text: string): boolean {

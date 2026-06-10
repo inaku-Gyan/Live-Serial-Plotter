@@ -306,11 +306,19 @@ function createProvider(options: CreateProviderOptions = {}): {
       }),
     },
   } satisfies MockWebviewView;
-  const provider = new ProfileConfigViewProvider({
+  const providerOptions = {
     extensionUri: vscode.Uri.file("/extension"),
     profileStore: new ProfileStore(options),
-    openMonitorPage: options.openMonitorPage,
-  });
+  };
+
+  const provider = new ProfileConfigViewProvider(
+    options.openMonitorPage === undefined
+      ? providerOptions
+      : {
+          ...providerOptions,
+          openMonitorPage: options.openMonitorPage,
+        },
+  );
 
   return {
     provider,
