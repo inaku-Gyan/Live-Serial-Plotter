@@ -4,6 +4,7 @@ import "./styles.css";
 import MonitorApp from "./monitor/MonitorApp.vue";
 import {
   createMonitorStore,
+  MonitorStoreKey,
   type MonitorPersistedState,
   type MonitorStoreOptions,
   type VsCodeApi,
@@ -26,8 +27,9 @@ if (initialProfileKey !== undefined) {
 }
 
 const store = createMonitorStore(vscode, storeOptions);
-
-createApp(MonitorApp, { store }).mount(root);
+const app = createApp(MonitorApp);
+app.provide(MonitorStoreKey, store);
+app.mount(root);
 
 function nonEmptyString(value: string | undefined): string | undefined {
   return value === undefined || value.length === 0 ? undefined : value;

@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { baudRatePresets } from "../../baudRate";
 import { parserModes, type ParserMode, type ProfileSummary } from "../../../../src/shared/protocol";
-import type { MonitorStore } from "../store";
+import { useMonitorStore } from "../store";
 
-defineProps<{
-  store: MonitorStore;
-}>();
+const store = useMonitorStore();
+const {
+  state,
+  baudRateValid,
+  connectionStatusText,
+  portSelectDisabled,
+  parserModeSelectDisabled,
+  connectDisabled,
+} = store;
 
-function handleProfileChange(store: MonitorStore, event: Event): void {
+function handleProfileChange(event: Event): void {
   const target = event.target;
 
   if (target instanceof HTMLSelectElement) {
@@ -15,7 +21,7 @@ function handleProfileChange(store: MonitorStore, event: Event): void {
   }
 }
 
-function handlePortChange(store: MonitorStore, event: Event): void {
+function handlePortChange(event: Event): void {
   const target = event.target;
 
   if (target instanceof HTMLSelectElement) {
@@ -23,7 +29,7 @@ function handlePortChange(store: MonitorStore, event: Event): void {
   }
 }
 
-function handleBaudInput(store: MonitorStore, event: Event): void {
+function handleBaudInput(event: Event): void {
   const target = event.target;
 
   if (target instanceof HTMLInputElement) {
@@ -31,7 +37,7 @@ function handleBaudInput(store: MonitorStore, event: Event): void {
   }
 }
 
-function handleParserChange(store: MonitorStore, event: Event): void {
+function handleParserChange(event: Event): void {
   const target = event.target;
 
   if (target instanceof HTMLSelectElement) {
@@ -66,11 +72,11 @@ function formatParserMode(parserMode: ParserMode): string {
     <label class="field">
       <span>Profile</span>
       <select
-        :value="store.state.profileKey"
-        :disabled="store.state.connected"
-        @change="handleProfileChange(store, $event)"
+        :value="state.profileKey"
+        :disabled="state.connected"
+        @change="handleProfileChange($event)"
       >
-        <option v-for="profile in store.state.profiles" :key="profile.key" :value="profile.key">
+        <option v-for="profile in state.profiles" :key="profile.key" :value="profile.key">
           {{ formatProfileSummary(profile) }}
         </option>
       </select>
@@ -78,12 +84,12 @@ function formatParserMode(parserMode: ParserMode): string {
     <label class="field field-wide">
       <span>Port</span>
       <select
-        :value="store.state.selectedPath"
-        :disabled="store.portSelectDisabled.value"
-        @change="handlePortChange(store, $event)"
+        :value="state.selectedPath"
+        :disabled="portSelectDisabled"
+        @change="handlePortChange($event)"
       >
-        <option v-if="store.state.ports.length === 0" value="">No ports found</option>
-        <option v-for="port in store.state.ports" :key="port.path" :value="port.path">
+        <option v-if="state.ports.length === 0" value="">No ports found</option>
+        <option v-for="port in state.ports" :key="port.path" :value="port.path">
           {{ port.manufacturer === undefined ? port.path : `${port.path} (${port.manufacturer})` }}
         </option>
       </select>
@@ -94,17 +100,17 @@ function formatParserMode(parserMode: ParserMode): string {
     <label class="field">
       <span>Baud</span>
       <input
-        :value="store.state.baudRateInput"
+        :value="state.baudRateInput"
         type="number"
         min="1"
         step="1"
         inputmode="numeric"
         list="baudRatePresets"
         autocomplete="off"
-        :disabled="store.state.connected"
-        :aria-invalid="store.baudRateValid.value ? 'false' : 'true'"
-        @input="handleBaudInput(store, $event)"
-        @change="handleBaudInput(store, $event)"
+        :disabled="state.connected"
+        :aria-invalid="baudRateValid ? 'false' : 'true'"
+        @input="handleBaudInput($event)"
+        @change="handleBaudInput($event)"
       />
       <datalist id="baudRatePresets">
         <option v-for="baudRate in baudRatePresets" :key="baudRate" :value="String(baudRate)" />
@@ -113,9 +119,9 @@ function formatParserMode(parserMode: ParserMode): string {
     <label class="field">
       <span>Parser</span>
       <select
-        :value="store.state.parserMode"
-        :disabled="store.parserModeSelectDisabled.value"
-        @change="handleParserChange(store, $event)"
+        :value="state.parserMode"
+        :disabled="parserModeSelectDisabled"
+        @change="handleParserChange($event)"
       >
         <option v-for="parserMode in parserModes" :key="parserMode" :value="parserMode">
           {{ formatParserMode(parserMode) }}
@@ -124,15 +130,15 @@ function formatParserMode(parserMode: ParserMode): string {
     </label>
     <button
       class="button"
-      :class="store.state.connected ? 'button-secondary' : 'button-primary'"
+      :class="state.connected ? 'button-secondary' : 'button-primary'"
       type="button"
-      :disabled="store.connectDisabled.value"
+      :disabled="connectDisabled"
       @click="store.toggleConnection()"
     >
-      {{ store.state.connected ? "Disconnect" : "Connect" }}
+      {{ state.connected ? "Disconnect" : "Connect" }}
     </button>
-    <span class="status" :class="{ 'status-connected': store.state.connected }" aria-live="polite">
-      {{ store.connectionStatusText.value }}
+    <span class="status" :class="{ 'status-connected': state.connected }" aria-live="polite">
+      {{ connectionStatusText }}
     </span>
   </header>
 </template>

@@ -1,33 +1,32 @@
 <script setup lang="ts">
-import type { MonitorStore } from "../store";
+import { useMonitorStore } from "../store";
 
-const props = defineProps<{
-  store: MonitorStore;
-}>();
+const store = useMonitorStore();
+const { state } = store;
 
 function handleSaveAs(): void {
-  const target = props.store.state.layoutTargets[0];
+  const target = state.layoutTargets[0];
 
   if (target === undefined) {
-    props.store.showError("No user or workspace layout target is configured.");
+    store.showError("No user or workspace layout target is configured.");
     return;
   }
 
-  const layoutId = window.prompt("Layout id", props.store.state.activeLayout.id);
+  const layoutId = window.prompt("Layout id", state.activeLayout.id);
 
   if (layoutId === null || layoutId.trim().length === 0) {
     return;
   }
 
-  props.store.saveLayoutAs(layoutId.trim(), target);
+  store.saveLayoutAs(layoutId.trim(), target);
 }
 </script>
 
 <template>
   <section class="layout-controls" aria-label="Layout controls">
     <div class="layout-controls-summary">
-      <strong>{{ store.state.activeLayout.name }}</strong>
-      <span>{{ store.state.layoutKey }}</span>
+      <strong>{{ state.activeLayout.name }}</strong>
+      <span>{{ state.layoutKey }}</span>
     </div>
     <div class="layout-controls-actions">
       <button type="button" class="button button-secondary" @click="store.resetPageLayout">

@@ -1,16 +1,13 @@
 <script setup lang="ts">
 import { onMounted, ref } from "vue";
-import type { MonitorStore } from "../store";
+import { useMonitorStore } from "../store";
 
-const props = defineProps<{
-  store: MonitorStore;
-}>();
-
+const store = useMonitorStore();
 const outputWorkspace = ref<HTMLElement>();
 
 onMounted(() => {
   if (outputWorkspace.value !== undefined) {
-    props.store.mountOutputs(outputWorkspace.value);
+    store.mountOutputs(outputWorkspace.value);
   }
 });
 </script>

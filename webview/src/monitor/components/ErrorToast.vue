@@ -1,18 +1,17 @@
 <script setup lang="ts">
-import type { MonitorStore } from "../store";
+import { useMonitorStore } from "../store";
 
-defineProps<{
-  store: MonitorStore;
-}>();
+const store = useMonitorStore();
+const { state } = store;
 </script>
 
 <template>
   <div
     class="error-toast"
-    :class="{ 'error-toast-visible': store.state.errorVisible }"
+    :class="{ 'error-toast-visible': state.errorVisible }"
     role="status"
     aria-live="polite"
   >
-    {{ store.state.errorMessage }}
+    {{ state.errorMessage }}
   </div>
 </template>

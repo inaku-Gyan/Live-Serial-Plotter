@@ -1,4 +1,4 @@
-import { computed, reactive } from "vue";
+import { computed, inject, reactive, type InjectionKey } from "vue";
 import { defaultLayout } from "../../../src/profiles/defaultLayout";
 import { defaultProfile } from "../../../src/profiles/defaultProfile";
 import {
@@ -407,3 +407,15 @@ export function createMonitorStore(
 }
 
 export type MonitorStore = ReturnType<typeof createMonitorStore>;
+
+export const MonitorStoreKey: InjectionKey<MonitorStore> = Symbol("MonitorStore");
+
+export function useMonitorStore(): MonitorStore {
+  const store = inject(MonitorStoreKey);
+
+  if (store === undefined) {
+    throw new Error("MonitorStore was not provided.");
+  }
+
+  return store;
+}

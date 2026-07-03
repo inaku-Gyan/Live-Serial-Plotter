@@ -15,6 +15,7 @@ import type {
 import MonitorApp from "../../webview/src/monitor/MonitorApp.vue";
 import {
   createMonitorStore,
+  MonitorStoreKey,
   type MonitorOutputAdapter,
   type MonitorPersistedState,
   type VsCodeApi,
@@ -232,7 +233,7 @@ function mountMonitor(): {
     createOutputAdapter: () => adapter,
   });
   const wrapper = mount(MonitorApp, {
-    props: { store },
+    global: { provide: { [MonitorStoreKey]: store } },
     attachTo: document.body,
   });
 

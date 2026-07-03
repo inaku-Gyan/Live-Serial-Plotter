@@ -1,15 +1,13 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import type { MonitorStore } from "../store";
+import { useMonitorStore } from "../store";
 
-const props = defineProps<{
-  store: MonitorStore;
-}>();
-
+const store = useMonitorStore();
+const { sendDisabled } = store;
 const text = ref("");
 
 function handleSubmit(): void {
-  if (props.store.sendText(text.value)) {
+  if (store.sendText(text.value)) {
     text.value = "";
   }
 }
@@ -23,10 +21,8 @@ function handleSubmit(): void {
       autocomplete="off"
       spellcheck="false"
       placeholder="Send text"
-      :disabled="store.sendDisabled.value"
+      :disabled="sendDisabled"
     />
-    <button class="button button-primary" type="submit" :disabled="store.sendDisabled.value">
-      Send
-    </button>
+    <button class="button button-primary" type="submit" :disabled="sendDisabled">Send</button>
   </form>
 </template>
