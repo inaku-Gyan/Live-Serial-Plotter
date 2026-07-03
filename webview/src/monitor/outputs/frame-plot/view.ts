@@ -16,14 +16,22 @@ import {
 } from "./canvas";
 import type { OutputView } from "../types";
 
+interface ThemeColors {
+  foreground: string;
+  muted: string;
+  grid: string;
+}
+
 export class FramePlot2dView implements OutputView {
   readonly outputId: string;
   readonly kind = "framePlot2d" as const;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly resizeObserver: ResizeObserver | undefined;
+  private readonly themeObserver: MutationObserver | undefined;
   private latestPacket: FramePlot2dPacket | undefined;
   private viewLayout: FramePlot2dViewLayoutConfig | undefined;
+  private themeColors: ThemeColors | undefined;
 
   constructor(
     parent: HTMLElement,
@@ -46,6 +54,14 @@ export class FramePlot2dView implements OutputView {
       this.resizeObserver = new ResizeObserver(() => this.draw());
       this.resizeObserver.observe(this.canvas);
     }
+
+    if (typeof MutationObserver !== "undefined") {
+      this.themeObserver = new MutationObserver(() => {
+        this.themeColors = undefined;
+        this.draw();
+      });
+      this.themeObserver.observe(document.body, { attributes: true, attributeFilter: ["class"] });
+    }
   }
 
   updateData(packet: OutputPacket): void {
@@ -64,6 +80,7 @@ export class FramePlot2dView implements OutputView {
 
   dispose(): void {
     this.resizeObserver?.disconnect();
+    this.themeObserver?.disconnect();
   }
 
   applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
@@ -87,6 +104,19 @@ export class FramePlot2dView implements OutputView {
     return layout;
   }
 
+  private readColors(): ThemeColors {
+    if (this.themeColors === undefined) {
+      const style = getComputedStyle(this.canvas);
+      this.themeColors = {
+        foreground: readCssColor(style, "--vscode-foreground", "#cccccc"),
+        muted: readCssColor(style, "--vscode-descriptionForeground", "#8f8f8f"),
+        grid: readCssColor(style, "--vscode-panel-border", "#3c3c3c"),
+      };
+    }
+
+    return this.themeColors;
+  }
+
   private draw(): void {
     const context = getCanvasContext(this.canvas);
 
@@ -101,10 +131,7 @@ export class FramePlot2dView implements OutputView {
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
     context.clearRect(0, 0, size.width, size.height);
 
-    const style = getComputedStyle(this.canvas);
-    const foreground = readCssColor(style, "--vscode-foreground", "#cccccc");
-    const muted = readCssColor(style, "--vscode-descriptionForeground", "#8f8f8f");
-    const grid = readCssColor(style, "--vscode-panel-border", "#3c3c3c");
+    const { foreground, muted, grid } = this.readColors();
     const bounds =
       this.viewLayout?.bounds ??
       this.latestPacket?.bounds ??

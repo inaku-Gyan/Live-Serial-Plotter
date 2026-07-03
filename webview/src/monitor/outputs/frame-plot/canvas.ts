@@ -24,18 +24,25 @@ export function readCssColor(style: CSSStyleDeclaration, name: string, fallback:
 export function inferBounds(
   packet: FramePlot2dPacket | undefined,
 ): { xMin: number; xMax: number; yMin: number; yMax: number } | undefined {
-  const points = packet?.layers.flatMap((layer) => layer.points) ?? [];
+  let xMin = Number.POSITIVE_INFINITY;
+  let xMax = Number.NEGATIVE_INFINITY;
+  let yMin = Number.POSITIVE_INFINITY;
+  let yMax = Number.NEGATIVE_INFINITY;
+  let count = 0;
 
-  if (points.length === 0) {
-    return undefined;
+  for (const layer of packet?.layers ?? []) {
+    for (const point of layer.points) {
+      count += 1;
+      xMin = Math.min(xMin, point.x);
+      xMax = Math.max(xMax, point.x);
+      yMin = Math.min(yMin, point.y);
+      yMax = Math.max(yMax, point.y);
+    }
   }
 
-  const xValues = points.map((point) => point.x);
-  const yValues = points.map((point) => point.y);
-  const xMin = Math.min(...xValues);
-  const xMax = Math.max(...xValues);
-  const yMin = Math.min(...yValues);
-  const yMax = Math.max(...yValues);
+  if (count === 0) {
+    return undefined;
+  }
 
   return {
     xMin: xMin === xMax ? xMin - 1 : xMin,
