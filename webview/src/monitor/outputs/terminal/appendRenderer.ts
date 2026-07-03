@@ -6,12 +6,12 @@ import type {
   TerminalViewStateConfig,
 } from "../../../../../src/shared/protocol";
 import { appendPanelHeaderButton, createPanelHeader } from "../panel/chrome";
-import type { OutputView } from "../types";
+import type { OutputRenderer } from "../types";
 
 const defaultMaxRawLines = 500;
 const standbyText = "Waiting for serial text";
 
-export class TerminalAppendView implements OutputView {
+export class TerminalAppendRenderer implements OutputRenderer {
   readonly outputId: string;
   readonly kind = "terminalAppend" as const;
 
@@ -25,9 +25,9 @@ export class TerminalAppendView implements OutputView {
     viewLayout: OutputLayoutConfig["viewState"] | undefined,
   ) {
     this.outputId = config.id;
-    this.applyViewLayout(viewLayout);
+    this.applyViewState(viewLayout);
 
-    const header = createPanelHeader(config, "Terminal", () => this.resetView());
+    const header = createPanelHeader(config, "Terminal", () => this.resetViewState());
     appendPanelHeaderButton(header, "Clear", () => this.clearData(), "output-clear-button");
 
     this.pre = document.createElement("pre");
@@ -77,15 +77,15 @@ export class TerminalAppendView implements OutputView {
     }
   }
 
-  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void {
+  applyViewState(layout: OutputLayoutConfig["viewState"] | undefined): void {
     this.viewLayout = layout?.kind === "terminalAppend" ? layout : undefined;
   }
 
-  resetView(): void {
-    this.applyViewLayout(undefined);
+  resetViewState(): void {
+    this.applyViewState(undefined);
   }
 
-  captureViewLayout(): OutputLayoutConfig["viewState"] {
+  captureViewState(): OutputLayoutConfig["viewState"] {
     return {
       kind: "terminalAppend",
       autoScroll: this.getAutoScroll(),

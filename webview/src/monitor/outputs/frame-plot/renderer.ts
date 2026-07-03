@@ -14,7 +14,7 @@ import {
   readCssColor,
   scaleLinear,
 } from "./canvas";
-import type { OutputView } from "../types";
+import type { OutputRenderer } from "../types";
 
 interface ThemeColors {
   foreground: string;
@@ -22,7 +22,7 @@ interface ThemeColors {
   grid: string;
 }
 
-export class FramePlot2dView implements OutputView {
+export class FramePlot2dRenderer implements OutputRenderer {
   readonly outputId: string;
   readonly kind = "framePlot2d" as const;
 
@@ -39,13 +39,13 @@ export class FramePlot2dView implements OutputView {
     viewLayout: OutputLayoutConfig["viewState"] | undefined,
   ) {
     this.outputId = config.id;
-    this.applyViewLayout(viewLayout);
+    this.applyViewState(viewLayout);
     this.canvas = document.createElement("canvas");
     this.canvas.className = "output-frame-canvas";
     this.canvas.setAttribute("aria-label", "Frame plot");
 
     parent.append(
-      createPanelHeader(config, "Frame Plot", () => this.resetView()),
+      createPanelHeader(config, "Frame Plot", () => this.resetViewState()),
       this.canvas,
     );
     this.draw();
@@ -83,16 +83,16 @@ export class FramePlot2dView implements OutputView {
     this.themeObserver?.disconnect();
   }
 
-  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void {
+  applyViewState(layout: OutputLayoutConfig["viewState"] | undefined): void {
     this.viewLayout = layout?.kind === "framePlot2d" ? layout : undefined;
   }
 
-  resetView(): void {
-    this.applyViewLayout(this.viewLayout);
+  resetViewState(): void {
+    this.applyViewState(this.viewLayout);
     this.draw();
   }
 
-  captureViewLayout(): OutputLayoutConfig["viewState"] {
+  captureViewState(): OutputLayoutConfig["viewState"] {
     const layout: FramePlot2dViewStateConfig = {
       kind: "framePlot2d",
     };

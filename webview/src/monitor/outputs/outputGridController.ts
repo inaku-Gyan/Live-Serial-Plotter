@@ -5,15 +5,15 @@ import type {
   OutputLayoutConfig,
   OutputPacket,
 } from "../../../../src/shared/protocol";
-import { createOutputView } from "./factory";
+import { createOutputRenderer } from "./factory";
 import { applyPanelLayout, cssEscape, sortOutputsByLayout } from "./panel/layout";
-import type { MonitorOutputControllerOptions, OutputView } from "./types";
+import type { OutputGridControllerOptions, OutputRenderer } from "./types";
 
-export class MonitorOutputController {
-  private readonly views = new Map<string, OutputView>();
+export class DomOutputGridController {
+  private readonly views = new Map<string, OutputRenderer>();
   private currentLayout: LayoutConfig | undefined;
 
-  constructor(private readonly options: MonitorOutputControllerOptions) {}
+  constructor(private readonly options: OutputGridControllerOptions) {}
 
   renderOutputs(outputs: readonly OutputConfig[], layout: LayoutConfig = defaultLayout): void {
     this.disposeViews();
@@ -22,7 +22,7 @@ export class MonitorOutputController {
     this.options.root.replaceChildren();
 
     for (const output of sortOutputsByLayout(outputs, layout)) {
-      const view = createOutputView(this.options.root, output, layout.outputs[output.id]);
+      const view = createOutputRenderer(this.options.root, output, layout.outputs[output.id]);
       this.views.set(output.id, view);
     }
   }
@@ -31,8 +31,8 @@ export class MonitorOutputController {
     this.views.get(packet.outputId)?.updateData(packet);
   }
 
-  resetOutputView(outputId: string): void {
-    this.views.get(outputId)?.resetView();
+  resetOutputViewState(outputId: string): void {
+    this.views.get(outputId)?.resetViewState();
   }
 
   resetPageLayout(): void {
@@ -43,7 +43,7 @@ export class MonitorOutputController {
     this.applyPageLayout(this.currentLayout);
 
     for (const view of this.views.values()) {
-      view.resetView();
+      view.resetViewState();
       const panel = this.options.root.querySelector<HTMLElement>(
         `[data-output-id="${cssEscape(view.outputId)}"]`,
       );
@@ -51,7 +51,7 @@ export class MonitorOutputController {
     }
   }
 
-  captureSavableViewState(): LayoutConfig {
+  captureLayout(): LayoutConfig {
     const baseLayout = this.currentLayout;
 
     if (baseLayout === undefined) {
@@ -70,7 +70,7 @@ export class MonitorOutputController {
       const outputLayout: OutputLayoutConfig = {
         ...baseLayout.outputs[outputId],
       };
-      const viewLayout = view.captureViewLayout();
+      const viewLayout = view.captureViewState();
 
       if (viewLayout !== undefined) {
         outputLayout.viewState = viewLayout;

@@ -621,7 +621,7 @@ describe("time-series monitor output", () => {
 
     followButton.click();
 
-    expect(controller.captureSavableViewState().outputs.plot?.viewState).toMatchObject({
+    expect(controller.captureLayout().outputs.plot?.viewState).toMatchObject({
       kind: "timeSeriesLine",
       followMode: "locked",
       autoFollow: true,
@@ -1097,7 +1097,7 @@ describe("time-series monitor output", () => {
     rpmCheckbox.dispatchEvent(new Event("change"));
     plot.options.hooks?.setScale?.[0]?.(plot, "x");
 
-    controller.resetOutputView("plot");
+    controller.resetOutputViewState("plot");
 
     expect(plot.data).toEqual([
       [0, 1, 2],

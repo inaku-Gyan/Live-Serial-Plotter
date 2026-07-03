@@ -5,14 +5,14 @@ import type {
   TimeSeriesViewStateConfig,
 } from "../../../../src/shared/protocol";
 
-export interface MonitorOutputControllerOptions {
+export interface OutputGridControllerOptions {
   root: HTMLElement;
 }
 
 /**
  * Common adapter used by the monitor controller to drive one output renderer.
  */
-export interface OutputView {
+export interface OutputRenderer {
   /** Profile output id used for packet routing and layout snapshots. */
   readonly outputId: string;
   /** Renderer kind declared by the output profile config. */
@@ -22,11 +22,11 @@ export interface OutputView {
   /** Clear runtime data currently displayed by this output. */
   clearData(): void;
   /** Apply renderer-specific view layout, not the outer panel grid layout. */
-  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void;
+  applyViewState(layout: OutputLayoutConfig["viewState"] | undefined): void;
   /** Reset interaction/view state without clearing runtime data. */
-  resetView(): void;
+  resetViewState(): void;
   /** Capture renderer-specific view state that can be saved into a layout profile. */
-  captureViewLayout(): OutputLayoutConfig["viewState"] | undefined;
+  captureViewState(): OutputLayoutConfig["viewState"] | undefined;
   /** Release observers, chart instances, and other renderer-owned resources. */
   dispose(): void;
 }

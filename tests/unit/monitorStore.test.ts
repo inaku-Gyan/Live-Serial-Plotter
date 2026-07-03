@@ -13,7 +13,7 @@ import type {
 } from "../../src/shared/protocol";
 import {
   createMonitorStore,
-  type MonitorOutputAdapter,
+  type OutputGridController,
   type MonitorPersistedState,
   type VsCodeApi,
 } from "../../webview/src/monitor/store";
@@ -169,12 +169,12 @@ describe("monitor store", () => {
     const { store, adapter } = createStore(vscode.api);
     store.mountOutputs(document.createElement("section"));
 
-    store.resetOutputView("plot");
+    store.resetOutputViewState("plot");
     store.resetPageLayout();
     store.saveLayout();
     store.saveLayoutAs("saved-layout", { label: "User", scope: "user" });
 
-    expect(adapter.resetOutputView).toHaveBeenCalledWith("plot");
+    expect(adapter.resetOutputViewState).toHaveBeenCalledWith("plot");
     expect(adapter.resetPageLayout).toHaveBeenCalled();
     expect(vscode.messages).toContainEqual({
       type: "saveLayout",
@@ -223,14 +223,14 @@ function createStore(vscode: VsCodeApi<MonitorPersistedState>): {
   return { store, adapter };
 }
 
-interface MockOutputAdapter extends MonitorOutputAdapter {
+interface MockOutputAdapter extends OutputGridController {
   renderOutputs: ReturnType<
     typeof vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>
   >;
   appendPacket: ReturnType<typeof vi.fn<(packet: OutputPacket) => void>>;
-  resetOutputView: ReturnType<typeof vi.fn<(outputId: string) => void>>;
+  resetOutputViewState: ReturnType<typeof vi.fn<(outputId: string) => void>>;
   resetPageLayout: ReturnType<typeof vi.fn<() => void>>;
-  captureSavableViewState: ReturnType<typeof vi.fn<() => LayoutConfig>>;
+  captureLayout: ReturnType<typeof vi.fn<() => LayoutConfig>>;
   dispose: ReturnType<typeof vi.fn<() => void>>;
 }
 
@@ -238,9 +238,9 @@ function createOutputAdapter(): MockOutputAdapter {
   return {
     renderOutputs: vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>(),
     appendPacket: vi.fn<(packet: OutputPacket) => void>(),
-    resetOutputView: vi.fn<(outputId: string) => void>(),
+    resetOutputViewState: vi.fn<(outputId: string) => void>(),
     resetPageLayout: vi.fn<() => void>(),
-    captureSavableViewState: vi.fn<() => LayoutConfig>(() => defaultLayout),
+    captureLayout: vi.fn<() => LayoutConfig>(() => defaultLayout),
     dispose: vi.fn<() => void>(),
   };
 }

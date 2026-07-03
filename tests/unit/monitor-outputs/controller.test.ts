@@ -12,7 +12,7 @@ import {
 
 setupMonitorOutputTest();
 
-describe("MonitorOutputController", () => {
+describe("DomOutputGridController", () => {
   test("renders profile outputs as standby panels in profile order", () => {
     const { root } = createController();
 

@@ -6,12 +6,12 @@ import type {
   TerminalViewStateConfig,
 } from "../../../../../src/shared/protocol";
 import { createPanelHeader } from "../panel/chrome";
-import type { OutputView } from "../types";
+import type { OutputRenderer } from "../types";
 
 const maxFrames = 200;
 const standbyText = "Waiting for frame data";
 
-export class TerminalFrameView implements OutputView {
+export class TerminalFrameRenderer implements OutputRenderer {
   readonly outputId: string;
   readonly kind = "terminalFrame" as const;
 
@@ -25,13 +25,13 @@ export class TerminalFrameView implements OutputView {
     viewLayout: OutputLayoutConfig["viewState"] | undefined,
   ) {
     this.outputId = config.id;
-    this.applyViewLayout(viewLayout);
+    this.applyViewState(viewLayout);
     this.pre = document.createElement("pre");
     this.pre.className = "output-terminal output-frame-terminal output-standby";
     this.pre.textContent = standbyText;
 
     parent.append(
-      createPanelHeader(config, "Frame Terminal", () => this.resetView()),
+      createPanelHeader(config, "Frame Terminal", () => this.resetViewState()),
       this.pre,
     );
   }
@@ -63,15 +63,15 @@ export class TerminalFrameView implements OutputView {
       .join("\n\n");
   }
 
-  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void {
+  applyViewState(layout: OutputLayoutConfig["viewState"] | undefined): void {
     this.viewLayout = layout?.kind === "terminalFrame" ? layout : undefined;
   }
 
-  resetView(): void {
-    this.applyViewLayout(undefined);
+  resetViewState(): void {
+    this.applyViewState(undefined);
   }
 
-  captureViewLayout(): OutputLayoutConfig["viewState"] {
+  captureViewState(): OutputLayoutConfig["viewState"] {
     const layout: TerminalViewStateConfig = {
       kind: "terminalFrame",
     };

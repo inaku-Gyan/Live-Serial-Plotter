@@ -16,7 +16,7 @@ import MonitorApp from "../../webview/src/monitor/MonitorApp.vue";
 import {
   createMonitorStore,
   MonitorStoreKey,
-  type MonitorOutputAdapter,
+  type OutputGridController,
   type MonitorPersistedState,
   type VsCodeApi,
 } from "../../webview/src/monitor/store";
@@ -263,14 +263,14 @@ function dispatchHostMessage(data: unknown): void {
   window.dispatchEvent(new MessageEvent("message", { data }));
 }
 
-interface MockOutputAdapter extends MonitorOutputAdapter {
+interface MockOutputAdapter extends OutputGridController {
   renderOutputs: ReturnType<
     typeof vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>
   >;
   appendPacket: ReturnType<typeof vi.fn<(packet: OutputPacket) => void>>;
-  resetOutputView: ReturnType<typeof vi.fn<(outputId: string) => void>>;
+  resetOutputViewState: ReturnType<typeof vi.fn<(outputId: string) => void>>;
   resetPageLayout: ReturnType<typeof vi.fn<() => void>>;
-  captureSavableViewState: ReturnType<typeof vi.fn<() => LayoutConfig>>;
+  captureLayout: ReturnType<typeof vi.fn<() => LayoutConfig>>;
   dispose: ReturnType<typeof vi.fn<() => void>>;
 }
 
@@ -278,9 +278,9 @@ function createOutputAdapter(): MockOutputAdapter {
   return {
     renderOutputs: vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>(),
     appendPacket: vi.fn<(packet: OutputPacket) => void>(),
-    resetOutputView: vi.fn<(outputId: string) => void>(),
+    resetOutputViewState: vi.fn<(outputId: string) => void>(),
     resetPageLayout: vi.fn<() => void>(),
-    captureSavableViewState: vi.fn<() => LayoutConfig>(() => defaultLayout),
+    captureLayout: vi.fn<() => LayoutConfig>(() => defaultLayout),
     dispose: vi.fn<() => void>(),
   };
 }

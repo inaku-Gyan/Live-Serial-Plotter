@@ -1,16 +1,16 @@
 import type { OutputConfig, OutputLayoutConfig } from "../../../../src/shared/protocol";
-import { FramePlot2dView } from "./frame-plot/view";
+import { FramePlot2dRenderer } from "./frame-plot/renderer";
 import { applyPanelLayout } from "./panel/layout";
-import { TerminalAppendView } from "./terminal/appendView";
-import { TerminalFrameView } from "./terminal/frameView";
-import { TimeSeriesLineView } from "./time-series/view";
-import type { OutputView } from "./types";
+import { TerminalAppendRenderer } from "./terminal/appendRenderer";
+import { TerminalFrameRenderer } from "./terminal/frameRenderer";
+import { TimeSeriesLineRenderer } from "./time-series/renderer";
+import type { OutputRenderer } from "./types";
 
-export function createOutputView(
+export function createOutputRenderer(
   root: HTMLElement,
   output: OutputConfig,
   layout: OutputLayoutConfig | undefined,
-): OutputView {
+): OutputRenderer {
   const section = document.createElement("section");
   section.className = `output-panel output-panel-${output.kind}`;
   section.dataset.outputId = output.id;
@@ -20,13 +20,13 @@ export function createOutputView(
 
   switch (output.kind) {
     case "terminalAppend":
-      return new TerminalAppendView(section, output, layout?.viewState);
+      return new TerminalAppendRenderer(section, output, layout?.viewState);
     case "terminalFrame":
-      return new TerminalFrameView(section, output, layout?.viewState);
+      return new TerminalFrameRenderer(section, output, layout?.viewState);
     case "timeSeriesLine":
-      return new TimeSeriesLineView(section, output, layout?.viewState);
+      return new TimeSeriesLineRenderer(section, output, layout?.viewState);
     case "framePlot2d":
-      return new FramePlot2dView(section, output, layout?.viewState);
+      return new FramePlot2dRenderer(section, output, layout?.viewState);
   }
 
   return assertNever(output);

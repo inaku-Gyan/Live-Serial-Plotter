@@ -5,7 +5,7 @@ import type {
   TimeSeriesLineOutputConfig,
   ToExtensionMessage,
 } from "../../../../src/shared/protocol";
-import { MonitorOutputController } from "../../../../webview/src/monitor/outputs/controller";
+import { DomOutputGridController } from "../../../../webview/src/monitor/outputs/outputGridController";
 
 const uPlotPathCacheKey = "_paths";
 
@@ -203,7 +203,7 @@ export function setupMonitorOutputTest(): void {
 }
 
 export function createController(): {
-  controller: MonitorOutputController;
+  controller: DomOutputGridController;
   root: HTMLElement;
   messages: ToExtensionMessage[];
 } {
@@ -212,14 +212,14 @@ export function createController(): {
   const messages: ToExtensionMessage[] = [];
 
   return {
-    controller: new MonitorOutputController({ root }),
+    controller: new DomOutputGridController({ root }),
     root,
     messages,
   };
 }
 
 export function renderProfile(root: HTMLElement, outputs: readonly OutputConfig[]): void {
-  const controller = new MonitorOutputController({ root });
+  const controller = new DomOutputGridController({ root });
   controller.renderOutputs(outputs);
 }
 

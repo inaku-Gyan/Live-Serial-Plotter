@@ -17,7 +17,7 @@ import {
   type ToWebviewMessage,
 } from "../../../src/shared/protocol";
 import { isBaudRateInputValid, parseBaudRateInput } from "../baudRate";
-import { MonitorOutputController } from "./outputs/controller";
+import { DomOutputGridController } from "./outputs/outputGridController";
 
 export interface VsCodeApi<State> {
   getState(): State | undefined;
@@ -33,19 +33,19 @@ export interface MonitorPersistedState {
   selectedPath?: string;
 }
 
-export interface MonitorOutputAdapter {
+export interface OutputGridController {
   renderOutputs(outputs: readonly OutputConfig[], layout: LayoutConfig): void;
   appendPacket(packet: OutputPacket): void;
-  resetOutputView(outputId: string): void;
+  resetOutputViewState(outputId: string): void;
   resetPageLayout(): void;
-  captureSavableViewState(): LayoutConfig;
+  captureLayout(): LayoutConfig;
   dispose(): void;
 }
 
 export interface MonitorStoreOptions {
   initialProfileKey?: string;
   errorToastDelayMs?: number;
-  createOutputAdapter?: (root: HTMLElement) => MonitorOutputAdapter;
+  createOutputAdapter?: (root: HTMLElement) => OutputGridController;
 }
 
 interface MonitorUiState {
@@ -79,9 +79,9 @@ export function createMonitorStore(
     persistedState?.baudRate ?? defaultProfile.serialDefaults?.baudRate ?? 115200;
   const errorToastDelayMs = options.errorToastDelayMs ?? 3500;
   const createOutputAdapter =
-    options.createOutputAdapter ?? ((root: HTMLElement) => new MonitorOutputController({ root }));
+    options.createOutputAdapter ?? ((root: HTMLElement) => new DomOutputGridController({ root }));
 
-  let outputAdapter: MonitorOutputAdapter | undefined;
+  let outputAdapter: OutputGridController | undefined;
   let errorTimer: ReturnType<typeof setTimeout> | undefined;
 
   const state = reactive<MonitorUiState>({
@@ -284,8 +284,8 @@ export function createMonitorStore(
     persistState();
   }
 
-  function resetOutputView(outputId: string): void {
-    outputAdapter?.resetOutputView(outputId);
+  function resetOutputViewState(outputId: string): void {
+    outputAdapter?.resetOutputViewState(outputId);
   }
 
   function resetPageLayout(): void {
@@ -293,12 +293,12 @@ export function createMonitorStore(
   }
 
   function saveLayout(): void {
-    const layout = outputAdapter?.captureSavableViewState() ?? state.activeLayout;
+    const layout = outputAdapter?.captureLayout() ?? state.activeLayout;
     postMessage({ type: "saveLayout", request: { layout, layoutKey: state.layoutKey } });
   }
 
   function saveLayoutAs(layoutId: string, target: LayoutSaveTarget): void {
-    const layout = outputAdapter?.captureSavableViewState() ?? state.activeLayout;
+    const layout = outputAdapter?.captureLayout() ?? state.activeLayout;
     postMessage({
       type: "saveLayoutAs",
       request: {
@@ -380,7 +380,7 @@ export function createMonitorStore(
     toggleConnection,
     sendText,
     handleHostMessage,
-    resetOutputView,
+    resetOutputViewState,
     resetPageLayout,
     saveLayout,
     saveLayoutAs,

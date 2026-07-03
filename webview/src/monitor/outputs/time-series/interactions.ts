@@ -5,7 +5,7 @@ interface TimeSeriesInteractionPluginOptions {
   onScaleChanged(scaleKey: string): void;
   onUserInteraction?(): void;
   onUserInteractionSettled?(): void;
-  resetView(): void;
+  resetViewState(): void;
 }
 
 interface TimeSeriesInteractionConfig {
@@ -63,7 +63,7 @@ interface PointerModifierBinding {
 }
 
 interface DoubleClickInteractionConfig {
-  resetView: boolean;
+  resetViewState: boolean;
 }
 
 interface PointerPosition {
@@ -169,7 +169,7 @@ export const defaultTimeSeriesInteractionConfig: TimeSeriesInteractionConfig = {
     pinchZoom: true,
   },
   doubleClick: {
-    resetView: true,
+    resetViewState: true,
   },
 };
 
@@ -349,12 +349,12 @@ function installGestureHandlers(
   }
 
   function handleDoubleClick(event: MouseEvent): void {
-    if (!config.doubleClick.resetView) {
+    if (!config.doubleClick.resetViewState) {
       return;
     }
 
     event.preventDefault();
-    options.resetView();
+    options.resetViewState();
   }
 
   function notifyUserInteraction(): void {

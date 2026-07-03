@@ -26,13 +26,13 @@ import {
   getYAxisLabel,
 } from "./seriesConfig";
 import type {
-  OutputView,
+  OutputRenderer,
   PlotRebuildOptions,
   PlotScaleRanges,
   TimeSeriesFollowMode,
 } from "../types";
 
-export class TimeSeriesLineView implements OutputView {
+export class TimeSeriesLineRenderer implements OutputRenderer {
   readonly outputId: string;
   readonly kind = "timeSeriesLine" as const;
 
@@ -57,7 +57,7 @@ export class TimeSeriesLineView implements OutputView {
   ) {
     this.outputId = config.id;
     this.dataBuffer = new TimeSeriesDataBuffer(config);
-    this.applyViewLayout(viewLayout);
+    this.applyViewState(viewLayout);
     this.chartElement = document.createElement("div");
     this.chartElement.className = "output-chart";
     this.legendElement = document.createElement("div");
@@ -70,7 +70,7 @@ export class TimeSeriesLineView implements OutputView {
       () => this.toggleFollowMode(),
       "output-follow-button",
     );
-    appendPanelHeaderButton(header, "Reset", () => this.resetView(), "output-reset-button");
+    appendPanelHeaderButton(header, "Reset", () => this.resetViewState(), "output-reset-button");
     this.updateFollowButton();
 
     parent.append(header, this.chartElement, this.legendElement);
@@ -127,7 +127,7 @@ export class TimeSeriesLineView implements OutputView {
     this.plot = undefined;
   }
 
-  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void {
+  applyViewState(layout: OutputLayoutConfig["viewState"] | undefined): void {
     this.viewLayout = layout?.kind === "timeSeriesLine" ? layout : undefined;
     this.followMode = this.getDefaultFollowMode();
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();
@@ -135,8 +135,8 @@ export class TimeSeriesLineView implements OutputView {
     this.updateFollowButton();
   }
 
-  resetView(): void {
-    this.applyViewLayout(this.viewLayout);
+  resetViewState(): void {
+    this.applyViewState(this.viewLayout);
     for (const channelName of this.dataBuffer.getChannelNames()) {
       const visible = this.getSeriesVisible(channelName);
       this.seriesVisibility.set(channelName, visible);
@@ -156,7 +156,7 @@ export class TimeSeriesLineView implements OutputView {
     this.updateFollowButton();
   }
 
-  captureViewLayout(): OutputLayoutConfig["viewState"] {
+  captureViewState(): OutputLayoutConfig["viewState"] {
     const layout: TimeSeriesViewStateConfig = {
       kind: "timeSeriesLine",
       showLegend: !this.legendElement.hidden,
@@ -245,7 +245,7 @@ export class TimeSeriesLineView implements OutputView {
           onScaleChanged: (scaleKey) => this.handlePlotScaleChanged(scaleKey),
           onUserInteraction: () => this.handlePlotUserInteraction(),
           onUserInteractionSettled: () => this.handlePlotUserInteractionSettled(),
-          resetView: () => this.resetView(),
+          resetViewState: () => this.resetViewState(),
         }),
         series,
       },
