@@ -19,7 +19,7 @@ describe("DomOutputGridController", () => {
     renderProfile(root, createOutputs());
 
     expect(
-      [...root.querySelectorAll(".output-panel")].map((panel) =>
+      [...root.querySelectorAll(".output-tile")].map((panel) =>
         panel.getAttribute("data-output-id"),
       ),
     ).toEqual(["raw", "plot", "frame", "scatter"]);

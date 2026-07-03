@@ -6,7 +6,7 @@ import type {
   OutputPacket,
 } from "../../../../src/shared/protocol";
 import { createOutputRenderer } from "./factory";
-import { applyPanelLayout, cssEscape, sortOutputsByLayout } from "./panel/layout";
+import { applyTileLayout, cssEscape, sortOutputsByLayout } from "./tile/layout";
 import type { OutputGridControllerOptions, OutputRenderer } from "./types";
 
 export class DomOutputGridController {
@@ -47,7 +47,7 @@ export class DomOutputGridController {
       const panel = this.options.root.querySelector<HTMLElement>(
         `[data-output-id="${cssEscape(view.outputId)}"]`,
       );
-      applyPanelLayout(panel, this.currentLayout.outputs[view.outputId]);
+      applyTileLayout(panel, this.currentLayout.outputs[view.outputId]);
     }
   }
 

@@ -205,7 +205,7 @@ select {
   padding: 16px;
 }
 
-.output-panel {
+.output-tile {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   min-height: 0;
@@ -213,13 +213,13 @@ select {
   background: var(--vscode-editor-background);
 }
 
-.output-panel-timeSeriesLine,
-.output-panel-framePlot2d {
+.output-tile-timeSeriesLine,
+.output-tile-framePlot2d {
   min-height: 320px;
 }
 
-.output-panel-terminalAppend,
-.output-panel-terminalFrame {
+.output-tile-terminalAppend,
+.output-tile-terminalFrame {
   min-height: 220px;
 }
 

@@ -5,7 +5,7 @@ import type {
   TerminalFramePacket,
   TerminalViewStateConfig,
 } from "../../../../../src/shared/protocol";
-import { createPanelHeader } from "../panel/chrome";
+import { createTileHeader } from "../tile/chrome";
 import type { OutputRenderer } from "../types";
 
 const maxFrames = 200;
@@ -31,7 +31,7 @@ export class TerminalFrameRenderer implements OutputRenderer {
     this.pre.textContent = standbyText;
 
     parent.append(
-      createPanelHeader(config, "Frame Terminal", () => this.resetViewState()),
+      createTileHeader(config, "Frame Terminal", () => this.resetViewState()),
       this.pre,
     );
   }

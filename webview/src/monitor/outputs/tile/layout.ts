@@ -39,7 +39,7 @@ function compareOutputLayoutOrder(
   return (leftOrder ?? 10_000 + leftIndex) - (rightOrder ?? 10_000 + rightIndex);
 }
 
-export function applyPanelLayout(
+export function applyTileLayout(
   panel: HTMLElement | null,
   layout: OutputLayoutConfig | undefined,
 ): void {

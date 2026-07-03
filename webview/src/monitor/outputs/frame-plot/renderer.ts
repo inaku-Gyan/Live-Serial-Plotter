@@ -5,7 +5,7 @@ import type {
   OutputLayoutConfig,
   OutputPacket,
 } from "../../../../../src/shared/protocol";
-import { createPanelHeader } from "../panel/chrome";
+import { createTileHeader } from "../tile/chrome";
 import {
   drawCenterAxes,
   getCanvasContext,
@@ -45,7 +45,7 @@ export class FramePlot2dRenderer implements OutputRenderer {
     this.canvas.setAttribute("aria-label", "Frame plot");
 
     parent.append(
-      createPanelHeader(config, "Frame Plot", () => this.resetViewState()),
+      createTileHeader(config, "Frame Plot", () => this.resetViewState()),
       this.canvas,
     );
     this.draw();

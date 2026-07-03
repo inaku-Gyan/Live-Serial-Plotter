@@ -10,7 +10,7 @@ import {
   createTimeSeriesInteractionPlugins,
   defaultTimeSeriesInteractionConfig,
 } from "./interactions";
-import { appendPanelHeaderButton, createPanelHeader } from "../panel/chrome";
+import { appendTileHeaderButton, createTileHeader } from "../tile/chrome";
 import { TimeSeriesDataBuffer } from "./dataBuffer";
 import { renderTimeSeriesLegend } from "./legend";
 import { invalidatePlotPaths } from "./pathCache";
@@ -63,14 +63,14 @@ export class TimeSeriesLineRenderer implements OutputRenderer {
     this.legendElement = document.createElement("div");
     this.legendElement.className = "output-legend";
 
-    const header = createPanelHeader(config, "Time Series");
-    this.followButton = appendPanelHeaderButton(
+    const header = createTileHeader(config, "Time Series");
+    this.followButton = appendTileHeaderButton(
       header,
       "Follow",
       () => this.toggleFollowMode(),
       "output-follow-button",
     );
-    appendPanelHeaderButton(header, "Reset", () => this.resetViewState(), "output-reset-button");
+    appendTileHeaderButton(header, "Reset", () => this.resetViewState(), "output-reset-button");
     this.updateFollowButton();
 
     parent.append(header, this.chartElement, this.legendElement);

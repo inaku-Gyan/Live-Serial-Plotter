@@ -1,6 +1,6 @@
 import type { OutputConfig, OutputLayoutConfig } from "../../../../src/shared/protocol";
 import { FramePlot2dRenderer } from "./frame-plot/renderer";
-import { applyPanelLayout } from "./panel/layout";
+import { applyTileLayout } from "./tile/layout";
 import { TerminalAppendRenderer } from "./terminal/appendRenderer";
 import { TerminalFrameRenderer } from "./terminal/frameRenderer";
 import { TimeSeriesLineRenderer } from "./time-series/renderer";
@@ -12,10 +12,10 @@ export function createOutputRenderer(
   layout: OutputLayoutConfig | undefined,
 ): OutputRenderer {
   const section = document.createElement("section");
-  section.className = `output-panel output-panel-${output.kind}`;
+  section.className = `output-tile output-tile-${output.kind}`;
   section.dataset.outputId = output.id;
   section.dataset.outputKind = output.kind;
-  applyPanelLayout(section, layout);
+  applyTileLayout(section, layout);
   root.append(section);
 
   switch (output.kind) {

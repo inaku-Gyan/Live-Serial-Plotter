@@ -5,7 +5,7 @@ import type {
   TerminalAppendPacket,
   TerminalViewStateConfig,
 } from "../../../../../src/shared/protocol";
-import { appendPanelHeaderButton, createPanelHeader } from "../panel/chrome";
+import { appendTileHeaderButton, createTileHeader } from "../tile/chrome";
 import type { OutputRenderer } from "../types";
 
 const defaultMaxRawLines = 500;
@@ -27,8 +27,8 @@ export class TerminalAppendRenderer implements OutputRenderer {
     this.outputId = config.id;
     this.applyViewState(viewLayout);
 
-    const header = createPanelHeader(config, "Terminal", () => this.resetViewState());
-    appendPanelHeaderButton(header, "Clear", () => this.clearData(), "output-clear-button");
+    const header = createTileHeader(config, "Terminal", () => this.resetViewState());
+    appendTileHeaderButton(header, "Clear", () => this.clearData(), "output-clear-button");
 
     this.pre = document.createElement("pre");
     this.pre.className = "output-terminal output-standby";

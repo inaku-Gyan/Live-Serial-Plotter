@@ -1,6 +1,6 @@
 import type { OutputConfig } from "../../../../../src/shared/protocol";
 
-export function createPanelHeader(
+export function createTileHeader(
   config: OutputConfig,
   fallbackKind: string,
   onReset?: () => void,
@@ -21,19 +21,19 @@ export function createPanelHeader(
   header.append(text);
 
   if (onReset !== undefined) {
-    appendPanelHeaderButton(header, "Reset", onReset, "output-reset-button");
+    appendTileHeaderButton(header, "Reset", onReset, "output-reset-button");
   }
 
   return header;
 }
 
-export function appendPanelHeaderButton(
+export function appendTileHeaderButton(
   header: HTMLElement,
   label: string,
   onClick: () => void,
   className: string,
 ): HTMLButtonElement {
-  const actions = getPanelHeaderActions(header);
+  const actions = getTileHeaderActions(header);
   const button = document.createElement("button");
   button.className = `button button-secondary ${className}`;
   button.type = "button";
@@ -43,7 +43,7 @@ export function appendPanelHeaderButton(
   return button;
 }
 
-function getPanelHeaderActions(header: HTMLElement): HTMLElement {
+function getTileHeaderActions(header: HTMLElement): HTMLElement {
   const existingActions = header.querySelector<HTMLElement>(".output-header-actions");
 
   if (existingActions !== null) {
