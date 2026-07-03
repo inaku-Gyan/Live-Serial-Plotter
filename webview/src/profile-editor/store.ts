@@ -1,4 +1,5 @@
 import { computed, reactive, watch, type WatchStopHandle } from "vue";
+import { formatError } from "../../../src/shared/formatError";
 import type {
   ProfileConfig,
   ProfileEditorState,
@@ -284,8 +285,4 @@ export type ProfileEditorStore = ReturnType<typeof createProfileEditorStore>;
 
 function cloneProfile(profile: ProfileConfig): ProfileConfig {
   return JSON.parse(JSON.stringify(profile));
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

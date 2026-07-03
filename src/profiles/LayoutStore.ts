@@ -1,6 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { formatError } from "../shared/formatError";
 import { builtinLayouts, defaultLayout } from "./defaultLayout";
 import { parseJsonc } from "./jsonc";
 import {
@@ -671,11 +672,6 @@ function getPositiveInteger(value: unknown): number | undefined {
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 async function writeLayoutFile(filePath: string, config: LayoutConfig): Promise<void> {
   await writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }

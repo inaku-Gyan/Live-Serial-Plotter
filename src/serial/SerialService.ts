@@ -6,6 +6,7 @@ import {
   type PipelineRunnerOptions,
 } from "../pipeline/PipelineRunner";
 import { defaultProfile } from "../profiles/defaultProfile";
+import { formatError } from "../shared/formatError";
 import type {
   ConnectionSettings,
   ConnectionState,
@@ -327,8 +328,4 @@ function getLineEndingText(lineEnding: LineEnding): string {
   }
 
   return "";
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

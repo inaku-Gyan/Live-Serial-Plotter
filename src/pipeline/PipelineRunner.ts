@@ -1,4 +1,5 @@
 import { BuiltinLineParser, type LineParser } from "../parsers/parseLine";
+import { formatError } from "../shared/formatError";
 import type {
   BuiltinParserConfig,
   CodecConfig,
@@ -114,8 +115,4 @@ function createBuiltinParser(config: ParserConfig): LineParser {
   }
 
   return new BuiltinLineParser(config);
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
