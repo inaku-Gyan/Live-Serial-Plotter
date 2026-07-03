@@ -8,12 +8,14 @@ import {
   type SerialServiceOptions,
 } from "../serial/SerialService";
 import { OutputPacketBatcher } from "../session/OutputPacketBatcher";
+import { formatError } from "../shared/formatError";
 import {
   isParserMode,
   type ConnectionState,
   type ProfileConfig,
   type ToExtensionMessage,
 } from "../shared/protocol";
+import { buildWebviewHtml } from "./webviewHtml";
 
 const panelViewType = "liveSerialPlotter.panel";
 
@@ -250,35 +252,14 @@ export class LiveSerialPlotterPanel {
   }
 
   private getHtml(): string {
-    const webview = this.panel.webview;
-    const nonce = getNonce();
-    const scriptUri = String(
-      webview.asWebviewUri(
-        vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.js"),
-      ),
-    );
-    const styleUri = String(
-      webview.asWebviewUri(
-        vscode.Uri.joinPath(this.extensionUri, "dist", "webview", "assets", "index.css"),
-      ),
-    );
-
-    const initialProfileKey = escapeHtmlAttribute(this.activeProfileKey ?? "");
-
-    return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link nonce="${nonce}" href="${styleUri}" rel="stylesheet">
-    <title>Live Serial Plotter</title>
-  </head>
-  <body data-initial-profile-key="${initialProfileKey}">
-    <div id="app"></div>
-    <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
-  </body>
-</html>`;
+    return buildWebviewHtml({
+      webview: this.panel.webview,
+      extensionUri: this.extensionUri,
+      entry: "index",
+      rootId: "app",
+      title: "Live Serial Plotter",
+      bodyDataset: { "initial-profile-key": this.activeProfileKey ?? "" },
+    });
   }
 
   private dispose(): void {
@@ -290,28 +271,4 @@ export class LiveSerialPlotterPanel {
       this.disposables.pop()?.dispose();
     }
   }
-}
-
-function getNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let nonce = "";
-
-  for (let index = 0; index < 32; index += 1) {
-    nonce += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-
-  return nonce;
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function escapeHtmlAttribute(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&#39;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
 }

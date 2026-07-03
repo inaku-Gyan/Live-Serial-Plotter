@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 import type { ProfileCopyTarget, ProfileStore } from "../profiles/ProfileStore";
+import { formatError } from "../shared/formatError";
+import { buildWebviewHtml } from "./webviewHtml";
 import type {
   ProfileConfig,
   ProfileEditorState,
@@ -220,46 +222,12 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
   }
 
   private getHtml(webview: ProfileConfigWebviewView["webview"]): string {
-    const nonce = getNonce();
-    const profileStyleUri = String(
-      webview.asWebviewUri(
-        vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.css"),
-      ),
-    );
-    const scriptUri = String(
-      webview.asWebviewUri(
-        vscode.Uri.joinPath(this.options.extensionUri, "dist", "webview", "assets", "profile.js"),
-      ),
-    );
-
-    return `<!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${webview.cspSource} data:; style-src ${webview.cspSource}; script-src 'nonce-${nonce}'; font-src ${webview.cspSource};">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link nonce="${nonce}" href="${profileStyleUri}" rel="stylesheet">
-    <title>Live Serial Plotter Profiles</title>
-  </head>
-  <body>
-    <div id="profileApp"></div>
-    <script nonce="${nonce}" type="module" src="${scriptUri}"></script>
-  </body>
-</html>`;
+    return buildWebviewHtml({
+      webview,
+      extensionUri: this.options.extensionUri,
+      entry: "profile",
+      rootId: "profileApp",
+      title: "Live Serial Plotter Profiles",
+    });
   }
-}
-
-function getNonce(): string {
-  const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-  let nonce = "";
-
-  for (let index = 0; index < 32; index += 1) {
-    nonce += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-
-  return nonce;
-}
-
-function formatError(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
