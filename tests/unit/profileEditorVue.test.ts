@@ -12,6 +12,7 @@ import type {
 import ProfileEditorApp from "../../webview/src/profile-editor/ProfileEditorApp.vue";
 import {
   createProfileEditorStore,
+  ProfileEditorStoreKey,
   type ProfileEditorPersistedState,
   type VsCodeApi,
 } from "../../webview/src/profile-editor/store";
@@ -282,7 +283,7 @@ function mountProfileEditor(): {
   const vscode = createVscodeApi();
   const store = createProfileEditorStore(vscode.api);
   const wrapper = mount(ProfileEditorApp, {
-    props: { store },
+    global: { provide: { [ProfileEditorStoreKey]: store } },
     attachTo: document.body,
   });
 

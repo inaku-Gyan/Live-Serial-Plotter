@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { nextTick } from "vue";
 import type { ProfileConfig, ProfileSummary } from "../../../../src/shared/protocol";
-import type { ProfileEditorStore } from "../store";
+import { useProfileEditorStore } from "../store";
 
-defineProps<{
-  store: ProfileEditorStore;
-}>();
+const store = useProfileEditorStore();
 
 function formatProfileLocation(profile: ProfileSummary): string {
   if (profile.scope === "workspace") {
@@ -27,11 +25,7 @@ function formatOutputs(profile: ProfileConfig): string {
   return profile.outputs.map((output) => `${output.kind}:${output.id}`).join(", ");
 }
 
-function handleProfileContextMenu(
-  event: MouseEvent,
-  store: ProfileEditorStore,
-  profileKey: string,
-): void {
+function handleProfileContextMenu(event: MouseEvent, profileKey: string): void {
   store.openProfileContextMenu(profileKey, event.clientX, event.clientY);
   void focusOpenProfileMenu();
 }
@@ -56,7 +50,7 @@ async function focusOpenProfileMenu(): Promise<void> {
         class="profile-list-item"
         :data-active="profile.key === store.state.selectedProfileKey ? 'true' : 'false'"
         :data-menu-open="profile.key === store.state.profileMenu?.profileKey ? 'true' : 'false'"
-        @contextmenu.prevent="handleProfileContextMenu($event, store, profile.key)"
+        @contextmenu.prevent="handleProfileContextMenu($event, profile.key)"
       >
         <button
           class="profile-list-main"

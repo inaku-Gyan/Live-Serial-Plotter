@@ -4,6 +4,7 @@ import "./profileEditor.css";
 import ProfileEditorApp from "./profile-editor/ProfileEditorApp.vue";
 import {
   createProfileEditorStore,
+  ProfileEditorStoreKey,
   type ProfileEditorPersistedState,
   type VsCodeApi,
 } from "./profile-editor/store";
@@ -18,5 +19,6 @@ if (root === null) {
 
 const vscode = acquireVsCodeApi<ProfileEditorPersistedState>();
 const store = createProfileEditorStore(vscode);
-
-createApp(ProfileEditorApp, { store }).mount(root);
+const app = createApp(ProfileEditorApp);
+app.provide(ProfileEditorStoreKey, store);
+app.mount(root);

@@ -1,4 +1,4 @@
-import { computed, reactive, watch, type WatchStopHandle } from "vue";
+import { computed, inject, reactive, watch, type InjectionKey, type WatchStopHandle } from "vue";
 import { formatError } from "../../../src/shared/formatError";
 import type {
   ProfileConfig,
@@ -282,6 +282,18 @@ export function createProfileEditorStore(
 }
 
 export type ProfileEditorStore = ReturnType<typeof createProfileEditorStore>;
+
+export const ProfileEditorStoreKey: InjectionKey<ProfileEditorStore> = Symbol("ProfileEditorStore");
+
+export function useProfileEditorStore(): ProfileEditorStore {
+  const store = inject(ProfileEditorStoreKey);
+
+  if (store === undefined) {
+    throw new Error("ProfileEditorStore was not provided.");
+  }
+
+  return store;
+}
 
 function cloneProfile(profile: ProfileConfig): ProfileConfig {
   return JSON.parse(JSON.stringify(profile));

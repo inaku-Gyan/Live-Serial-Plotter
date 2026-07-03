@@ -12,20 +12,18 @@ import type {
   TimeSeriesOutputPatch,
   TimeSeriesPatch,
 } from "../../profileEditorModel";
-import type { ProfileEditorStore } from "../store";
+import { useProfileEditorStore } from "../store";
 
-const props = defineProps<{
-  store: ProfileEditorStore;
-}>();
+const store = useProfileEditorStore();
 
-const profile = computed(() => props.store.state.selectedProfile);
-const draft = computed(() => props.store.state.draft);
-const isReadonly = computed(() => props.store.isBuiltin.value);
+const profile = computed(() => store.state.selectedProfile);
+const draft = computed(() => store.state.draft);
+const isReadonly = computed(() => store.isBuiltin.value);
 const sourceLabel = computed(
   () =>
-    props.store.state.selectedSource?.filePath ??
-    props.store.state.selectedSource?.workspaceName ??
-    props.store.state.selectedSource?.scope ??
+    store.state.selectedSource?.filePath ??
+    store.state.selectedSource?.workspaceName ??
+    store.state.selectedSource?.scope ??
     "builtin",
 );
 
