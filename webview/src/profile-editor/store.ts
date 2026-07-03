@@ -11,7 +11,7 @@ import {
   applyProfileEditorPatch,
   createProfileEditorPatch,
   type ProfileEditorPatch,
-} from "../profileEditorModel";
+} from "./model";
 
 export type ProfileEditorView = "home" | "editor";
 

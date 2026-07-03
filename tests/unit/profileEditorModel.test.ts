@@ -3,7 +3,7 @@ import {
   applyProfileEditorPatch,
   createProfileEditorPatch,
   type ProfileEditorPatch,
-} from "../../webview/src/profileEditorModel";
+} from "../../webview/src/profile-editor/model";
 import type { ProfileConfig } from "../../src/shared/protocol";
 
 describe("profileEditorModel", () => {

@@ -8,8 +8,8 @@ import type {
   TimeAxisConfig,
   TimeSeriesConfig,
   TimeSeriesLineOutputConfig,
-} from "../../src/shared/protocol";
-import { parseBaudRateInput } from "./baudRate";
+} from "../../../src/shared/protocol";
+import { parseBaudRateInput } from "../baudRate";
 
 export interface ProfileEditorPatch {
   id: string;
