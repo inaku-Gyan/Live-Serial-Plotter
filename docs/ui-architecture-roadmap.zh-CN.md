@@ -1,5 +1,9 @@
 # UI 架构重构路线图
 
+> ⚠️ **本文件是长期方向。本轮的具体执行、当前命名与删除清单以 [ui-refactor-plan.zh-CN.md](./ui-refactor-plan.zh-CN.md) 与 [ui-refactor-rename-table.zh-CN.md](./ui-refactor-rename-table.zh-CN.md) 为准（no-compat 彻底重构）。**
+>
+> 目标命名对照：`OutputRenderer`（旧 OutputView）、`OutputGridController`（旧 MonitorOutputController + MonitorOutputAdapter）、`OutputGrid`.vue（旧 OutputWorkspace；输出区**不叫** Workspace）、`OutputTile`（面板框，旧 OutputPanel\*）、`PageStore`（旧 monitor store）、`MonitorPage`（一个 webview 实例）、`.viewState`（旧 `.view`，`*ViewLayoutConfig`→`*ViewStateConfig`）、`OutputTileLayoutConfig`（旧 OutputPanelLayoutConfig）。legacy 数据链 `rawLine`/`seriesAppend`/`PlotSample`/`PointBatcher`/`clearLog` 已删除。下文 §2「已完成」描述的是重构前基线（旧名属实），其余处若出现旧名，以本对照为准。
+
 本文档记录 Live Serial Plotter UI 架构的长期演进要求。它不是某一次重构的执行计划，也不是固定三阶段排期。每个阶段真正开始前，都要重新分析当前实现、需求、风险和测试，再制定该阶段的详细计划。
 
 当前已确认的方向：
@@ -86,9 +90,9 @@ Extension Host profile/layout stores
 当前方向：
 
 - 先做保守模块拆分，不立即引入完整插件系统。
-- 保留 `MonitorOutputController` 作为 output 生命周期、packet routing、layout reset/capture 的协调者。
+- 保留输出区协调器（本轮更名为 `OutputGridController`，合并原 `MonitorOutputController` + `MonitorOutputAdapter`）作为 output 生命周期、packet routing、layout reset/capture 的协调者；未来栅格布局落地时拆为 `OutputGrid`(Vue) + `OutputTile`(Vue) + `PacketRouter`。
 - 每种 renderer 独立管理自己的 DOM、数据缓冲和 view state。
-- `OutputWorkspace.vue` 继续只提供 workspace 容器，不接管高频输出渲染。
+- `OutputGrid.vue`（旧 `OutputWorkspace.vue`）继续只提供输出区容器，不接管高频输出渲染。
 
 已完成：
 
@@ -102,7 +106,7 @@ Extension Host profile/layout stores
 - 新增 output 类型是否已经足够多，是否需要 `kind -> renderer factory` registry。
 - `terminalAppend`、`terminalFrame`、`timeSeriesLine`、`framePlot2d` 的共同 view contract 是否稳定。
 - layout preset 中 `panel` 和 `view` 状态的 capture/reset 语义是否需要扩展。
-- legacy `rawLine` / `seriesAppend` 是否仍有兼容价值，是否可统一收敛到 `outputPacket`。
+- legacy `rawLine` / `seriesAppend`：已决定 no-compat 删除，全部收敛到 `outputPacket`（见 [rename-table §F](./ui-refactor-rename-table.zh-CN.md)）。
 - uPlot resize、follow mode、zoom、legend 和 series discovery 是否仍应完全留在 renderer 内。
 
 建议验收方向：

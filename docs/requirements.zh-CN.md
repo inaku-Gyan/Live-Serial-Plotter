@@ -30,16 +30,16 @@
 - 用户显式 Save Layout 才覆盖当前 layout preset；Save As Layout 创建新 layout preset，并更新当前 profile 的 `layout.defaultPreset`。
 - 每个 output 面板应支持单独 Reset View；页面应支持 Reset Layout。reset 只恢复布局/视图状态，不清空实时数据。
 - 实时数据点、terminal 当前文本、canvas frame、hover/cursor、临时选区、toast 和串口连接状态永不写入 profile 或 layout。
-- monitor layout 控制条（当前 layout 名称、Reset Layout、Save Layout、Save As）应紧跟连接 toolbar 显示，使用内容高度，不应占用 workspace 的可伸缩空间。
+- monitor layout 控制条（当前 layout 名称、Reset Layout、Save Layout、Save As）应紧跟连接 toolbar 显示，使用内容高度，不应占用输出区（OutputGrid）的可伸缩空间。
 - 连接按钮在可连接状态使用 primary 样式；已连接时的 Disconnect 按钮使用中性 secondary 样式，不使用错误/危险色。
 
 ### 监视器页面 Vue 外壳与高频渲染边界
 
-- 监视器页面使用 Vue 3 管理低频 UI 外壳：toolbar、profile/port/baud/parser 状态、send row、toast、output workspace 容器。
+- 监视器页面使用 Vue 3 管理低频 UI 外壳：toolbar、profile/port/baud/parser 状态、send row、toast、输出区（OutputGrid）容器。
 - 当前阶段不引入 Pinia；沿用 typed composable store 风格。该约束是基于当前状态规模和页面边界的阶段性架构判断，不是永久禁令；当多个 Webview 页面共享复杂实体状态、跨页面同步或 store 组合复杂度显著上升时，应重新评估。
-- uPlot、canvas、终端输出等高频渲染保留命令式 adapter。
+- uPlot、canvas、终端输出等高频渲染保留命令式 renderer。
 - uPlot 实例、图表数据数组、canvas frame 数据不得放入 Vue 深层响应式状态。
-- `outputPacket`、legacy `rawLine`、legacy `seriesAppend` 直接转发给命令式 renderer，不进入 Vue reactive packet buffer。
+- `outputPacket` 直接转发给命令式 renderer，不进入 Vue reactive packet buffer。
 - 不引入 React。
 
 ### UI 架构重构路线图

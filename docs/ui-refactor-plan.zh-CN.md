@@ -34,16 +34,16 @@
 
 架构骨架良好（宿主/Webview 边界清晰、协议集中、命令式 renderer 零 Vue 泄漏、helper 分层正确；多页面已原生支持，见 §3.9-B）。问题集中在下列具体点：
 
-| #   | 问题                                                                                                                                                             | 位置                                                                                                                       | 层        |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------- |
-| 1   | 整包 `store` 当 prop 逐层传，模板里到处 `store.x.value`（`state.x` 又不用），易漏 `.value` 造成静默 bug                                                          | [MonitorToolbar.vue:105](../webview/src/monitor/components/MonitorToolbar.vue#L105)、[SendRow.vue:24](../webview/src/monitor/components/SendRow.vue#L24) | Vue 外壳  |
-| 2   | `EditorPage.vue` 454 行单体表单，违背路线图 §3"不堆在单文件"目标                                                                                                 | [EditorPage.vue](../webview/src/profile-editor/components/EditorPage.vue)                                                 | Vue 外壳  |
-| 3   | 模板里 `terminalPatch()/timeSeriesPatch()` 反复 O(n) `.find()`，且在模板内 `throw`                                                                               | [EditorPage.vue:36-58](../webview/src/profile-editor/components/EditorPage.vue#L36-L58)                                   | Vue 外壳  |
-| 4   | `getNonce()`/`formatError()`/`getHtml()` 在两个 host 文件几乎逐字重复                                                                                            | [LiveSerialPlotterPanel.ts:295](../src/panel/LiveSerialPlotterPanel.ts#L295)、[ProfileConfigViewProvider.ts:252](../src/panel/ProfileConfigViewProvider.ts#L252) | 宿主/桥接 |
-| 5   | `.button` / reset / body 主题变量在两个 CSS 文件重复                                                                                                             | [styles.css](../webview/src/styles.css)、[profileEditor.css](../webview/src/profileEditor.css)                            | 样式      |
-| 6   | `OutputView` 契约语义不统一：`resetView` 两套含义；`captureViewLayout` 仅 TimeSeries 承重、其余是回环 stub；构造签名不一致（仅 TerminalAppend 需 `postMessage`） | [types.ts:19](../webview/src/monitor/outputs/types.ts#L19)、[factory.ts:24](../webview/src/monitor/outputs/factory.ts#L24) | Renderer  |
-| 7   | terminal 每 packet 整表重拼 + 全量 `textContent`；`TerminalFrameView.frames` Map 无上限（内存泄漏）；FramePlot 每帧 `getComputedStyle` + `Math.min(...allPoints)` 展开 | [appendView.ts:67](../webview/src/monitor/outputs/terminal/appendView.ts#L67)、[frameView.ts:15](../webview/src/monitor/outputs/terminal/frameView.ts#L15) | Renderer  |
-| 8   | `profileEditor.ts` / `profileEditorModel.ts` / `profileEditor.css` 平铺在 `webview/src/` 根，与 `profile-editor/` 目录不对称                                     | [webview/src/](../webview/src/)                                                                                           | 组织      |
+| #   | 问题                                                                                                                                                                   | 位置                                                                                                                                                             | 层        |
+| --- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------- |
+| 1   | 整包 `store` 当 prop 逐层传，模板里到处 `store.x.value`（`state.x` 又不用），易漏 `.value` 造成静默 bug                                                                | [MonitorToolbar.vue:105](../webview/src/monitor/components/MonitorToolbar.vue#L105)、[SendRow.vue:24](../webview/src/monitor/components/SendRow.vue#L24)         | Vue 外壳  |
+| 2   | `EditorPage.vue` 454 行单体表单，违背路线图 §3"不堆在单文件"目标                                                                                                       | [EditorPage.vue](../webview/src/profile-editor/components/EditorPage.vue)                                                                                        | Vue 外壳  |
+| 3   | 模板里 `terminalPatch()/timeSeriesPatch()` 反复 O(n) `.find()`，且在模板内 `throw`                                                                                     | [EditorPage.vue:36-58](../webview/src/profile-editor/components/EditorPage.vue#L36-L58)                                                                          | Vue 外壳  |
+| 4   | `getNonce()`/`formatError()`/`getHtml()` 在两个 host 文件几乎逐字重复                                                                                                  | [LiveSerialPlotterPanel.ts:295](../src/panel/LiveSerialPlotterPanel.ts#L295)、[ProfileConfigViewProvider.ts:252](../src/panel/ProfileConfigViewProvider.ts#L252) | 宿主/桥接 |
+| 5   | `.button` / reset / body 主题变量在两个 CSS 文件重复                                                                                                                   | [styles.css](../webview/src/styles.css)、[profileEditor.css](../webview/src/profileEditor.css)                                                                   | 样式      |
+| 6   | `OutputView` 契约语义不统一：`resetView` 两套含义；`captureViewLayout` 仅 TimeSeries 承重、其余是回环 stub；构造签名不一致（仅 TerminalAppend 需 `postMessage`）       | [types.ts:19](../webview/src/monitor/outputs/types.ts#L19)、[factory.ts:24](../webview/src/monitor/outputs/factory.ts#L24)                                       | Renderer  |
+| 7   | terminal 每 packet 整表重拼 + 全量 `textContent`；`TerminalFrameView.frames` Map 无上限（内存泄漏）；FramePlot 每帧 `getComputedStyle` + `Math.min(...allPoints)` 展开 | [appendView.ts:67](../webview/src/monitor/outputs/terminal/appendView.ts#L67)、[frameView.ts:15](../webview/src/monitor/outputs/terminal/frameView.ts#L15)       | Renderer  |
+| 8   | `profileEditor.ts` / `profileEditorModel.ts` / `profileEditor.css` 平铺在 `webview/src/` 根，与 `profile-editor/` 目录不对称                                           | [webview/src/](../webview/src/)                                                                                                                                  | 组织      |
 
 **大但不用动**：`interactions.ts`（865 行，纯函数 + 单向依赖 + 单一职责）、`view.ts`（628 行，follow 状态机本身复杂但已合理拆分）。可选拆分，非架构债。
 
@@ -89,14 +89,14 @@
 
 ### 3.2 目标概念词表（每层一个名字 + 一句定义）
 
-| 层级       | 目标概念名                     | 定义                                                              | 运行时归属          |
-| ---------- | ------------------------------ | ----------------------------------------------------------------- | ------------------- |
-| 页面       | **MonitorPage**                | 一个独立 webview 实例，1:1 对应 host 的 `LiveSerialPlotterPanel`；含全部 chrome + 一个输出区；可随时新建、状态互不共享 | Vue app root（概念层） |
-| 页面状态   | **PageStore**（今 `monitor store`） | 低频页面状态：选择项/连接/toast **＋ 面板清单和几何**          | Vue reactive        |
-| 输出区     | **OutputGrid**                 | 页面内**只放输出面板**的那块区域；未来栅格自由布局的接入层（几何、拖拽、缩放、吸附） | Vue 组件（＋布局引擎） |
-| 面板       | **OutputTile**                 | 一个面板框（标题栏＋chrome＋未来的拖拽/缩放手柄），内含一个 renderer，持有几何 | Vue 组件            |
-| 路由       | **PacketRouter**               | 高频路由：`Map<outputId, renderer>`，`store.appendPacket → router → renderer.updateData`，**绕开 Vue** | 命令式非响应式      |
-| 渲染器     | **OutputRenderer**（今 `OutputView`） | 只画面板**内容区**（uPlot/canvas/terminal），不管框和几何       | 命令式              |
+| 层级     | 目标概念名                            | 定义                                                                                                                   | 运行时归属             |
+| -------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ---------------------- |
+| 页面     | **MonitorPage**                       | 一个独立 webview 实例，1:1 对应 host 的 `LiveSerialPlotterPanel`；含全部 chrome + 一个输出区；可随时新建、状态互不共享 | Vue app root（概念层） |
+| 页面状态 | **PageStore**（今 `monitor store`）   | 低频页面状态：选择项/连接/toast **＋ 面板清单和几何**                                                                  | Vue reactive           |
+| 输出区   | **OutputGrid**                        | 页面内**只放输出面板**的那块区域；未来栅格自由布局的接入层（几何、拖拽、缩放、吸附）                                   | Vue 组件（＋布局引擎） |
+| 面板     | **OutputTile**                        | 一个面板框（标题栏＋chrome＋未来的拖拽/缩放手柄），内含一个 renderer，持有几何                                         | Vue 组件               |
+| 路由     | **PacketRouter**                      | 高频路由：`Map<outputId, renderer>`，`store.appendPacket → router → renderer.updateData`，**绕开 Vue**                 | 命令式非响应式         |
+| 渲染器   | **OutputRenderer**（今 `OutputView`） | 只画面板**内容区**（uPlot/canvas/terminal），不管框和几何                                                              | 命令式                 |
 
 > **为什么不叫 Workspace**：`Workspace` 会和 VS Code 自己的 `vscode.workspace`（用户打开的项目文件夹）撞名，在扩展代码里极易误解；改用 `OutputGrid`（并与面板 `OutputTile` 组成 "grid of tiles" 一对）。
 >
@@ -121,23 +121,23 @@ MonitorPage = WebviewPanel
      └─ 高频 packet: PageStore.appendPacket → PacketRouter → renderer.updateData（不经 Vue）
 ```
 
-| 概念              | 拥有的状态                                                      | 只与谁通信                                   |
-| ----------------- | ------------------------------------------------------------- | -------------------------------------------- |
-| Extension Host    | 串口连接、profile/layout 文件、script trust                    | 通过 messages 与各 Webview                   |
-| PageStore         | 选择项/连接/toast、active profile/layout 快照、**面板清单+几何**、持有 PacketRouter | 收 host message；`provide` 给组件；驱动路由   |
-| Vue shell / OutputGrid / OutputTile | 仅低频 UI 与面板几何（组件局部或 PageStore）    | `inject` PageStore                           |
-| PacketRouter      | `Map<outputId, OutputRenderer>`                                | 被 PageStore 调用；转发给 renderer           |
-| OutputRenderer    | uPlot / canvas / DOM 实例 + **运行时视图状态**                 | 被 PacketRouter/面板调用；`postMessage`（经 context） |
+| 概念                                | 拥有的状态                                                                          | 只与谁通信                                            |
+| ----------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| Extension Host                      | 串口连接、profile/layout 文件、script trust                                         | 通过 messages 与各 Webview                            |
+| PageStore                           | 选择项/连接/toast、active profile/layout 快照、**面板清单+几何**、持有 PacketRouter | 收 host message；`provide` 给组件；驱动路由           |
+| Vue shell / OutputGrid / OutputTile | 仅低频 UI 与面板几何（组件局部或 PageStore）                                        | `inject` PageStore                                    |
+| PacketRouter                        | `Map<outputId, OutputRenderer>`                                                     | 被 PageStore 调用；转发给 renderer                    |
+| OutputRenderer                      | uPlot / canvas / DOM 实例 + **运行时视图状态**                                      | 被 PacketRouter/面板调用；`postMessage`（经 context） |
 
 ### 3.4 每个输出的三条正交轴
 
 一个输出（如一张时序图）同时被三种互不相同的东西描述，命名上必须区分：
 
-| 描述           | 类型                                | 频率 | 进 Vue 响应式？ | 产生方                   | 消费方                                  |
-| -------------- | ----------------------------------- | ---- | --------------- | ------------------------ | --------------------------------------- |
-| **规格 spec**  | `OutputConfig`                      | 静态 | 快照可以        | profile 声明             | 面板/Renderer 构造                      |
-| **数据 data**  | `OutputPacket`                      | 高频 | **否（硬约束）** | 串口 → host              | `Renderer.updateData`                   |
-| **布局 layout** | `OutputLayoutConfig`＝`panel`＋`view` | 低频 | 快照可以        | layout preset / 运行时 capture | OutputGrid 应用 `panel`；Renderer 应用 `view` |
+| 描述            | 类型                                  | 频率 | 进 Vue 响应式？  | 产生方                         | 消费方                                        |
+| --------------- | ------------------------------------- | ---- | ---------------- | ------------------------------ | --------------------------------------------- |
+| **规格 spec**   | `OutputConfig`                        | 静态 | 快照可以         | profile 声明                   | 面板/Renderer 构造                            |
+| **数据 data**   | `OutputPacket`                        | 高频 | **否（硬约束）** | 串口 → host                    | `Renderer.updateData`                         |
+| **布局 layout** | `OutputLayoutConfig`＝`panel`＋`view` | 低频 | 快照可以         | layout preset / 运行时 capture | OutputGrid 应用 `panel`；Renderer 应用 `view` |
 
 **关键约束（这是为栅格自由布局留余地的核心）**：`panel`（几何/摆放）归 **OutputGrid/OutputTile** 管，**对 OutputRenderer 完全不可见**；renderer 只通过 ResizeObserver 感知"内容盒变了"，不关心为什么变。→ 以后 `panel` 从 grid-flow 换成栅格坐标，renderer 一行都不用改。
 
@@ -175,10 +175,10 @@ interface OutputRenderer {
 
 ```ts
 interface RendererContext {
-  mount: HTMLElement;                          // 面板内容区容器（面板框由 OutputGrid/OutputTile 提供）
+  mount: HTMLElement; // 面板内容区容器（面板框由 OutputGrid/OutputTile 提供）
   config: OutputConfig;
   viewState: OutputViewLayoutConfig | undefined;
-  postMessage: PostMessage;                    // 统一提供给所有 renderer
+  postMessage: PostMessage; // 统一提供给所有 renderer
   // 预留：theme accessor、shared services…
 }
 
@@ -197,17 +197,17 @@ type RendererFactory = (ctx: RendererContext) => OutputRenderer;
 
 > ⚠️ **完整逐符号对照与删除清单以配套的 [ui-refactor-rename-table.zh-CN.md](./ui-refactor-rename-table.zh-CN.md) 为准。** 因本轮 no-compat，下表「本轮做？」列中原标"后置/可选/留缝(命名)"的 protocol 改名（`view→viewState` 等）与 legacy 删除**均已纳入本轮**；`panel→tile` 改名也已并入本轮（对照表 §H）。仅 §3.9 的栅格**拖拽/缩放功能**与跨页面**共享状态功能**仍不实现（`MonitorPageRegistry` 仍是占位）。
 
-| 现名                                                     | 目标名                                                 | 本轮做？ | 影响面                                        |
-| -------------------------------------------------------- | ------------------------------------------------------ | -------- | --------------------------------------------- |
-| `OutputView`（实例）                                     | `OutputRenderer`                                       | ✅        | 仅 webview                                    |
-| `MonitorOutputController` / `MonitorOutputAdapter`（两名一物） | 合并为 `OutputGridController`                     | ✅        | 仅 webview                                    |
-| store 字段 `outputAdapter`                               | `outputGrid`                                           | ✅        | 仅 webview                                    |
-| 方法 `applyViewLayout` / `captureViewLayout` / `resetView` | `applyViewState` / `captureViewState` / `resetViewState` | ✅        | 仅 webview                                    |
-| 组件 `OutputWorkspace.vue` / CSS `.workspace`           | `OutputGrid.vue` / `.output-grid`                      | ✅        | 仅 webview                                    |
-| `monitor store`（概念）                                  | `PageStore`（`createMonitorStore` 函数名可保留）        | 文档为主 | 仅 webview                                    |
-| `OutputGridController`（本轮产物）                       | 未来拆为 `OutputGrid`(Vue) + `OutputTile`(Vue) + `PacketRouter` | ❌ 留缝  | 栅格自由布局落地时（§3.9-A）                  |
-| —（无）                                                  | `MonitorPageRegistry`（Host 侧跨页面）                  | ❌ 留位  | 跨页面状态落地时（§3.9-B）                    |
-| `OutputViewLayoutConfig` / `.view`                       | （可选）`OutputViewStateConfig` / `.viewState`          | ❌ 后置  | **ripples 到 protocol + schema + 测试**       |
+| 现名                                                           | 目标名                                                          | 本轮做？ | 影响面                                  |
+| -------------------------------------------------------------- | --------------------------------------------------------------- | -------- | --------------------------------------- |
+| `OutputView`（实例）                                           | `OutputRenderer`                                                | ✅       | 仅 webview                              |
+| `MonitorOutputController` / `MonitorOutputAdapter`（两名一物） | 合并为 `OutputGridController`                                   | ✅       | 仅 webview                              |
+| store 字段 `outputAdapter`                                     | `outputGrid`                                                    | ✅       | 仅 webview                              |
+| 方法 `applyViewLayout` / `captureViewLayout` / `resetView`     | `applyViewState` / `captureViewState` / `resetViewState`        | ✅       | 仅 webview                              |
+| 组件 `OutputWorkspace.vue` / CSS `.workspace`                  | `OutputGrid.vue` / `.output-grid`                               | ✅       | 仅 webview                              |
+| `monitor store`（概念）                                        | `PageStore`（`createMonitorStore` 函数名可保留）                | 文档为主 | 仅 webview                              |
+| `OutputGridController`（本轮产物）                             | 未来拆为 `OutputGrid`(Vue) + `OutputTile`(Vue) + `PacketRouter` | ❌ 留缝  | 栅格自由布局落地时（§3.9-A）            |
+| —（无）                                                        | `MonitorPageRegistry`（Host 侧跨页面）                          | ❌ 留位  | 跨页面状态落地时（§3.9-B）              |
+| `OutputViewLayoutConfig` / `.view`                             | （可选）`OutputViewStateConfig` / `.viewState`                  | ❌ 后置  | **ripples 到 protocol + schema + 测试** |
 
 ### 3.9 预留扩展点（本轮不实现，只留余地）
 
@@ -286,13 +286,13 @@ type RendererFactory = (ctx: RendererContext) => OutputRenderer;
 
 ## 5. 风险与回滚
 
-| 风险                                             | 缓解                                                             |
-| ------------------------------------------------ | --------------------------------------------------------------- |
-| 阶段 B/E 大面积改名触碰所有组件/测试             | 分小 commit；每步 `pnpm test`；保持行为测试覆盖不降             |
-| 去 prop 后遗漏某处 `.value` 造成静默 truthy bug  | 改造后全量 grep `.value`；严格 typecheck；连接态/禁用态手测一轮 |
-| terminal 增量渲染改错导致丢行/顺序错             | 保留 maxLines 上限测试；对照重构前后同一输入的可见输出         |
-| 为 §3.9 留缝时过度设计（提前造引擎/注册表）      | 严守非目标：本轮只划边界、不写实现；§3.9 只名不做              |
-| protocol `.view→.viewState`（阶段 F）ripple      | 默认不做；若做则连同 `schema:generate` 一起改并 `pnpm check`   |
-| CSP / 打包产物路径被动到                         | 阶段 A/F 后必跑 `pnpm package` smoke                            |
+| 风险                                            | 缓解                                                            |
+| ----------------------------------------------- | --------------------------------------------------------------- |
+| 阶段 B/E 大面积改名触碰所有组件/测试            | 分小 commit；每步 `pnpm test`；保持行为测试覆盖不降             |
+| 去 prop 后遗漏某处 `.value` 造成静默 truthy bug | 改造后全量 grep `.value`；严格 typecheck；连接态/禁用态手测一轮 |
+| terminal 增量渲染改错导致丢行/顺序错            | 保留 maxLines 上限测试；对照重构前后同一输入的可见输出          |
+| 为 §3.9 留缝时过度设计（提前造引擎/注册表）     | 严守非目标：本轮只划边界、不写实现；§3.9 只名不做               |
+| protocol `.view→.viewState`（阶段 F）ripple     | 默认不做；若做则连同 `schema:generate` 一起改并 `pnpm check`    |
+| CSP / 打包产物路径被动到                        | 阶段 A/F 后必跑 `pnpm package` smoke                            |
 
 回滚粒度＝单个 commit。因每阶段独立提交且各自验收，任一阶段异常可单独 revert 而不影响其它阶段。

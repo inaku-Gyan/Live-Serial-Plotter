@@ -62,4 +62,4 @@ and outputs `live-serial-plotter-<version>.vsix` in the project root.
 Open the project in VS Code and run the `Run Extension` launch configuration. It
 runs the `pnpm: build` task first, then opens an Extension Development Host.
 
-In the Extension Development Host, run the command `Live Serial Plotter: Open`.
+In the Extension Development Host, run the command `Live Serial Plotter: New Page`.
