@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { baudRatePresets } from "../../baudRate";
 import { parserModes, type ParserMode, type ProfileSummary } from "../../../../src/shared/protocol";
-import { useMonitorStore } from "../store";
+import { usePageStore } from "../store";
 
-const store = useMonitorStore();
+const store = usePageStore();
 const {
   state,
   baudRateValid,

@@ -12,24 +12,24 @@ import type {
   ProfileConfig,
   ToExtensionMessage,
 } from "../../src/shared/protocol";
-import MonitorApp from "../../webview/src/monitor/MonitorApp.vue";
+import MonitorPage from "../../webview/src/monitor/MonitorPage.vue";
 import {
-  createMonitorStore,
-  MonitorStoreKey,
+  createPageStore,
+  PageStoreKey,
   type OutputGridController,
-  type MonitorPersistedState,
+  type PagePersistedState,
   type VsCodeApi,
 } from "../../webview/src/monitor/store";
 
 vi.mock("uplot", () => ({ default: vi.fn<() => void>() }));
 
-describe("MonitorApp", () => {
+describe("MonitorPage", () => {
   test("renders disconnected monitor shell and mounts output workspace", async () => {
     const { wrapper, adapter, vscode } = mountMonitor();
     await nextTick();
 
     expect(wrapper.find(".toolbar").exists()).toBe(true);
-    expect(wrapper.find(".workspace").exists()).toBe(true);
+    expect(wrapper.find(".output-grid").exists()).toBe(true);
     expect(wrapper.find(".send-row").exists()).toBe(true);
     expect(wrapper.find(".layout-controls").exists()).toBe(true);
     expect(wrapper.find(".status").text()).toBe("Disconnected");
@@ -227,13 +227,13 @@ function mountMonitor(): {
   adapter: MockOutputAdapter;
 } {
   const vscode = createVscodeApi();
-  const adapter = createOutputAdapter();
-  const store = createMonitorStore(vscode.api, {
+  const adapter = createOutputGrid();
+  const store = createPageStore(vscode.api, {
     errorToastDelayMs: 50_000,
-    createOutputAdapter: () => adapter,
+    createOutputGrid: () => adapter,
   });
-  const wrapper = mount(MonitorApp, {
-    global: { provide: { [MonitorStoreKey]: store } },
+  const wrapper = mount(MonitorPage, {
+    global: { provide: { [PageStoreKey]: store } },
     attachTo: document.body,
   });
 
@@ -274,7 +274,7 @@ interface MockOutputAdapter extends OutputGridController {
   dispose: ReturnType<typeof vi.fn<() => void>>;
 }
 
-function createOutputAdapter(): MockOutputAdapter {
+function createOutputGrid(): MockOutputAdapter {
   return {
     renderOutputs: vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>(),
     appendPacket: vi.fn<(packet: OutputPacket) => void>(),
@@ -295,10 +295,10 @@ function createLayoutSummary() {
   };
 }
 
-function createVscodeApi(initialState?: MonitorPersistedState): {
-  api: VsCodeApi<MonitorPersistedState>;
+function createVscodeApi(initialState?: PagePersistedState): {
+  api: VsCodeApi<PagePersistedState>;
   messages: ToExtensionMessage[];
-  persistedState: MonitorPersistedState | undefined;
+  persistedState: PagePersistedState | undefined;
 } {
   const messages: ToExtensionMessage[] = [];
   let persistedState = initialState;

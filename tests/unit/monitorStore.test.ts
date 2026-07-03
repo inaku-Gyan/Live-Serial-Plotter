@@ -12,9 +12,9 @@ import type {
   ToExtensionMessage,
 } from "../../src/shared/protocol";
 import {
-  createMonitorStore,
+  createPageStore,
   type OutputGridController,
-  type MonitorPersistedState,
+  type PagePersistedState,
   type VsCodeApi,
 } from "../../webview/src/monitor/store";
 
@@ -50,7 +50,7 @@ describe("monitor store", () => {
     const vscode = createVscodeApi();
     const { store, adapter } = createStore(vscode.api);
     const root = document.createElement("section");
-    store.mountOutputs(root);
+    store.mountOutputGrid(root);
     const profile = createProfile({
       id: "telemetry",
       name: "Telemetry",
@@ -158,7 +158,7 @@ describe("monitor store", () => {
       lines: [{ text: "line" }],
     };
 
-    store.mountOutputs(document.createElement("section"));
+    store.mountOutputGrid(document.createElement("section"));
     store.handleHostMessage({ type: "outputPacket", packet });
 
     expect(adapter.appendPacket).toHaveBeenCalledWith(packet);
@@ -167,7 +167,7 @@ describe("monitor store", () => {
   test("sends layout reset and save actions through the adapter and host protocol", () => {
     const vscode = createVscodeApi();
     const { store, adapter } = createStore(vscode.api);
-    store.mountOutputs(document.createElement("section"));
+    store.mountOutputGrid(document.createElement("section"));
 
     store.resetOutputViewState("plot");
     store.resetPageLayout();
@@ -211,13 +211,13 @@ describe("monitor store", () => {
   });
 });
 
-function createStore(vscode: VsCodeApi<MonitorPersistedState>): {
-  store: ReturnType<typeof createMonitorStore>;
+function createStore(vscode: VsCodeApi<PagePersistedState>): {
+  store: ReturnType<typeof createPageStore>;
   adapter: MockOutputAdapter;
 } {
-  const adapter = createOutputAdapter();
-  const store = createMonitorStore(vscode, {
-    createOutputAdapter: () => adapter,
+  const adapter = createOutputGrid();
+  const store = createPageStore(vscode, {
+    createOutputGrid: () => adapter,
   });
 
   return { store, adapter };
@@ -234,7 +234,7 @@ interface MockOutputAdapter extends OutputGridController {
   dispose: ReturnType<typeof vi.fn<() => void>>;
 }
 
-function createOutputAdapter(): MockOutputAdapter {
+function createOutputGrid(): MockOutputAdapter {
   return {
     renderOutputs: vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>(),
     appendPacket: vi.fn<(packet: OutputPacket) => void>(),
@@ -245,10 +245,10 @@ function createOutputAdapter(): MockOutputAdapter {
   };
 }
 
-function createVscodeApi(initialState?: MonitorPersistedState): {
-  api: VsCodeApi<MonitorPersistedState>;
+function createVscodeApi(initialState?: PagePersistedState): {
+  api: VsCodeApi<PagePersistedState>;
   messages: ToExtensionMessage[];
-  persistedState: MonitorPersistedState | undefined;
+  persistedState: PagePersistedState | undefined;
 } {
   const messages: ToExtensionMessage[] = [];
   let persistedState = initialState;

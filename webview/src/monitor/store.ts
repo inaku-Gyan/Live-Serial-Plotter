@@ -25,7 +25,7 @@ export interface VsCodeApi<State> {
   postMessage(message: ToExtensionMessage): void;
 }
 
-export interface MonitorPersistedState {
+export interface PagePersistedState {
   baudRate?: number;
   layoutKey?: string;
   parserMode?: ParserMode;
@@ -42,13 +42,13 @@ export interface OutputGridController {
   dispose(): void;
 }
 
-export interface MonitorStoreOptions {
+export interface PageStoreOptions {
   initialProfileKey?: string;
   errorToastDelayMs?: number;
-  createOutputAdapter?: (root: HTMLElement) => OutputGridController;
+  createOutputGrid?: (root: HTMLElement) => OutputGridController;
 }
 
-interface MonitorUiState {
+interface PageState {
   profiles: ProfileSummary[];
   layouts: LayoutSummary[];
   layoutTargets: LayoutSaveTarget[];
@@ -70,21 +70,21 @@ const defaultProfileKey = `builtin:${defaultProfile.id}`;
 const defaultParserMode: ParserMode =
   defaultProfile.parser.kind === "builtin" ? defaultProfile.parser.mode : "auto";
 
-export function createMonitorStore(
-  vscode: VsCodeApi<MonitorPersistedState>,
-  options: MonitorStoreOptions = {},
+export function createPageStore(
+  vscode: VsCodeApi<PagePersistedState>,
+  options: PageStoreOptions = {},
 ) {
   const persistedState = vscode.getState();
   const initialBaudRate =
     persistedState?.baudRate ?? defaultProfile.serialDefaults?.baudRate ?? 115200;
   const errorToastDelayMs = options.errorToastDelayMs ?? 3500;
-  const createOutputAdapter =
-    options.createOutputAdapter ?? ((root: HTMLElement) => new DomOutputGridController({ root }));
+  const createOutputGrid =
+    options.createOutputGrid ?? ((root: HTMLElement) => new DomOutputGridController({ root }));
 
-  let outputAdapter: OutputGridController | undefined;
+  let outputGrid: OutputGridController | undefined;
   let errorTimer: ReturnType<typeof setTimeout> | undefined;
 
-  const state = reactive<MonitorUiState>({
+  const state = reactive<PageState>({
     profiles: [],
     layouts: [],
     layoutTargets: [],
@@ -117,10 +117,10 @@ export function createMonitorStore(
   );
   const sendDisabled = computed(() => !state.connected);
 
-  function mountOutputs(root: HTMLElement): void {
-    outputAdapter?.dispose();
-    outputAdapter = createOutputAdapter(root);
-    outputAdapter.renderOutputs(state.activeProfile.outputs, state.activeLayout);
+  function mountOutputGrid(root: HTMLElement): void {
+    outputGrid?.dispose();
+    outputGrid = createOutputGrid(root);
+    outputGrid.renderOutputs(state.activeProfile.outputs, state.activeLayout);
   }
 
   function requestPorts(): void {
@@ -230,7 +230,7 @@ export function createMonitorStore(
       state.activeLayout = message.layout;
       state.layoutKey = message.layoutKey;
       persistState();
-      outputAdapter?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
+      outputGrid?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
       return;
     }
 
@@ -239,7 +239,7 @@ export function createMonitorStore(
       state.activeLayout = message.layout;
       state.layoutKey = message.layoutKey;
       persistState();
-      outputAdapter?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
+      outputGrid?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
       return;
     }
 
@@ -249,7 +249,7 @@ export function createMonitorStore(
     }
 
     if (message.type === "outputPacket") {
-      outputAdapter?.appendPacket(message.packet);
+      outputGrid?.appendPacket(message.packet);
       return;
     }
 
@@ -264,8 +264,8 @@ export function createMonitorStore(
       errorTimer = undefined;
     }
 
-    outputAdapter?.dispose();
-    outputAdapter = undefined;
+    outputGrid?.dispose();
+    outputGrid = undefined;
   }
 
   function applyPorts(ports: readonly SerialPortSummary[]): void {
@@ -285,20 +285,20 @@ export function createMonitorStore(
   }
 
   function resetOutputViewState(outputId: string): void {
-    outputAdapter?.resetOutputViewState(outputId);
+    outputGrid?.resetOutputViewState(outputId);
   }
 
   function resetPageLayout(): void {
-    outputAdapter?.resetPageLayout();
+    outputGrid?.resetPageLayout();
   }
 
   function saveLayout(): void {
-    const layout = outputAdapter?.captureLayout() ?? state.activeLayout;
+    const layout = outputGrid?.captureLayout() ?? state.activeLayout;
     postMessage({ type: "saveLayout", request: { layout, layoutKey: state.layoutKey } });
   }
 
   function saveLayoutAs(layoutId: string, target: LayoutSaveTarget): void {
-    const layout = outputAdapter?.captureLayout() ?? state.activeLayout;
+    const layout = outputGrid?.captureLayout() ?? state.activeLayout;
     postMessage({
       type: "saveLayoutAs",
       request: {
@@ -331,7 +331,7 @@ export function createMonitorStore(
     }
 
     persistState();
-    outputAdapter?.renderOutputs(profile.outputs, layout);
+    outputGrid?.renderOutputs(profile.outputs, layout);
   }
 
   function showError(message: string): void {
@@ -370,7 +370,7 @@ export function createMonitorStore(
     parserModeSelectDisabled,
     connectDisabled,
     sendDisabled,
-    mountOutputs,
+    mountOutputGrid,
     requestPorts,
     requestProfiles,
     selectProfile,
@@ -389,15 +389,15 @@ export function createMonitorStore(
   };
 }
 
-export type MonitorStore = ReturnType<typeof createMonitorStore>;
+export type PageStore = ReturnType<typeof createPageStore>;
 
-export const MonitorStoreKey: InjectionKey<MonitorStore> = Symbol("MonitorStore");
+export const PageStoreKey: InjectionKey<PageStore> = Symbol("PageStore");
 
-export function useMonitorStore(): MonitorStore {
-  const store = inject(MonitorStoreKey);
+export function usePageStore(): PageStore {
+  const store = inject(PageStoreKey);
 
   if (store === undefined) {
-    throw new Error("MonitorStore was not provided.");
+    throw new Error("PageStore was not provided.");
   }
 
   return store;

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { useMonitorStore } from "../store";
+import { usePageStore } from "../store";
 
-const store = useMonitorStore();
+const store = usePageStore();
 const { state } = store;
 </script>
 

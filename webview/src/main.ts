@@ -1,12 +1,12 @@
 import { createApp } from "vue";
 import "uplot/dist/uPlot.min.css";
 import "./styles.css";
-import MonitorApp from "./monitor/MonitorApp.vue";
+import MonitorPage from "./monitor/MonitorPage.vue";
 import {
-  createMonitorStore,
-  MonitorStoreKey,
-  type MonitorPersistedState,
-  type MonitorStoreOptions,
+  createPageStore,
+  PageStoreKey,
+  type PagePersistedState,
+  type PageStoreOptions,
   type VsCodeApi,
 } from "./monitor/store";
 
@@ -18,17 +18,17 @@ if (root === null) {
   throw new Error("Missing required element: #app");
 }
 
-const vscode = acquireVsCodeApi<MonitorPersistedState>();
+const vscode = acquireVsCodeApi<PagePersistedState>();
 const initialProfileKey = nonEmptyString(document.body.dataset.initialProfileKey);
-const storeOptions: MonitorStoreOptions = {};
+const storeOptions: PageStoreOptions = {};
 
 if (initialProfileKey !== undefined) {
   storeOptions.initialProfileKey = initialProfileKey;
 }
 
-const store = createMonitorStore(vscode, storeOptions);
-const app = createApp(MonitorApp);
-app.provide(MonitorStoreKey, store);
+const store = createPageStore(vscode, storeOptions);
+const app = createApp(MonitorPage);
+app.provide(PageStoreKey, store);
 app.mount(root);
 
 function nonEmptyString(value: string | undefined): string | undefined {

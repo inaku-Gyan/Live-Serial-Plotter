@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { ref } from "vue";
-import { useMonitorStore } from "../store";
+import { usePageStore } from "../store";
 
-const store = useMonitorStore();
+const store = usePageStore();
 const { sendDisabled } = store;
 const text = ref("");
 

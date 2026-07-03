@@ -26,7 +26,7 @@ select {
   font: inherit;
 }
 
-.shell {
+.monitor-page {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
   height: 100%;
@@ -177,7 +177,7 @@ select {
   justify-content: end;
 }
 
-.workspace {
+.output-grid {
   display: grid;
   grid-auto-rows: minmax(220px, auto);
   grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr));
@@ -187,20 +187,20 @@ select {
   padding: 12px;
 }
 
-.workspace[data-layout-columns="single"] {
+.output-grid[data-layout-columns="single"] {
   grid-template-columns: 1fr;
 }
 
-.workspace[data-layout-columns="two"] {
+.output-grid[data-layout-columns="two"] {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
-.workspace[data-layout-density="compact"] {
+.output-grid[data-layout-density="compact"] {
   gap: 8px;
   padding: 8px;
 }
 
-.workspace[data-layout-density="comfortable"] {
+.output-grid[data-layout-density="comfortable"] {
   gap: 16px;
   padding: 16px;
 }
@@ -401,7 +401,7 @@ select {
     grid-column: span 2;
   }
 
-  .workspace {
+  .output-grid {
     grid-template-columns: 1fr;
   }
 

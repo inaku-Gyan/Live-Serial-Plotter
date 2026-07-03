@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted } from "vue";
 import type { ToWebviewMessage } from "../../../src/shared/protocol";
-import { useMonitorStore } from "./store";
+import { usePageStore } from "./store";
 import ErrorToast from "./components/ErrorToast.vue";
 import LayoutControls from "./components/LayoutControls.vue";
 import MonitorToolbar from "./components/MonitorToolbar.vue";
-import OutputWorkspace from "./components/OutputWorkspace.vue";
+import OutputGrid from "./components/OutputGrid.vue";
 import SendRow from "./components/SendRow.vue";
 
-const store = useMonitorStore();
+const store = usePageStore();
 
 function handleHostMessage(event: MessageEvent<ToWebviewMessage>): void {
   store.handleHostMessage(event.data);
@@ -27,10 +27,10 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <main class="shell">
+  <main class="monitor-page">
     <MonitorToolbar />
     <LayoutControls />
-    <OutputWorkspace />
+    <OutputGrid />
     <SendRow />
     <ErrorToast />
   </main>
