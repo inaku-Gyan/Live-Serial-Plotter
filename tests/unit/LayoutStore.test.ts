@@ -26,7 +26,7 @@ describe("LayoutStore", () => {
         "name": "Wide",
         "page": { "mode": "grid", "columns": "two" },
         "outputs": {
-          "plot": { "panel": { "order": 1, "columnSpan": 2, "minHeight": 360 } }
+          "plot": { "tile": { "order": 1, "columnSpan": 2, "minHeight": 360 } }
         }
       }`,
     );
@@ -58,8 +58,8 @@ describe("LayoutStore", () => {
       page: { mode: "grid", columns: "single", density: "compact" },
       outputs: {
         plot: {
-          panel: { order: 2, columnSpan: 2, minHeight: 400, collapsed: false },
-          view: {
+          tile: { order: 2, columnSpan: 2, minHeight: 400, collapsed: false },
+          viewState: {
             kind: "timeSeriesLine",
             showLegend: false,
             autoFollow: false,
@@ -71,8 +71,8 @@ describe("LayoutStore", () => {
     });
 
     expect(normalized.outputs.plot).toEqual({
-      panel: { order: 2, columnSpan: 2, minHeight: 400, collapsed: false },
-      view: {
+      tile: { order: 2, columnSpan: 2, minHeight: 400, collapsed: false },
+      viewState: {
         kind: "timeSeriesLine",
         showLegend: false,
         autoFollow: false,

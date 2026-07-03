@@ -5,7 +5,7 @@ import { formatError } from "../shared/formatError";
 import { builtinLayouts, defaultLayout } from "./defaultLayout";
 import { parseJsonc } from "./jsonc";
 import {
-  type FramePlot2dViewLayoutConfig,
+  type FramePlot2dViewStateConfig,
   type LayoutConfig,
   type LayoutRef,
   type LayoutSaveTarget,
@@ -13,11 +13,11 @@ import {
   type LayoutSummary,
   type MonitorPageLayoutConfig,
   type OutputLayoutConfig,
-  type OutputPanelLayoutConfig,
-  type OutputViewLayoutConfig,
+  type OutputTileLayoutConfig,
+  type OutputViewStateConfig,
   type ProfileScope,
-  type TerminalViewLayoutConfig,
-  type TimeSeriesViewLayoutConfig,
+  type TerminalViewStateConfig,
+  type TimeSeriesViewStateConfig,
 } from "../shared/protocol";
 
 export interface LoadedLayout {
@@ -410,26 +410,26 @@ function normalizeOutputLayout(value: unknown): OutputLayoutConfig {
   }
 
   const outputLayout: OutputLayoutConfig = {};
-  const panel = normalizePanelLayout(value.panel);
-  const view = normalizeViewLayout(value.view);
+  const panel = normalizePanelLayout(value.tile);
+  const view = normalizeViewLayout(value.viewState);
 
   if (panel !== undefined) {
-    outputLayout.panel = panel;
+    outputLayout.tile = panel;
   }
 
   if (view !== undefined) {
-    outputLayout.view = view;
+    outputLayout.viewState = view;
   }
 
   return outputLayout;
 }
 
-function normalizePanelLayout(value: unknown): OutputPanelLayoutConfig | undefined {
+function normalizePanelLayout(value: unknown): OutputTileLayoutConfig | undefined {
   if (!isPlainObject(value)) {
     return undefined;
   }
 
-  const panel: OutputPanelLayoutConfig = {};
+  const panel: OutputTileLayoutConfig = {};
   const order = getFiniteNumber(value.order);
   const columnSpan = getPositiveInteger(value.columnSpan);
   const minHeight = getPositiveInteger(value.minHeight);
@@ -457,7 +457,7 @@ function normalizePanelLayout(value: unknown): OutputPanelLayoutConfig | undefin
   return panel;
 }
 
-function normalizeViewLayout(value: unknown): OutputViewLayoutConfig | undefined {
+function normalizeViewLayout(value: unknown): OutputViewStateConfig | undefined {
   if (!isPlainObject(value) || typeof value.kind !== "string") {
     return undefined;
   }
@@ -477,8 +477,8 @@ function normalizeViewLayout(value: unknown): OutputViewLayoutConfig | undefined
   return undefined;
 }
 
-function normalizeTimeSeriesViewLayout(value: Record<string, unknown>): TimeSeriesViewLayoutConfig {
-  const layout: TimeSeriesViewLayoutConfig = {
+function normalizeTimeSeriesViewLayout(value: Record<string, unknown>): TimeSeriesViewStateConfig {
+  const layout: TimeSeriesViewStateConfig = {
     kind: "timeSeriesLine",
   };
   const zoom = normalizeAxisRange(value.zoom);
@@ -502,8 +502,8 @@ function normalizeTimeSeriesViewLayout(value: Record<string, unknown>): TimeSeri
   return layout;
 }
 
-function normalizeTerminalViewLayout(value: Record<string, unknown>): TerminalViewLayoutConfig {
-  const layout: TerminalViewLayoutConfig = {
+function normalizeTerminalViewLayout(value: Record<string, unknown>): TerminalViewStateConfig {
+  const layout: TerminalViewStateConfig = {
     kind: value.kind === "terminalFrame" ? "terminalFrame" : "terminalAppend",
   };
 
@@ -516,8 +516,8 @@ function normalizeTerminalViewLayout(value: Record<string, unknown>): TerminalVi
 
 function normalizeFramePlot2dViewLayout(
   value: Record<string, unknown>,
-): FramePlot2dViewLayoutConfig {
-  const layout: FramePlot2dViewLayoutConfig = {
+): FramePlot2dViewStateConfig {
+  const layout: FramePlot2dViewStateConfig = {
     kind: "framePlot2d",
   };
   const bounds = normalizeBounds(value.bounds);
@@ -529,7 +529,7 @@ function normalizeFramePlot2dViewLayout(
   return layout;
 }
 
-function normalizeAxisRange(value: unknown): TimeSeriesViewLayoutConfig["zoom"] {
+function normalizeAxisRange(value: unknown): TimeSeriesViewStateConfig["zoom"] {
   if (!isPlainObject(value)) {
     return undefined;
   }
@@ -550,7 +550,7 @@ function normalizeAxisRange(value: unknown): TimeSeriesViewLayoutConfig["zoom"] 
     return undefined;
   }
 
-  const range: NonNullable<TimeSeriesViewLayoutConfig["zoom"]> = {};
+  const range: NonNullable<TimeSeriesViewStateConfig["zoom"]> = {};
 
   if (x !== undefined) {
     range.x = x;
@@ -574,7 +574,7 @@ function normalizeRange(value: unknown): { min: number; max: number } | undefine
   return min === undefined || max === undefined ? undefined : { min, max };
 }
 
-function normalizeBounds(value: unknown): FramePlot2dViewLayoutConfig["bounds"] {
+function normalizeBounds(value: unknown): FramePlot2dViewStateConfig["bounds"] {
   if (!isPlainObject(value)) {
     return undefined;
   }

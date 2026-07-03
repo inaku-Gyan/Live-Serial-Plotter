@@ -4,7 +4,7 @@ import type {
   OutputPacket,
   TimeSeriesLineOutputConfig,
   TimeSeriesSample,
-  TimeSeriesViewLayoutConfig,
+  TimeSeriesViewStateConfig,
 } from "../../../../../src/shared/protocol";
 import {
   createTimeSeriesInteractionPlugins,
@@ -47,13 +47,13 @@ export class TimeSeriesLineView implements OutputView {
   private followMode: TimeSeriesFollowMode = "unlocked";
   private lockedFollowResumeTimer: ReturnType<typeof setTimeout> | undefined;
   private shouldPreserveScaleWhileFollowing = false;
-  private viewLayout: TimeSeriesViewLayoutConfig | undefined;
+  private viewLayout: TimeSeriesViewStateConfig | undefined;
   private plot: uPlot | undefined;
 
   constructor(
     parent: HTMLElement,
     private readonly config: TimeSeriesLineOutputConfig,
-    viewLayout: OutputLayoutConfig["view"] | undefined,
+    viewLayout: OutputLayoutConfig["viewState"] | undefined,
   ) {
     this.outputId = config.id;
     this.dataBuffer = new TimeSeriesDataBuffer(config);
@@ -127,7 +127,7 @@ export class TimeSeriesLineView implements OutputView {
     this.plot = undefined;
   }
 
-  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
+  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void {
     this.viewLayout = layout?.kind === "timeSeriesLine" ? layout : undefined;
     this.followMode = this.getDefaultFollowMode();
     this.isAutoFollowEnabled = this.getDefaultAutoFollow();
@@ -156,8 +156,8 @@ export class TimeSeriesLineView implements OutputView {
     this.updateFollowButton();
   }
 
-  captureViewLayout(): OutputLayoutConfig["view"] {
-    const layout: TimeSeriesViewLayoutConfig = {
+  captureViewLayout(): OutputLayoutConfig["viewState"] {
+    const layout: TimeSeriesViewStateConfig = {
       kind: "timeSeriesLine",
       showLegend: !this.legendElement.hidden,
       autoFollow: this.isAutoFollowEnabled,
@@ -583,7 +583,7 @@ export class TimeSeriesLineView implements OutputView {
     }
   }
 
-  private captureZoom(): TimeSeriesViewLayoutConfig["zoom"] {
+  private captureZoom(): TimeSeriesViewStateConfig["zoom"] {
     if (this.plot === undefined || this.isAutoFollowEnabled) {
       return undefined;
     }

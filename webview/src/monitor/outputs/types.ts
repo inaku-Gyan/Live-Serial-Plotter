@@ -2,7 +2,7 @@ import type {
   OutputConfig,
   OutputLayoutConfig,
   OutputPacket,
-  TimeSeriesViewLayoutConfig,
+  TimeSeriesViewStateConfig,
 } from "../../../../src/shared/protocol";
 
 export interface MonitorOutputControllerOptions {
@@ -22,11 +22,11 @@ export interface OutputView {
   /** Clear runtime data currently displayed by this output. */
   clearData(): void;
   /** Apply renderer-specific view layout, not the outer panel grid layout. */
-  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void;
+  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void;
   /** Reset interaction/view state without clearing runtime data. */
   resetView(): void;
   /** Capture renderer-specific view state that can be saved into a layout profile. */
-  captureViewLayout(): OutputLayoutConfig["view"] | undefined;
+  captureViewLayout(): OutputLayoutConfig["viewState"] | undefined;
   /** Release observers, chart instances, and other renderer-owned resources. */
   dispose(): void;
 }
@@ -35,8 +35,8 @@ export type PlotWindowConfig =
   | { mode: "points"; maxPoints: number }
   | { mode: "duration"; seconds: number };
 
-export type TimeSeriesFollowMode = NonNullable<TimeSeriesViewLayoutConfig["followMode"]>;
-export type PlotScaleRanges = NonNullable<TimeSeriesViewLayoutConfig["zoom"]>;
+export type TimeSeriesFollowMode = NonNullable<TimeSeriesViewStateConfig["followMode"]>;
+export type PlotScaleRanges = NonNullable<TimeSeriesViewStateConfig["zoom"]>;
 
 export interface UnitGroup {
   unit: string;

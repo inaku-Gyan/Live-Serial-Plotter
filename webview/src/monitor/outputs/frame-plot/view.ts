@@ -1,7 +1,7 @@
 import type {
   FramePlot2dOutputConfig,
   FramePlot2dPacket,
-  FramePlot2dViewLayoutConfig,
+  FramePlot2dViewStateConfig,
   OutputLayoutConfig,
   OutputPacket,
 } from "../../../../../src/shared/protocol";
@@ -30,13 +30,13 @@ export class FramePlot2dView implements OutputView {
   private readonly resizeObserver: ResizeObserver | undefined;
   private readonly themeObserver: MutationObserver | undefined;
   private latestPacket: FramePlot2dPacket | undefined;
-  private viewLayout: FramePlot2dViewLayoutConfig | undefined;
+  private viewLayout: FramePlot2dViewStateConfig | undefined;
   private themeColors: ThemeColors | undefined;
 
   constructor(
     parent: HTMLElement,
     private readonly config: FramePlot2dOutputConfig,
-    viewLayout: OutputLayoutConfig["view"] | undefined,
+    viewLayout: OutputLayoutConfig["viewState"] | undefined,
   ) {
     this.outputId = config.id;
     this.applyViewLayout(viewLayout);
@@ -83,7 +83,7 @@ export class FramePlot2dView implements OutputView {
     this.themeObserver?.disconnect();
   }
 
-  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
+  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void {
     this.viewLayout = layout?.kind === "framePlot2d" ? layout : undefined;
   }
 
@@ -92,8 +92,8 @@ export class FramePlot2dView implements OutputView {
     this.draw();
   }
 
-  captureViewLayout(): OutputLayoutConfig["view"] {
-    const layout: FramePlot2dViewLayoutConfig = {
+  captureViewLayout(): OutputLayoutConfig["viewState"] {
+    const layout: FramePlot2dViewStateConfig = {
       kind: "framePlot2d",
     };
 

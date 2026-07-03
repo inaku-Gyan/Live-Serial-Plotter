@@ -67,18 +67,18 @@
     "OutputLayoutConfig": {
       "type": "object",
       "properties": {
-        "panel": {
-          "$ref": "#/definitions/OutputPanelLayoutConfig",
-          "description": "Panel placement and sizing defaults."
+        "tile": {
+          "$ref": "#/definitions/OutputTileLayoutConfig",
+          "description": "Tile placement and sizing defaults."
         },
-        "view": {
-          "$ref": "#/definitions/OutputViewLayoutConfig",
-          "description": "Output renderer view defaults."
+        "viewState": {
+          "$ref": "#/definitions/OutputViewStateConfig",
+          "description": "Output renderer view state defaults."
         }
       },
       "additionalProperties": false
     },
-    "OutputPanelLayoutConfig": {
+    "OutputTileLayoutConfig": {
       "type": "object",
       "properties": {
         "order": {
@@ -106,20 +106,20 @@
       },
       "additionalProperties": false
     },
-    "OutputViewLayoutConfig": {
+    "OutputViewStateConfig": {
       "oneOf": [
         {
-          "$ref": "#/definitions/TimeSeriesViewLayoutConfig"
+          "$ref": "#/definitions/TimeSeriesViewStateConfig"
         },
         {
-          "$ref": "#/definitions/TerminalViewLayoutConfig"
+          "$ref": "#/definitions/TerminalViewStateConfig"
         },
         {
-          "$ref": "#/definitions/FramePlot2dViewLayoutConfig"
+          "$ref": "#/definitions/FramePlot2dViewStateConfig"
         }
       ]
     },
-    "TimeSeriesViewLayoutConfig": {
+    "TimeSeriesViewStateConfig": {
       "type": "object",
       "properties": {
         "kind": {
@@ -137,13 +137,13 @@
           "enum": ["unlocked", "locked"]
         },
         "zoom": {
-          "$ref": "#/definitions/AxisRangeLayoutConfig"
+          "$ref": "#/definitions/AxisRangeStateConfig"
         }
       },
       "required": ["kind"],
       "additionalProperties": false
     },
-    "AxisRangeLayoutConfig": {
+    "AxisRangeStateConfig": {
       "type": "object",
       "properties": {
         "x": {
@@ -178,7 +178,7 @@
       },
       "additionalProperties": false
     },
-    "TerminalViewLayoutConfig": {
+    "TerminalViewStateConfig": {
       "type": "object",
       "properties": {
         "kind": {
@@ -192,7 +192,7 @@
       "required": ["kind"],
       "additionalProperties": false
     },
-    "FramePlot2dViewLayoutConfig": {
+    "FramePlot2dViewStateConfig": {
       "type": "object",
       "properties": {
         "kind": {

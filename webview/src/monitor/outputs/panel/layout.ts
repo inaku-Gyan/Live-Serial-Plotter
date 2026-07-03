@@ -31,8 +31,8 @@ function compareOutputLayoutOrder(
   outputs: readonly OutputConfig[],
   layout: LayoutConfig,
 ): number {
-  const leftOrder = layout.outputs[left.id]?.panel?.order;
-  const rightOrder = layout.outputs[right.id]?.panel?.order;
+  const leftOrder = layout.outputs[left.id]?.tile?.order;
+  const rightOrder = layout.outputs[right.id]?.tile?.order;
   const leftIndex = outputs.findIndex((output) => output.id === left.id);
   const rightIndex = outputs.findIndex((output) => output.id === right.id);
 
@@ -47,7 +47,7 @@ export function applyPanelLayout(
     return;
   }
 
-  const panelLayout = layout?.panel;
+  const panelLayout = layout?.tile;
   panel.style.order = panelLayout?.order === undefined ? "" : String(panelLayout.order);
   panel.style.gridColumn =
     panelLayout?.columnSpan === undefined ? "" : `span ${panelLayout.columnSpan}`;

@@ -73,9 +73,9 @@ export class MonitorOutputController {
       const viewLayout = view.captureViewLayout();
 
       if (viewLayout !== undefined) {
-        outputLayout.view = viewLayout;
+        outputLayout.viewState = viewLayout;
       } else {
-        delete outputLayout.view;
+        delete outputLayout.viewState;
       }
 
       outputs[outputId] = outputLayout;

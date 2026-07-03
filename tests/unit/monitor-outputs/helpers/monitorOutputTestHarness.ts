@@ -224,7 +224,7 @@ export function renderProfile(root: HTMLElement, outputs: readonly OutputConfig[
 }
 
 export function createLayout(
-  view: NonNullable<LayoutConfig["outputs"][string]["view"]>,
+  view: NonNullable<LayoutConfig["outputs"][string]["viewState"]>,
 ): LayoutConfig {
   return {
     schemaVersion: 1,
@@ -233,7 +233,7 @@ export function createLayout(
     page: { mode: "grid", columns: "auto", density: "normal" },
     outputs: {
       plot: {
-        view,
+        viewState: view,
       },
     },
   };

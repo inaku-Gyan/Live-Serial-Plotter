@@ -3,7 +3,7 @@ import type {
   OutputPacket,
   TerminalAppendOutputConfig,
   TerminalAppendPacket,
-  TerminalViewLayoutConfig,
+  TerminalViewStateConfig,
 } from "../../../../../src/shared/protocol";
 import { appendPanelHeaderButton, createPanelHeader } from "../panel/chrome";
 import type { OutputView } from "../types";
@@ -17,12 +17,12 @@ export class TerminalAppendView implements OutputView {
 
   private readonly pre: HTMLPreElement;
   private lineCount = 0;
-  private viewLayout: TerminalViewLayoutConfig | undefined;
+  private viewLayout: TerminalViewStateConfig | undefined;
 
   constructor(
     parent: HTMLElement,
     private readonly config: TerminalAppendOutputConfig,
-    viewLayout: OutputLayoutConfig["view"] | undefined,
+    viewLayout: OutputLayoutConfig["viewState"] | undefined,
   ) {
     this.outputId = config.id;
     this.applyViewLayout(viewLayout);
@@ -77,7 +77,7 @@ export class TerminalAppendView implements OutputView {
     }
   }
 
-  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
+  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void {
     this.viewLayout = layout?.kind === "terminalAppend" ? layout : undefined;
   }
 
@@ -85,7 +85,7 @@ export class TerminalAppendView implements OutputView {
     this.applyViewLayout(undefined);
   }
 
-  captureViewLayout(): OutputLayoutConfig["view"] {
+  captureViewLayout(): OutputLayoutConfig["viewState"] {
     return {
       kind: "terminalAppend",
       autoScroll: this.getAutoScroll(),

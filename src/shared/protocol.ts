@@ -669,16 +669,16 @@ export interface MonitorPageLayoutConfig {
 
 export interface OutputLayoutConfig {
   /**
-   * Panel placement and sizing defaults.
+   * Tile placement and sizing defaults.
    */
-  panel?: OutputPanelLayoutConfig;
+  tile?: OutputTileLayoutConfig;
   /**
-   * Output renderer view defaults.
+   * Output renderer view state defaults.
    */
-  view?: OutputViewLayoutConfig;
+  viewState?: OutputViewStateConfig;
 }
 
-export interface OutputPanelLayoutConfig {
+export interface OutputTileLayoutConfig {
   /**
    * Sort order within the workspace.
    */
@@ -703,25 +703,25 @@ export interface OutputPanelLayoutConfig {
   maximized?: boolean;
 }
 
-export type OutputViewLayoutConfig =
-  | TimeSeriesViewLayoutConfig
-  | TerminalViewLayoutConfig
-  | FramePlot2dViewLayoutConfig;
+export type OutputViewStateConfig =
+  | TimeSeriesViewStateConfig
+  | TerminalViewStateConfig
+  | FramePlot2dViewStateConfig;
 
-export interface TimeSeriesViewLayoutConfig {
+export interface TimeSeriesViewStateConfig {
   kind: "timeSeriesLine";
   showLegend?: boolean;
   autoFollow?: boolean;
   followMode?: "unlocked" | "locked";
-  zoom?: AxisRangeLayoutConfig;
+  zoom?: AxisRangeStateConfig;
 }
 
-export interface TerminalViewLayoutConfig {
+export interface TerminalViewStateConfig {
   kind: "terminalAppend" | "terminalFrame";
   autoScroll?: boolean;
 }
 
-export interface FramePlot2dViewLayoutConfig {
+export interface FramePlot2dViewStateConfig {
   kind: "framePlot2d";
   bounds?: {
     xMin: number;
@@ -731,7 +731,7 @@ export interface FramePlot2dViewLayoutConfig {
   };
 }
 
-export interface AxisRangeLayoutConfig {
+export interface AxisRangeStateConfig {
   x?: { min: number; max: number };
   y?: Record<string, { min: number; max: number }>;
 }

@@ -20,13 +20,13 @@ export function createOutputView(
 
   switch (output.kind) {
     case "terminalAppend":
-      return new TerminalAppendView(section, output, layout?.view);
+      return new TerminalAppendView(section, output, layout?.viewState);
     case "terminalFrame":
-      return new TerminalFrameView(section, output, layout?.view);
+      return new TerminalFrameView(section, output, layout?.viewState);
     case "timeSeriesLine":
-      return new TimeSeriesLineView(section, output, layout?.view);
+      return new TimeSeriesLineView(section, output, layout?.viewState);
     case "framePlot2d":
-      return new FramePlot2dView(section, output, layout?.view);
+      return new FramePlot2dView(section, output, layout?.viewState);
   }
 
   return assertNever(output);

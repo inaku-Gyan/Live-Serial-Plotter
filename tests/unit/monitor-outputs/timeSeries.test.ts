@@ -621,7 +621,7 @@ describe("time-series monitor output", () => {
 
     followButton.click();
 
-    expect(controller.captureSavableViewState().outputs.plot?.view).toMatchObject({
+    expect(controller.captureSavableViewState().outputs.plot?.viewState).toMatchObject({
       kind: "timeSeriesLine",
       followMode: "locked",
       autoFollow: true,

@@ -3,7 +3,7 @@ import type {
   OutputPacket,
   TerminalFrameOutputConfig,
   TerminalFramePacket,
-  TerminalViewLayoutConfig,
+  TerminalViewStateConfig,
 } from "../../../../../src/shared/protocol";
 import { createPanelHeader } from "../panel/chrome";
 import type { OutputView } from "../types";
@@ -17,12 +17,12 @@ export class TerminalFrameView implements OutputView {
 
   private readonly frames = new Map<string | number, string>();
   private readonly pre: HTMLPreElement;
-  private viewLayout: TerminalViewLayoutConfig | undefined;
+  private viewLayout: TerminalViewStateConfig | undefined;
 
   constructor(
     parent: HTMLElement,
     config: TerminalFrameOutputConfig,
-    viewLayout: OutputLayoutConfig["view"] | undefined,
+    viewLayout: OutputLayoutConfig["viewState"] | undefined,
   ) {
     this.outputId = config.id;
     this.applyViewLayout(viewLayout);
@@ -63,7 +63,7 @@ export class TerminalFrameView implements OutputView {
       .join("\n\n");
   }
 
-  applyViewLayout(layout: OutputLayoutConfig["view"] | undefined): void {
+  applyViewLayout(layout: OutputLayoutConfig["viewState"] | undefined): void {
     this.viewLayout = layout?.kind === "terminalFrame" ? layout : undefined;
   }
 
@@ -71,8 +71,8 @@ export class TerminalFrameView implements OutputView {
     this.applyViewLayout(undefined);
   }
 
-  captureViewLayout(): OutputLayoutConfig["view"] {
-    const layout: TerminalViewLayoutConfig = {
+  captureViewLayout(): OutputLayoutConfig["viewState"] {
+    const layout: TerminalViewStateConfig = {
       kind: "terminalFrame",
     };
 

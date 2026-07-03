@@ -11,23 +11,23 @@ export const defaultLayout: LayoutConfig = {
   },
   outputs: {
     raw: {
-      panel: {
+      tile: {
         order: 10,
         columnSpan: 1,
         minHeight: 220,
       },
-      view: {
+      viewState: {
         kind: "terminalAppend",
         autoScroll: true,
       },
     },
     plot: {
-      panel: {
+      tile: {
         order: 20,
         columnSpan: 2,
         minHeight: 340,
       },
-      view: {
+      viewState: {
         kind: "timeSeriesLine",
         showLegend: true,
         autoFollow: true,
