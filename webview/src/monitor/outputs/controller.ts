@@ -7,18 +7,13 @@ import type {
 } from "../../../../src/shared/protocol";
 import { createOutputView } from "./factory";
 import { applyPanelLayout, cssEscape, sortOutputsByLayout } from "./panel/layout";
-import { TerminalAppendView } from "./terminal/appendView";
-import { TimeSeriesLineView } from "./time-series/view";
-import type { MonitorOutputControllerOptions, OutputView, PostMessage } from "./types";
+import type { MonitorOutputControllerOptions, OutputView } from "./types";
 
 export class MonitorOutputController {
   private readonly views = new Map<string, OutputView>();
   private currentLayout: LayoutConfig | undefined;
-  private readonly postMessage: PostMessage;
 
-  constructor(private readonly options: MonitorOutputControllerOptions) {
-    this.postMessage = options.postMessage;
-  }
+  constructor(private readonly options: MonitorOutputControllerOptions) {}
 
   renderOutputs(outputs: readonly OutputConfig[], layout: LayoutConfig = defaultLayout): void {
     this.disposeViews();
@@ -27,40 +22,13 @@ export class MonitorOutputController {
     this.options.root.replaceChildren();
 
     for (const output of sortOutputsByLayout(outputs, layout)) {
-      const view = createOutputView(
-        this.options.root,
-        output,
-        layout.outputs[output.id],
-        this.postMessage,
-      );
+      const view = createOutputView(this.options.root, output, layout.outputs[output.id]);
       this.views.set(output.id, view);
     }
   }
 
   appendPacket(packet: OutputPacket): void {
     this.views.get(packet.outputId)?.updateData(packet);
-  }
-
-  appendLegacyRawLine(line: string, timestamp: number): void {
-    const view = this.findFirstView("terminalAppend");
-
-    if (view instanceof TerminalAppendView) {
-      view.appendLines([{ text: line }], timestamp);
-    }
-  }
-
-  appendLegacySeries(samples: readonly { t: number; values: Record<string, number> }[]): void {
-    const view = this.findFirstView("timeSeriesLine");
-
-    if (view instanceof TimeSeriesLineView) {
-      view.appendSamples(samples.map((sample) => ({ time: sample.t, values: sample.values })));
-    }
-  }
-
-  clearAll(): void {
-    for (const view of this.views.values()) {
-      view.clearData();
-    }
   }
 
   resetOutputView(outputId: string): void {
@@ -124,10 +92,6 @@ export class MonitorOutputController {
 
   dispose(): void {
     this.disposeViews();
-  }
-
-  private findFirstView(kind: OutputConfig["kind"]): OutputView | undefined {
-    return [...this.views.values()].find((view) => view.kind === kind);
   }
 
   private disposeViews(): void {

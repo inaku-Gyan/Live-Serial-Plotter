@@ -13,7 +13,6 @@ import type {
   LineEnding,
   OutputPacket,
   ParserMode,
-  PlotSample,
   ProfileConfig,
   SerialPortSummary,
 } from "../shared/protocol";
@@ -32,8 +31,6 @@ export interface SerialPortFactory {
 
 export interface SerialServiceEvents {
   onConnectionState?(state: ConnectionState): void;
-  onRawLine?(line: string, t: number): void;
-  onSample?(sample: PlotSample): void;
   onOutputPacket?(packet: OutputPacket): void;
   onError?(message: string): void;
 }
@@ -296,21 +293,6 @@ export class SerialService {
 
   private handleOutputPacket(packet: OutputPacket): void {
     this.events.onOutputPacket?.(packet);
-
-    if (packet.kind === "terminalAppend" && packet.outputId === "raw") {
-      for (const line of packet.lines) {
-        this.events.onRawLine?.(line.text, line.timestamp ?? packet.receivedAt);
-      }
-    }
-
-    if (packet.kind === "timeSeriesAppend") {
-      for (const sample of packet.samples) {
-        this.events.onSample?.({
-          t: sample.time,
-          values: sample.values,
-        });
-      }
-    }
   }
 }
 

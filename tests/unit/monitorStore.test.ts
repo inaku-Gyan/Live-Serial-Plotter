@@ -160,15 +160,8 @@ describe("monitor store", () => {
 
     store.mountOutputs(document.createElement("section"));
     store.handleHostMessage({ type: "outputPacket", packet });
-    store.handleHostMessage({ type: "rawLine", line: "legacy", t: 1_100 });
-    store.handleHostMessage({
-      type: "seriesAppend",
-      samples: [{ t: 1, values: { temp: 24 } }],
-    });
 
     expect(adapter.appendPacket).toHaveBeenCalledWith(packet);
-    expect(adapter.appendLegacyRawLine).toHaveBeenCalledWith("legacy", 1_100);
-    expect(adapter.appendLegacySeries).toHaveBeenCalledWith([{ t: 1, values: { temp: 24 } }]);
   });
 
   test("sends layout reset and save actions through the adapter and host protocol", () => {
@@ -235,10 +228,6 @@ interface MockOutputAdapter extends MonitorOutputAdapter {
     typeof vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>
   >;
   appendPacket: ReturnType<typeof vi.fn<(packet: OutputPacket) => void>>;
-  appendLegacyRawLine: ReturnType<typeof vi.fn<(line: string, timestamp: number) => void>>;
-  appendLegacySeries: ReturnType<
-    typeof vi.fn<(samples: readonly { t: number; values: Record<string, number> }[]) => void>
-  >;
   resetOutputView: ReturnType<typeof vi.fn<(outputId: string) => void>>;
   resetPageLayout: ReturnType<typeof vi.fn<() => void>>;
   captureSavableViewState: ReturnType<typeof vi.fn<() => LayoutConfig>>;
@@ -249,9 +238,6 @@ function createOutputAdapter(): MockOutputAdapter {
   return {
     renderOutputs: vi.fn<(outputs: readonly OutputConfig[], layout: LayoutConfig) => void>(),
     appendPacket: vi.fn<(packet: OutputPacket) => void>(),
-    appendLegacyRawLine: vi.fn<(line: string, timestamp: number) => void>(),
-    appendLegacySeries:
-      vi.fn<(samples: readonly { t: number; values: Record<string, number> }[]) => void>(),
     resetOutputView: vi.fn<(outputId: string) => void>(),
     resetPageLayout: vi.fn<() => void>(),
     captureSavableViewState: vi.fn<() => LayoutConfig>(() => defaultLayout),

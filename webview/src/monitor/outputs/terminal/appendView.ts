@@ -6,7 +6,7 @@ import type {
   TerminalViewLayoutConfig,
 } from "../../../../../src/shared/protocol";
 import { appendPanelHeaderButton, createPanelHeader } from "../panel/chrome";
-import type { OutputView, PostMessage } from "../types";
+import type { OutputView } from "../types";
 
 const defaultMaxRawLines = 500;
 const standbyText = "Waiting for serial text";
@@ -23,21 +23,12 @@ export class TerminalAppendView implements OutputView {
     parent: HTMLElement,
     private readonly config: TerminalAppendOutputConfig,
     viewLayout: OutputLayoutConfig["view"] | undefined,
-    private readonly postMessage: PostMessage,
   ) {
     this.outputId = config.id;
     this.applyViewLayout(viewLayout);
 
     const header = createPanelHeader(config, "Terminal", () => this.resetView());
-    appendPanelHeaderButton(
-      header,
-      "Clear",
-      () => {
-        this.clearData();
-        this.postMessage({ type: "clearLog" });
-      },
-      "output-clear-button",
-    );
+    appendPanelHeaderButton(header, "Clear", () => this.clearData(), "output-clear-button");
 
     this.pre = document.createElement("pre");
     this.pre.className = "output-terminal output-standby";

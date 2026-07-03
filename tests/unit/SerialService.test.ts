@@ -7,7 +7,11 @@ import {
   type SerialPortLike,
 } from "../../src/serial/SerialService";
 import { defaultProfile } from "../../src/profiles/defaultProfile";
-import type { ConnectionSettings, SerialPortSummary } from "../../src/shared/protocol";
+import type {
+  ConnectionSettings,
+  OutputPacket,
+  SerialPortSummary,
+} from "../../src/shared/protocol";
 
 interface MockPortBinding {
   emitData(data: string | Buffer): void;
@@ -112,15 +116,11 @@ describe("SerialService", () => {
     ]);
   });
 
-  test("receives raw lines and parsed samples from mock serial data", async () => {
-    const rawLines: string[] = [];
-    const samples: Array<Record<string, number>> = [];
+  test("emits output packets from mock serial data", async () => {
+    const packets: OutputPacket[] = [];
     const factory = new MockSerialPortFactory();
     const service = new SerialService(
-      {
-        onRawLine: (line) => rawLines.push(line),
-        onSample: (sample) => samples.push(sample.values),
-      },
+      { onOutputPacket: (packet) => packets.push(packet) },
       factory,
     );
 
@@ -129,8 +129,21 @@ describe("SerialService", () => {
     await waitForMicrotask();
     await service.disconnect();
 
-    expect(rawLines).toEqual(["temp=21.5", "bad line", "1,2"]);
-    expect(samples).toEqual([{ temp: 21.5 }, { channel1: 1, channel2: 2 }]);
+    const lines: string[] = [];
+    const sampleValues: Array<Record<string, number>> = [];
+
+    for (const packet of packets) {
+      if (packet.kind === "terminalAppend") {
+        lines.push(...packet.lines.map((line) => line.text));
+      }
+
+      if (packet.kind === "timeSeriesAppend") {
+        sampleValues.push(...packet.samples.map((sample) => sample.values));
+      }
+    }
+
+    expect(lines).toEqual(["temp=21.5", "bad line", "1,2"]);
+    expect(sampleValues).toEqual([{ temp: 21.5 }, { channel1: 1, channel2: 2 }]);
   });
 
   test("writes to the connected mock serial port", async () => {
@@ -172,15 +185,11 @@ describe("SerialService", () => {
     const robotLines: string[] = [];
     const sensorLines: string[] = [];
     const robotService = new SerialService(
-      {
-        onRawLine: (line) => robotLines.push(line),
-      },
+      { onOutputPacket: (packet) => collectTerminalLines(packet, robotLines) },
       robotFactory,
     );
     const sensorService = new SerialService(
-      {
-        onRawLine: (line) => sensorLines.push(line),
-      },
+      { onOutputPacket: (packet) => collectTerminalLines(packet, sensorLines) },
       sensorFactory,
     );
 
@@ -226,6 +235,12 @@ describe("SerialService", () => {
 
 async function waitForMicrotask(): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
+}
+
+function collectTerminalLines(packet: OutputPacket, target: string[]): void {
+  if (packet.kind === "terminalAppend") {
+    target.push(...packet.lines.map((line) => line.text));
+  }
 }
 
 function getMockSerialPortConstructor(value: unknown): MockSerialPortConstructor {

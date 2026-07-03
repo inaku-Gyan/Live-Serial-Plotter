@@ -4,13 +4,12 @@ import { applyPanelLayout } from "./panel/layout";
 import { TerminalAppendView } from "./terminal/appendView";
 import { TerminalFrameView } from "./terminal/frameView";
 import { TimeSeriesLineView } from "./time-series/view";
-import type { OutputView, PostMessage } from "./types";
+import type { OutputView } from "./types";
 
 export function createOutputView(
   root: HTMLElement,
   output: OutputConfig,
   layout: OutputLayoutConfig | undefined,
-  postMessage: PostMessage,
 ): OutputView {
   const section = document.createElement("section");
   section.className = `output-panel output-panel-${output.kind}`;
@@ -21,7 +20,7 @@ export function createOutputView(
 
   switch (output.kind) {
     case "terminalAppend":
-      return new TerminalAppendView(section, output, layout?.view, postMessage);
+      return new TerminalAppendView(section, output, layout?.view);
     case "terminalFrame":
       return new TerminalFrameView(section, output, layout?.view);
     case "timeSeriesLine":

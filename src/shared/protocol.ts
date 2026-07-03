@@ -22,11 +22,6 @@ export interface ConnectionSettings {
   parserMode?: ParserMode;
 }
 
-export interface PlotSample {
-  t: number;
-  values: Record<string, number>;
-}
-
 export interface ConnectionState {
   connected: boolean;
   path?: string;
@@ -768,7 +763,6 @@ export type ToExtensionMessage =
   | { type: "disconnect" }
   | { type: "send"; text: string }
   | { type: "setParserMode"; parserMode: ParserMode }
-  | { type: "clearLog" }
   | { type: "saveLayout"; request: SaveLayoutRequest }
   | { type: "saveLayoutAs"; request: SaveLayoutAsRequest };
 
@@ -795,8 +789,6 @@ export type ToWebviewMessage =
   | { type: "layoutSavedAs"; layout: LayoutConfig; layoutKey: string; profile: ProfileConfig }
   | { type: "outputPacket"; packet: OutputPacket }
   | { type: "connectionState"; state: ConnectionState }
-  | { type: "rawLine"; line: string; t: number }
-  | { type: "seriesAppend"; samples: PlotSample[] }
   | { type: "error"; message: string };
 
 export type ToProfileEditorMessage =

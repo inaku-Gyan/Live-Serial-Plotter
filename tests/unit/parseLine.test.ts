@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { BuiltinLineParser, parseLine, toPlotSample } from "../../src/parsers/parseLine";
+import { BuiltinLineParser, parseLine } from "../../src/parsers/parseLine";
 
 describe("parseLine", () => {
   test("parses CSV numeric channels", () => {
@@ -43,10 +43,6 @@ describe("parseLine", () => {
     expect(parseLine('{"x":1,"y":2}', "auto")).toEqual({ values: { x: 1, y: 2 } });
     expect(parseLine("x=1 y=2", "auto")).toEqual({ values: { x: 1, y: 2 } });
     expect(parseLine("1,2", "auto")).toEqual({ values: { channel1: 1, channel2: 2 } });
-  });
-
-  test("raw mode does not produce plot samples", () => {
-    expect(toPlotSample("1,2,3", "raw", 1000)).toBeNull();
   });
 
   test("malformed line keeps parser result empty instead of throwing", () => {

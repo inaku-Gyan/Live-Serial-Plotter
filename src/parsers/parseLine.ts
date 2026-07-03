@@ -1,10 +1,4 @@
-import type {
-  BuiltinParserConfig,
-  Frame,
-  JsonObject,
-  ParserMode,
-  PlotSample,
-} from "../shared/protocol";
+import type { BuiltinParserConfig, Frame, JsonObject, ParserMode } from "../shared/protocol";
 
 export interface ParsedLine {
   values: Record<string, number>;
@@ -179,23 +173,6 @@ export function parseLine(line: string, parserMode: ParserMode): ParsedLine {
 
   return {
     values: getNumericFields(fields),
-  };
-}
-
-export function toPlotSample(
-  line: string,
-  parserMode: ParserMode,
-  t = Date.now(),
-): PlotSample | null {
-  const parsed = parseLine(line, parserMode);
-
-  if (Object.keys(parsed.values).length === 0) {
-    return null;
-  }
-
-  return {
-    t,
-    values: parsed.values,
   };
 }
 

@@ -212,21 +212,14 @@ export function createController(): {
   const messages: ToExtensionMessage[] = [];
 
   return {
-    controller: new MonitorOutputController({
-      root,
-      postMessage: (message) => messages.push(message),
-    }),
+    controller: new MonitorOutputController({ root }),
     root,
     messages,
   };
 }
 
 export function renderProfile(root: HTMLElement, outputs: readonly OutputConfig[]): void {
-  const messages: ToExtensionMessage[] = [];
-  const controller = new MonitorOutputController({
-    root,
-    postMessage: (message) => messages.push(message),
-  });
+  const controller = new MonitorOutputController({ root });
   controller.renderOutputs(outputs);
 }
 

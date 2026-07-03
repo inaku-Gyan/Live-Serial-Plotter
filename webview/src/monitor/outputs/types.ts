@@ -3,14 +3,10 @@ import type {
   OutputLayoutConfig,
   OutputPacket,
   TimeSeriesViewLayoutConfig,
-  ToExtensionMessage,
 } from "../../../../src/shared/protocol";
-
-export type PostMessage = (message: ToExtensionMessage) => void;
 
 export interface MonitorOutputControllerOptions {
   root: HTMLElement;
-  postMessage: PostMessage;
 }
 
 /**

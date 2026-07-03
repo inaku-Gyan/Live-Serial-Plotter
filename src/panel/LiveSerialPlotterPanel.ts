@@ -159,10 +159,6 @@ export class LiveSerialPlotterPanel {
         });
         return;
       }
-
-      if (message.type === "clearLog") {
-        return;
-      }
     } catch (error) {
       this.postError(formatError(error));
     }

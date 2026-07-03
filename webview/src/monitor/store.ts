@@ -36,8 +36,6 @@ export interface MonitorPersistedState {
 export interface MonitorOutputAdapter {
   renderOutputs(outputs: readonly OutputConfig[], layout: LayoutConfig): void;
   appendPacket(packet: OutputPacket): void;
-  appendLegacyRawLine(line: string, timestamp: number): void;
-  appendLegacySeries(samples: readonly { t: number; values: Record<string, number> }[]): void;
   resetOutputView(outputId: string): void;
   resetPageLayout(): void;
   captureSavableViewState(): LayoutConfig;
@@ -47,10 +45,7 @@ export interface MonitorOutputAdapter {
 export interface MonitorStoreOptions {
   initialProfileKey?: string;
   errorToastDelayMs?: number;
-  createOutputAdapter?: (
-    root: HTMLElement,
-    postMessage: (message: ToExtensionMessage) => void,
-  ) => MonitorOutputAdapter;
+  createOutputAdapter?: (root: HTMLElement) => MonitorOutputAdapter;
 }
 
 interface MonitorUiState {
@@ -84,9 +79,7 @@ export function createMonitorStore(
     persistedState?.baudRate ?? defaultProfile.serialDefaults?.baudRate ?? 115200;
   const errorToastDelayMs = options.errorToastDelayMs ?? 3500;
   const createOutputAdapter =
-    options.createOutputAdapter ??
-    ((root: HTMLElement, postToExtension: (message: ToExtensionMessage) => void) =>
-      new MonitorOutputController({ root, postMessage: postToExtension }));
+    options.createOutputAdapter ?? ((root: HTMLElement) => new MonitorOutputController({ root }));
 
   let outputAdapter: MonitorOutputAdapter | undefined;
   let errorTimer: ReturnType<typeof setTimeout> | undefined;
@@ -126,7 +119,7 @@ export function createMonitorStore(
 
   function mountOutputs(root: HTMLElement): void {
     outputAdapter?.dispose();
-    outputAdapter = createOutputAdapter(root, postMessage);
+    outputAdapter = createOutputAdapter(root);
     outputAdapter.renderOutputs(state.activeProfile.outputs, state.activeLayout);
   }
 
@@ -252,16 +245,6 @@ export function createMonitorStore(
 
     if (message.type === "connectionState") {
       state.connected = message.state.connected;
-      return;
-    }
-
-    if (message.type === "rawLine") {
-      outputAdapter?.appendLegacyRawLine(message.line, message.t);
-      return;
-    }
-
-    if (message.type === "seriesAppend") {
-      outputAdapter?.appendLegacySeries(message.samples);
       return;
     }
 
