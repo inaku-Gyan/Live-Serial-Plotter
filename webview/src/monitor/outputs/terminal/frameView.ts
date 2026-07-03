@@ -8,6 +8,9 @@ import type {
 import { createPanelHeader } from "../panel/chrome";
 import type { OutputView } from "../types";
 
+const maxFrames = 200;
+const standbyText = "Waiting for frame data";
+
 export class TerminalFrameView implements OutputView {
   readonly outputId: string;
   readonly kind = "terminalFrame" as const;
@@ -25,7 +28,7 @@ export class TerminalFrameView implements OutputView {
     this.applyViewLayout(viewLayout);
     this.pre = document.createElement("pre");
     this.pre.className = "output-terminal output-frame-terminal output-standby";
-    this.pre.textContent = "Waiting for frame data";
+    this.pre.textContent = standbyText;
 
     parent.append(
       createPanelHeader(config, "Frame Terminal", () => this.resetView()),
@@ -43,6 +46,17 @@ export class TerminalFrameView implements OutputView {
 
   appendFrame(packet: TerminalFramePacket): void {
     this.frames.set(packet.frameId, packet.text);
+
+    while (this.frames.size > maxFrames) {
+      const oldest = this.frames.keys().next().value;
+
+      if (oldest === undefined) {
+        break;
+      }
+
+      this.frames.delete(oldest);
+    }
+
     this.pre.classList.remove("output-standby");
     this.pre.textContent = [...this.frames.entries()]
       .map(([frameId, text]) => `#${String(frameId)}\n${text}`)
@@ -72,7 +86,7 @@ export class TerminalFrameView implements OutputView {
   clearData(): void {
     this.frames.clear();
     this.pre.classList.add("output-standby");
-    this.pre.textContent = "Waiting for frame data";
+    this.pre.textContent = standbyText;
   }
 
   dispose(): void {}

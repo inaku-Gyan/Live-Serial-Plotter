@@ -9,13 +9,14 @@ import { appendPanelHeaderButton, createPanelHeader } from "../panel/chrome";
 import type { OutputView, PostMessage } from "../types";
 
 const defaultMaxRawLines = 500;
+const standbyText = "Waiting for serial text";
 
 export class TerminalAppendView implements OutputView {
   readonly outputId: string;
   readonly kind = "terminalAppend" as const;
 
-  private readonly lines: string[] = [];
   private readonly pre: HTMLPreElement;
+  private lineCount = 0;
   private viewLayout: TerminalViewLayoutConfig | undefined;
 
   constructor(
@@ -40,7 +41,7 @@ export class TerminalAppendView implements OutputView {
 
     this.pre = document.createElement("pre");
     this.pre.className = "output-terminal output-standby";
-    this.pre.textContent = "Waiting for serial text";
+    this.pre.textContent = standbyText;
 
     parent.append(header, this.pre);
   }
@@ -54,17 +55,31 @@ export class TerminalAppendView implements OutputView {
   }
 
   appendLines(lines: TerminalAppendPacket["lines"], timestamp: number): void {
+    if (lines.length === 0) {
+      return;
+    }
+
+    if (this.lineCount === 0) {
+      this.pre.classList.remove("output-standby");
+      this.pre.textContent = "";
+    }
+
     const time = new Date(timestamp).toLocaleTimeString();
-    this.lines.push(...lines.map((line) => `[${time}] ${line.text}`));
+    const fragment = document.createDocumentFragment();
+
+    for (const line of lines) {
+      fragment.append(document.createTextNode(`[${time}] ${line.text}\n`));
+    }
+
+    this.pre.append(fragment);
+    this.lineCount += lines.length;
 
     const maxLines = this.config.maxLines ?? defaultMaxRawLines;
 
-    if (this.lines.length > maxLines) {
-      this.lines.splice(0, this.lines.length - maxLines);
+    while (this.lineCount > maxLines && this.pre.firstChild !== null) {
+      this.pre.firstChild.remove();
+      this.lineCount -= 1;
     }
-
-    this.pre.classList.remove("output-standby");
-    this.pre.textContent = this.lines.join("\n");
 
     if (this.getAutoScroll()) {
       this.pre.scrollTop = this.pre.scrollHeight;
@@ -87,9 +102,9 @@ export class TerminalAppendView implements OutputView {
   }
 
   clearData(): void {
-    this.lines.length = 0;
+    this.lineCount = 0;
     this.pre.classList.add("output-standby");
-    this.pre.textContent = "Waiting for serial text";
+    this.pre.textContent = standbyText;
   }
 
   dispose(): void {}
