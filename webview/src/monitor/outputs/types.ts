@@ -1,4 +1,5 @@
 import type {
+  LayoutConfig,
   OutputConfig,
   OutputLayoutConfig,
   OutputPacket,
@@ -10,7 +11,20 @@ export interface OutputGridControllerOptions {
 }
 
 /**
- * Common adapter used by the monitor controller to drive one output renderer.
+ * Port used by the page store to drive the output grid without depending on the
+ * DOM implementation. `DomOutputGridController` is the production implementation.
+ */
+export interface OutputGridController {
+  renderOutputs(outputs: readonly OutputConfig[], layout: LayoutConfig): void;
+  appendPacket(packet: OutputPacket): void;
+  resetOutputViewState(outputId: string): void;
+  resetPageLayout(): void;
+  captureLayout(): LayoutConfig;
+  dispose(): void;
+}
+
+/**
+ * Common adapter used by the output grid controller to drive one output renderer.
  */
 export interface OutputRenderer {
   /** Profile output id used for packet routing and layout snapshots. */
@@ -21,7 +35,7 @@ export interface OutputRenderer {
   updateData(packet: OutputPacket): void;
   /** Clear runtime data currently displayed by this output. */
   clearData(): void;
-  /** Apply renderer-specific view layout, not the outer panel grid layout. */
+  /** Apply renderer-specific view state, not the outer tile grid layout. */
   applyViewState(layout: OutputLayoutConfig["viewState"] | undefined): void;
   /** Reset interaction/view state without clearing runtime data. */
   resetViewState(): void;

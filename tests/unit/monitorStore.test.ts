@@ -15,7 +15,7 @@ import {
   createPageStore,
   type OutputGridController,
   type PagePersistedState,
-  type VsCodeApi,
+  type PageVsCodeApi,
 } from "../../webview/src/monitor/store";
 
 vi.mock("uplot", () => ({ default: vi.fn<() => void>() }));
@@ -211,7 +211,7 @@ describe("monitor store", () => {
   });
 });
 
-function createStore(vscode: VsCodeApi<PagePersistedState>): {
+function createStore(vscode: PageVsCodeApi): {
   store: ReturnType<typeof createPageStore>;
   adapter: MockOutputAdapter;
 } {
@@ -246,7 +246,7 @@ function createOutputGrid(): MockOutputAdapter {
 }
 
 function createVscodeApi(initialState?: PagePersistedState): {
-  api: VsCodeApi<PagePersistedState>;
+  api: PageVsCodeApi;
   messages: ToExtensionMessage[];
   persistedState: PagePersistedState | undefined;
 } {

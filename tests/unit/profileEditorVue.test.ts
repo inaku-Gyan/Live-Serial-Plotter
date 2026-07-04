@@ -14,7 +14,7 @@ import {
   createProfileEditorStore,
   ProfileEditorStoreKey,
   type ProfileEditorPersistedState,
-  type VsCodeApi,
+  type ProfileEditorVsCodeApi,
 } from "../../webview/src/profile-editor/store";
 
 describe("ProfileEditorApp", () => {
@@ -297,7 +297,7 @@ function dispatchEditorState(state: ProfileEditorState): void {
 }
 
 function createVscodeApi(): {
-  api: VsCodeApi<ProfileEditorPersistedState>;
+  api: ProfileEditorVsCodeApi;
   messages: ToProfileEditorMessage[];
   persistedState: ProfileEditorPersistedState | undefined;
 } {

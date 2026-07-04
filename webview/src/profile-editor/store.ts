@@ -7,17 +7,20 @@ import type {
   ToProfileEditorMessage,
   ToProfileEditorWebviewMessage,
 } from "../../../src/shared/protocol";
+import type { VsCodeApi } from "../../../src/shared/vscodeApi";
 import {
   applyProfileEditorPatch,
   createProfileEditorPatch,
   type ProfileEditorPatch,
 } from "./model";
 
-export type ProfileEditorView = "home" | "editor";
+export type ProfileEditorScreen = "home" | "editor";
+
+export type ProfileEditorVsCodeApi = VsCodeApi<ProfileEditorPersistedState, ToProfileEditorMessage>;
 
 export interface ProfileEditorPersistedState {
   selectedProfileKey?: string;
-  view?: ProfileEditorView;
+  screen?: ProfileEditorScreen;
 }
 
 export interface ProfileMenu {
@@ -26,25 +29,19 @@ export interface ProfileMenu {
   y?: number;
 }
 
-export interface VsCodeApi<State> {
-  getState(): State | undefined;
-  setState(state: State): void;
-  postMessage(message: ToProfileEditorMessage): void;
-}
-
 interface ProfileEditorUiState {
   editorState: ProfileEditorState | undefined;
   selectedProfile: ProfileConfig | undefined;
   selectedProfileKey: string | undefined;
   selectedSource: ProfileSourceMetadata | undefined;
   draft: ProfileEditorPatch | undefined;
-  view: ProfileEditorView;
+  screen: ProfileEditorScreen;
   profileMenu: ProfileMenu | undefined;
   statusText: string;
 }
 
 export function createProfileEditorStore(
-  vscode: VsCodeApi<ProfileEditorPersistedState>,
+  vscode: ProfileEditorVsCodeApi,
   options: { autosaveDelayMs?: number } = {},
 ) {
   const persistedState = vscode.getState();
@@ -59,11 +56,11 @@ export function createProfileEditorStore(
     selectedProfileKey: persistedState?.selectedProfileKey,
     selectedSource: undefined,
     draft: undefined,
-    view: persistedState?.view ?? "home",
+    screen: persistedState?.screen ?? "home",
     profileMenu: undefined,
     statusText: "",
   });
-  syncProfileEditorView();
+  syncProfileEditorScreen();
 
   const isBuiltin = computed(() => state.selectedSource?.scope === "builtin");
   const isReady = computed(
@@ -92,29 +89,29 @@ export function createProfileEditorStore(
   }
 
   function handleHostMessage(message: ToProfileEditorWebviewMessage): void {
-    if (message.type === "profileEditorState") {
-      applyEditorState(message.state);
-      return;
+    switch (message.type) {
+      case "profileEditorState":
+        applyEditorState(message.state);
+        return;
+      case "profileAutoSaved":
+        state.selectedProfileKey = message.profileKey;
+        persistState();
+        setStatusText(`Saved to ${message.filePath}`);
+        return;
+      case "profileCopied":
+        state.screen = "editor";
+        state.selectedProfileKey = message.profileKey;
+        state.profileMenu = undefined;
+        persistState();
+        syncProfileEditorScreen();
+        setStatusText(`Copied to ${message.filePath}`);
+        return;
+      case "error":
+        setStatusText(message.message);
+        return;
+      default:
+        assertNever(message);
     }
-
-    if (message.type === "profileAutoSaved") {
-      state.selectedProfileKey = message.profileKey;
-      persistState();
-      setStatusText(`Saved to ${message.filePath}`);
-      return;
-    }
-
-    if (message.type === "profileCopied") {
-      state.view = "editor";
-      state.selectedProfileKey = message.profileKey;
-      state.profileMenu = undefined;
-      persistState();
-      syncProfileEditorView();
-      setStatusText(`Copied to ${message.filePath}`);
-      return;
-    }
-
-    setStatusText(message.message);
   }
 
   function selectProfile(profileKey: string): void {
@@ -130,10 +127,10 @@ export function createProfileEditorStore(
   }
 
   function openEditor(profileKey = state.selectedProfileKey): void {
-    state.view = "editor";
+    state.screen = "editor";
     state.profileMenu = undefined;
     persistState();
-    syncProfileEditorView();
+    syncProfileEditorScreen();
 
     if (profileKey !== undefined && profileKey !== state.selectedProfileKey) {
       state.selectedProfileKey = profileKey;
@@ -142,10 +139,10 @@ export function createProfileEditorStore(
   }
 
   function backToHome(): void {
-    state.view = "home";
+    state.screen = "home";
     state.profileMenu = undefined;
     persistState();
-    syncProfileEditorView();
+    syncProfileEditorScreen();
   }
 
   function toggleProfileMenu(profileKey: string): void {
@@ -181,7 +178,7 @@ export function createProfileEditorStore(
   }
 
   function scheduleAutoSave(): void {
-    if (state.view !== "editor" || isBuiltin.value) {
+    if (state.screen !== "editor" || isBuiltin.value) {
       return;
     }
 
@@ -241,7 +238,7 @@ export function createProfileEditorStore(
 
   function persistState(): void {
     const nextPersistedState: ProfileEditorPersistedState = {
-      view: state.view,
+      screen: state.screen,
     };
 
     if (state.selectedProfileKey !== undefined) {
@@ -251,8 +248,8 @@ export function createProfileEditorStore(
     vscode.setState(nextPersistedState);
   }
 
-  function syncProfileEditorView(): void {
-    postMessage({ type: "setProfileEditorView", view: state.view });
+  function syncProfileEditorScreen(): void {
+    postMessage({ type: "setProfileEditorScreen", screen: state.screen });
   }
 
   function postMessage(message: ToProfileEditorMessage): void {
@@ -297,4 +294,8 @@ export function useProfileEditorStore(): ProfileEditorStore {
 
 function cloneProfile(profile: ProfileConfig): ProfileConfig {
   return JSON.parse(JSON.stringify(profile));
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled host message: ${JSON.stringify(value)}`);
 }

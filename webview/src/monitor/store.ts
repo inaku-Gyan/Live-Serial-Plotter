@@ -7,8 +7,6 @@ import {
   type LayoutConfig,
   type LayoutSaveTarget,
   type LayoutSummary,
-  type OutputConfig,
-  type OutputPacket,
   type ParserMode,
   type ProfileConfig,
   type ProfileSummary,
@@ -16,14 +14,14 @@ import {
   type ToExtensionMessage,
   type ToWebviewMessage,
 } from "../../../src/shared/protocol";
+import type { VsCodeApi } from "../../../src/shared/vscodeApi";
 import { isBaudRateInputValid, parseBaudRateInput } from "../baudRate";
 import { DomOutputGridController } from "./outputs/outputGridController";
+import type { OutputGridController } from "./outputs/types";
 
-export interface VsCodeApi<State> {
-  getState(): State | undefined;
-  setState(state: State): void;
-  postMessage(message: ToExtensionMessage): void;
-}
+export type { OutputGridController };
+
+export type PageVsCodeApi = VsCodeApi<PagePersistedState, ToExtensionMessage>;
 
 export interface PagePersistedState {
   baudRate?: number;
@@ -31,15 +29,6 @@ export interface PagePersistedState {
   parserMode?: ParserMode;
   profileKey?: string;
   selectedPath?: string;
-}
-
-export interface OutputGridController {
-  renderOutputs(outputs: readonly OutputConfig[], layout: LayoutConfig): void;
-  appendPacket(packet: OutputPacket): void;
-  resetOutputViewState(outputId: string): void;
-  resetPageLayout(): void;
-  captureLayout(): LayoutConfig;
-  dispose(): void;
 }
 
 export interface PageStoreOptions {
@@ -70,10 +59,7 @@ const defaultProfileKey = `builtin:${defaultProfile.id}`;
 const defaultParserMode: ParserMode =
   defaultProfile.parser.kind === "builtin" ? defaultProfile.parser.mode : "auto";
 
-export function createPageStore(
-  vscode: VsCodeApi<PagePersistedState>,
-  options: PageStoreOptions = {},
-) {
+export function createPageStore(vscode: PageVsCodeApi, options: PageStoreOptions = {}) {
   const persistedState = vscode.getState();
   const initialBaudRate =
     persistedState?.baudRate ?? defaultProfile.serialDefaults?.baudRate ?? 115200;
@@ -203,58 +189,48 @@ export function createPageStore(
   }
 
   function handleHostMessage(message: ToWebviewMessage): void {
-    if (message.type === "ports") {
-      applyPorts(message.ports);
-      return;
-    }
-
-    if (message.type === "profiles") {
-      state.profiles = [...message.profiles];
-      state.layouts = [...message.layouts];
-      state.layoutTargets = [...message.layoutTargets];
-      applyProfile(
-        message.activeProfile,
-        message.activeProfileKey,
-        message.activeLayout,
-        message.activeLayoutKey,
-      );
-      return;
-    }
-
-    if (message.type === "activeProfile") {
-      applyProfile(message.profile, message.profileKey, message.layout, message.layoutKey);
-      return;
-    }
-
-    if (message.type === "layoutSaved") {
-      state.activeLayout = message.layout;
-      state.layoutKey = message.layoutKey;
-      persistState();
-      outputGrid?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
-      return;
-    }
-
-    if (message.type === "layoutSavedAs") {
-      state.activeProfile = message.profile;
-      state.activeLayout = message.layout;
-      state.layoutKey = message.layoutKey;
-      persistState();
-      outputGrid?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
-      return;
-    }
-
-    if (message.type === "connectionState") {
-      state.connected = message.state.connected;
-      return;
-    }
-
-    if (message.type === "outputPacket") {
-      outputGrid?.appendPacket(message.packet);
-      return;
-    }
-
-    if (message.type === "error") {
-      showError(message.message);
+    switch (message.type) {
+      case "ports":
+        applyPorts(message.ports);
+        return;
+      case "profiles":
+        state.profiles = [...message.profiles];
+        state.layouts = [...message.layouts];
+        state.layoutTargets = [...message.layoutTargets];
+        applyProfile(
+          message.activeProfile,
+          message.activeProfileKey,
+          message.activeLayout,
+          message.activeLayoutKey,
+        );
+        return;
+      case "activeProfile":
+        applyProfile(message.profile, message.profileKey, message.layout, message.layoutKey);
+        return;
+      case "layoutSaved":
+        state.activeLayout = message.layout;
+        state.layoutKey = message.layoutKey;
+        persistState();
+        outputGrid?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
+        return;
+      case "layoutSavedAs":
+        state.activeProfile = message.profile;
+        state.activeLayout = message.layout;
+        state.layoutKey = message.layoutKey;
+        persistState();
+        outputGrid?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
+        return;
+      case "connectionState":
+        state.connected = message.state.connected;
+        return;
+      case "outputPacket":
+        outputGrid?.appendPacket(message.packet);
+        return;
+      case "error":
+        showError(message.message);
+        return;
+      default:
+        assertNever(message);
     }
   }
 
@@ -401,4 +377,8 @@ export function usePageStore(): PageStore {
   }
 
   return store;
+}
+
+function assertNever(value: never): never {
+  throw new Error(`Unhandled host message: ${JSON.stringify(value)}`);
 }

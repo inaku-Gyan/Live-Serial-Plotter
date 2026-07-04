@@ -28,14 +28,14 @@
         },
         "page": {
           "$ref": "#/definitions/MonitorPageLayoutConfig",
-          "description": "Page-level workspace layout options."
+          "description": "Page-level output grid layout options."
         },
         "outputs": {
           "type": "object",
           "additionalProperties": {
             "$ref": "#/definitions/OutputLayoutConfig"
           },
-          "description": "Per-output panel and view defaults, keyed by profile output id."
+          "description": "Per-output tile and view state defaults, keyed by profile output id."
         }
       },
       "required": ["schemaVersion", "id", "name", "page", "outputs"],
@@ -53,12 +53,12 @@
         "columns": {
           "type": "string",
           "enum": ["auto", "single", "two"],
-          "description": "Responsive column strategy used by the monitor workspace."
+          "description": "Responsive column strategy used by the output grid."
         },
         "density": {
           "type": "string",
           "enum": ["compact", "normal", "comfortable"],
-          "description": "Workspace density."
+          "description": "Output grid density."
         }
       },
       "required": ["mode"],
@@ -83,25 +83,25 @@
       "properties": {
         "order": {
           "type": "number",
-          "description": "Sort order within the workspace."
+          "description": "Sort order within the output grid."
         },
         "columnSpan": {
           "type": "number",
-          "description": "Number of grid columns occupied by this panel.",
+          "description": "Number of grid columns occupied by this tile.",
           "minimum": 1
         },
         "minHeight": {
           "type": "number",
-          "description": "Minimum panel height in CSS pixels.",
+          "description": "Minimum tile height in CSS pixels.",
           "minimum": 1
         },
         "collapsed": {
           "type": "boolean",
-          "description": "Whether the panel starts collapsed."
+          "description": "Whether the tile starts collapsed."
         },
         "maximized": {
           "type": "boolean",
-          "description": "Whether the panel starts maximized."
+          "description": "Whether the tile starts maximized."
         }
       },
       "additionalProperties": false

@@ -4,7 +4,7 @@ import type { ProfileEditorState, ToProfileEditorMessage } from "../../src/share
 import {
   createProfileEditorStore,
   type ProfileEditorPersistedState,
-  type VsCodeApi,
+  type ProfileEditorVsCodeApi,
 } from "../../webview/src/profile-editor/store";
 
 describe("profileEditorStore", () => {
@@ -27,7 +27,7 @@ describe("profileEditorStore", () => {
     expect(store.state.draft?.name).toBe("Default Auto Plot");
     expect(vscode.persistedState).toEqual({
       selectedProfileKey: "builtin:default",
-      view: "home",
+      screen: "home",
     });
   });
 
@@ -69,10 +69,10 @@ describe("profileEditorStore", () => {
       filePath: "/root/.live-serial-plotter/profiles/saved.jsonc",
     });
 
-    expect(store.state.view).toBe("editor");
+    expect(store.state.screen).toBe("editor");
     expect(store.state.selectedProfileKey).toBe("workspace:file:///root:saved");
     expect(store.state.statusText).toContain("saved.jsonc");
-    expect(vscode.messages).toContainEqual({ type: "setProfileEditorView", view: "editor" });
+    expect(vscode.messages).toContainEqual({ type: "setProfileEditorScreen", screen: "editor" });
   });
 
   test("autosaves editable draft changes after debounce", () => {
@@ -121,7 +121,7 @@ describe("profileEditorStore", () => {
 
   test("does not autosave host state refreshes", () => {
     vi.useFakeTimers();
-    const vscode = createVscodeApi({ view: "editor" });
+    const vscode = createVscodeApi({ screen: "editor" });
     const store = createProfileEditorStore(vscode.api);
 
     store.handleHostMessage({
@@ -140,7 +140,7 @@ describe("profileEditorStore", () => {
 });
 
 function createVscodeApi(initialState?: ProfileEditorPersistedState): {
-  api: VsCodeApi<ProfileEditorPersistedState>;
+  api: ProfileEditorVsCodeApi;
   messages: ToProfileEditorMessage[];
   persistedState: ProfileEditorPersistedState | undefined;
 } {

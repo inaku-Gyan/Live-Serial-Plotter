@@ -5,12 +5,11 @@ import MonitorPage from "./monitor/MonitorPage.vue";
 import {
   createPageStore,
   PageStoreKey,
-  type PagePersistedState,
   type PageStoreOptions,
-  type VsCodeApi,
+  type PageVsCodeApi,
 } from "./monitor/store";
 
-declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
+declare function acquireVsCodeApi(): PageVsCodeApi;
 
 const root = document.querySelector<HTMLElement>("#app");
 
@@ -18,7 +17,7 @@ if (root === null) {
   throw new Error("Missing required element: #app");
 }
 
-const vscode = acquireVsCodeApi<PagePersistedState>();
+const vscode = acquireVsCodeApi();
 const initialProfileKey = nonEmptyString(document.body.dataset.initialProfileKey);
 const storeOptions: PageStoreOptions = {};
 

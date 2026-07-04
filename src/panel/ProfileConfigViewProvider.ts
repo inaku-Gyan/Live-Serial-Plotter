@@ -82,11 +82,11 @@ export class ProfileConfigViewProvider implements vscode.WebviewViewProvider {
         return;
       }
 
-      if (message.type === "setProfileEditorView") {
+      if (message.type === "setProfileEditorScreen") {
         await vscode.commands.executeCommand(
           "setContext",
-          "liveSerialPlotter.profileEditorView",
-          message.view,
+          "liveSerialPlotter.profileEditorScreen",
+          message.screen,
         );
         return;
       }

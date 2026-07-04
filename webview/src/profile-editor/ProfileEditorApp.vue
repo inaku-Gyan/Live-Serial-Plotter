@@ -70,7 +70,7 @@ onBeforeUnmount(() => {
 
 <template>
   <main v-if="!isReady" class="profile-editor">Loading profiles...</main>
-  <main v-else-if="store.state.view === 'home'" class="profile-home">
+  <main v-else-if="store.state.screen === 'home'" class="profile-home">
     <HomePage />
     <StatusBlock v-if="store.state.statusText.length > 0" :text="store.state.statusText" />
   </main>

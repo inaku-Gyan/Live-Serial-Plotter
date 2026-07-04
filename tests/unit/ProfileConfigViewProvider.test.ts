@@ -252,12 +252,12 @@ describe("ProfileConfigViewProvider", () => {
 
     provider.resolveWebviewView(webviewView);
     await waitForAsyncWork();
-    dispatch({ type: "setProfileEditorView", view: "editor" });
+    dispatch({ type: "setProfileEditorScreen", screen: "editor" });
     await waitForAsyncWork();
 
     expect(__vscodeMock.executeCommand).toHaveBeenCalledWith(
       "setContext",
-      "liveSerialPlotter.profileEditorView",
+      "liveSerialPlotter.profileEditorScreen",
       "editor",
     );
   });
@@ -268,7 +268,7 @@ describe("ProfileConfigViewProvider", () => {
     expect(viewTitleMenu).toEqual([
       {
         command: "liveSerialPlotter.profiles.openJson",
-        when: "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorView == editor",
+        when: "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorScreen == editor",
         group: "navigation@1",
       },
       {

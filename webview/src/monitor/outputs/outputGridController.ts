@@ -7,73 +7,58 @@ import type {
 } from "../../../../src/shared/protocol";
 import { createOutputRenderer } from "./factory";
 import { applyTileLayout, cssEscape, sortOutputsByLayout } from "./tile/layout";
-import type { OutputGridControllerOptions, OutputRenderer } from "./types";
+import type { OutputGridController, OutputGridControllerOptions, OutputRenderer } from "./types";
 
-export class DomOutputGridController {
-  private readonly views = new Map<string, OutputRenderer>();
-  private currentLayout: LayoutConfig | undefined;
+export class DomOutputGridController implements OutputGridController {
+  private readonly renderers = new Map<string, OutputRenderer>();
+  private currentLayout: LayoutConfig = defaultLayout;
 
   constructor(private readonly options: OutputGridControllerOptions) {}
 
   renderOutputs(outputs: readonly OutputConfig[], layout: LayoutConfig = defaultLayout): void {
-    this.disposeViews();
+    this.disposeRenderers();
     this.currentLayout = layout;
     this.applyPageLayout(layout);
     this.options.root.replaceChildren();
 
     for (const output of sortOutputsByLayout(outputs, layout)) {
-      const view = createOutputRenderer(this.options.root, output, layout.outputs[output.id]);
-      this.views.set(output.id, view);
+      const renderer = createOutputRenderer(this.options.root, output, layout.outputs[output.id]);
+      this.renderers.set(output.id, renderer);
     }
   }
 
   appendPacket(packet: OutputPacket): void {
-    this.views.get(packet.outputId)?.updateData(packet);
+    this.renderers.get(packet.outputId)?.updateData(packet);
   }
 
   resetOutputViewState(outputId: string): void {
-    this.views.get(outputId)?.resetViewState();
+    this.renderers.get(outputId)?.resetViewState();
   }
 
   resetPageLayout(): void {
-    if (this.currentLayout === undefined) {
-      return;
-    }
-
     this.applyPageLayout(this.currentLayout);
 
-    for (const view of this.views.values()) {
-      view.resetViewState();
-      const panel = this.options.root.querySelector<HTMLElement>(
-        `[data-output-id="${cssEscape(view.outputId)}"]`,
+    for (const renderer of this.renderers.values()) {
+      renderer.resetViewState();
+      const tile = this.options.root.querySelector<HTMLElement>(
+        `[data-output-id="${cssEscape(renderer.outputId)}"]`,
       );
-      applyTileLayout(panel, this.currentLayout.outputs[view.outputId]);
+      applyTileLayout(tile, this.currentLayout.outputs[renderer.outputId]);
     }
   }
 
   captureLayout(): LayoutConfig {
     const baseLayout = this.currentLayout;
-
-    if (baseLayout === undefined) {
-      return {
-        schemaVersion: 1,
-        id: "unsaved",
-        name: "Unsaved Layout",
-        page: { mode: "grid", columns: "auto", density: "normal" },
-        outputs: {},
-      };
-    }
-
     const outputs: Record<string, OutputLayoutConfig> = {};
 
-    for (const [outputId, view] of this.views.entries()) {
+    for (const [outputId, renderer] of this.renderers.entries()) {
       const outputLayout: OutputLayoutConfig = {
         ...baseLayout.outputs[outputId],
       };
-      const viewLayout = view.captureViewState();
+      const viewState = renderer.captureViewState();
 
-      if (viewLayout !== undefined) {
-        outputLayout.viewState = viewLayout;
+      if (viewState !== undefined) {
+        outputLayout.viewState = viewState;
       } else {
         delete outputLayout.viewState;
       }
@@ -91,15 +76,15 @@ export class DomOutputGridController {
   }
 
   dispose(): void {
-    this.disposeViews();
+    this.disposeRenderers();
   }
 
-  private disposeViews(): void {
-    for (const view of this.views.values()) {
-      view.dispose();
+  private disposeRenderers(): void {
+    for (const renderer of this.renderers.values()) {
+      renderer.dispose();
     }
 
-    this.views.clear();
+    this.renderers.clear();
   }
 
   private applyPageLayout(layout: LayoutConfig): void {

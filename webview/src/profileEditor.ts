@@ -5,11 +5,10 @@ import ProfileEditorApp from "./profile-editor/ProfileEditorApp.vue";
 import {
   createProfileEditorStore,
   ProfileEditorStoreKey,
-  type ProfileEditorPersistedState,
-  type VsCodeApi,
+  type ProfileEditorVsCodeApi,
 } from "./profile-editor/store";
 
-declare function acquireVsCodeApi<State>(): VsCodeApi<State>;
+declare function acquireVsCodeApi(): ProfileEditorVsCodeApi;
 
 const root = document.querySelector<HTMLElement>("#profileApp");
 
@@ -17,7 +16,7 @@ if (root === null) {
   throw new Error("Missing required element: #profileApp");
 }
 
-const vscode = acquireVsCodeApi<ProfileEditorPersistedState>();
+const vscode = acquireVsCodeApi();
 const store = createProfileEditorStore(vscode);
 const app = createApp(ProfileEditorApp);
 app.provide(ProfileEditorStoreKey, store);

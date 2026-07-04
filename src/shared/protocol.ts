@@ -643,11 +643,11 @@ export interface LayoutConfig {
    */
   name: string;
   /**
-   * Page-level workspace layout options.
+   * Page-level output grid layout options.
    */
   page: MonitorPageLayoutConfig;
   /**
-   * Per-output panel and view defaults, keyed by profile output id.
+   * Per-output tile and view state defaults, keyed by profile output id.
    */
   outputs: Record<string, OutputLayoutConfig>;
 }
@@ -658,11 +658,11 @@ export interface MonitorPageLayoutConfig {
    */
   mode: "grid";
   /**
-   * Responsive column strategy used by the monitor workspace.
+   * Responsive column strategy used by the output grid.
    */
   columns?: "auto" | "single" | "two";
   /**
-   * Workspace density.
+   * Output grid density.
    */
   density?: "compact" | "normal" | "comfortable";
 }
@@ -680,25 +680,25 @@ export interface OutputLayoutConfig {
 
 export interface OutputTileLayoutConfig {
   /**
-   * Sort order within the workspace.
+   * Sort order within the output grid.
    */
   order?: number;
   /**
-   * Number of grid columns occupied by this panel.
+   * Number of grid columns occupied by this tile.
    * @minimum 1
    */
   columnSpan?: number;
   /**
-   * Minimum panel height in CSS pixels.
+   * Minimum tile height in CSS pixels.
    * @minimum 1
    */
   minHeight?: number;
   /**
-   * Whether the panel starts collapsed.
+   * Whether the tile starts collapsed.
    */
   collapsed?: boolean;
   /**
-   * Whether the panel starts maximized.
+   * Whether the tile starts maximized.
    */
   maximized?: boolean;
 }
@@ -794,7 +794,7 @@ export type ToWebviewMessage =
 export type ToProfileEditorMessage =
   | { type: "requestProfileEditorState"; profileKey?: string }
   | { type: "selectProfileForEdit"; profileKey: string }
-  | { type: "setProfileEditorView"; view: "home" | "editor" }
+  | { type: "setProfileEditorScreen"; screen: "home" | "editor" }
   | { type: "openMonitorForProfile"; profileKey: string }
   | { type: "autoSaveProfile"; profile: ProfileConfig }
   | { type: "copyProfileByKey"; profileKey: string }

@@ -116,7 +116,7 @@
       "view/title": [
         {
           "command": "liveSerialPlotter.profiles.openJson",
-          "when": "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorView == editor",
+          "when": "view == liveSerialPlotter.profiles && liveSerialPlotter.profileEditorScreen == editor",
           "group": "navigation@1"
         },
         {
