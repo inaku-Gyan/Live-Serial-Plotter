@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
-import { LiveSerialPlotterPanel } from "./panel/LiveSerialPlotterPanel";
-import { ProfileConfigViewProvider } from "./panel/ProfileConfigViewProvider";
-import { VscodeScriptParserTrustStore } from "./panel/VscodeScriptParserTrustStore";
+import { MonitorPageHost } from "./host/MonitorPageHost";
+import { ProfileConfigViewProvider } from "./host/ProfileConfigViewProvider";
+import { VscodeScriptParserTrustStore } from "./parsers/VscodeScriptParserTrustStore";
 import { ScriptParserLoader } from "./parsers/ScriptParserLoader";
 import { getWorkspaceLayoutsDirectory, LayoutStore } from "./profiles/LayoutStore";
 import { getWorkspaceProfilesDirectory, ProfileStore } from "./profiles/ProfileStore";
@@ -17,7 +17,7 @@ export function activate(context: vscode.ExtensionContext): void {
     extensionUri: context.extensionUri,
     profileStore,
     openMonitorPage: (profileKey) => {
-      LiveSerialPlotterPanel.open(context.extensionUri, {
+      MonitorPageHost.open(context.extensionUri, {
         serialPortFactory,
         profileStore,
         layoutStore,
@@ -34,7 +34,7 @@ export function activate(context: vscode.ExtensionContext): void {
       { webviewOptions: { retainContextWhenHidden: true } },
     ),
     vscode.commands.registerCommand("liveSerialPlotter.open", () => {
-      LiveSerialPlotterPanel.open(context.extensionUri, {
+      MonitorPageHost.open(context.extensionUri, {
         serialPortFactory,
         profileStore,
         layoutStore,

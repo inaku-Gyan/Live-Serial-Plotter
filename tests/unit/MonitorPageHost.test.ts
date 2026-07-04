@@ -1,18 +1,18 @@
 import * as vscode from "vscode";
 import { beforeEach, describe, expect, test } from "vitest";
-import { LiveSerialPlotterPanel } from "../../src/panel/LiveSerialPlotterPanel";
+import { MonitorPageHost } from "../../src/host/MonitorPageHost";
 import { __resetVscodeMock, __vscodeMock } from "../mocks/vscode";
 
 const extensionUri = vscode.Uri.file("/extension");
 
-describe("LiveSerialPlotterPanel", () => {
+describe("MonitorPageHost", () => {
   beforeEach(() => {
     __resetVscodeMock();
   });
 
   test("opens a new webview panel for each command invocation", () => {
-    LiveSerialPlotterPanel.open(extensionUri);
-    LiveSerialPlotterPanel.open(extensionUri);
+    MonitorPageHost.open(extensionUri);
+    MonitorPageHost.open(extensionUri);
 
     expect(__vscodeMock.createWebviewPanel).toHaveBeenCalledTimes(2);
     expect(__vscodeMock.createdPanels).toHaveLength(2);
@@ -30,7 +30,7 @@ describe("LiveSerialPlotterPanel", () => {
   });
 
   test("passes the initial profile key to the webview", () => {
-    LiveSerialPlotterPanel.open(extensionUri, {
+    MonitorPageHost.open(extensionUri, {
       initialProfileKey: "workspace:file:///workspace:telemetry",
     });
 

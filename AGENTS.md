@@ -20,10 +20,10 @@ Live Serial Plotter 是一个 VS Code 桌面扩展，用于串口监控、串口
 ## 主要目录
 
 - `src/extension.ts`：扩展激活入口，注册 `liveSerialPlotter.open` 命令。
-- `src/panel/LiveSerialPlotterPanel.ts`：Webview panel 生命周期、消息路由和串口会话协调。
+- `src/host/MonitorPageHost.ts`：监视页 Webview 生命周期、消息路由和串口会话协调（`src/host/` 存放 Webview 宿主）。
 - `src/serial/`：串口服务和 UTF-8 行解码。
 - `src/parsers/parseLine.ts`：`raw`、`csv`、`jsonl`、`keyValue`、`auto` 解析逻辑。
-- `src/session/`：输出包批处理和环形缓冲。
+- `src/pipeline/`：帧切分、字段映射、时间轴解析和输出包批处理。
 - `src/shared/protocol.ts`：Extension Host 和 Webview 共享消息协议。
 - `webview/src/`：Webview UI、监控页 Vue 外壳、命令式 uPlot/canvas renderer、Vue sidebar profile editor 和样式。
 - `tests/unit/`：解析器、缓冲、解码和串口服务单元测试。

@@ -155,7 +155,7 @@ Extension Host profile/layout stores
 
 后续阶段开工前必须重新设计和检查：
 
-- `LiveSerialPlotterPanel` 与 `ProfileConfigViewProvider` 的 HTML/CSP/nonce helper 是否可以共享。
+- `MonitorPageHost` 与 `ProfileConfigViewProvider` 的 HTML/CSP/nonce helper 是否可以共享。
 - Vite 多入口产物名称和 VSIX 打包规则是否稳定。
 - `retainContextWhenHidden` 对 monitor 和 sidebar 的生命周期影响是否不同。
 - Webview persisted state 是否需要统一 helper，还是保持各 store 自己管理更清晰。

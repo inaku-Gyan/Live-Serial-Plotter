@@ -1,6 +1,6 @@
 import { createApp } from "vue";
 import "uplot/dist/uPlot.min.css";
-import "./styles.css";
+import "./monitor.css";
 import MonitorPage from "./monitor/MonitorPage.vue";
 import {
   createPageStore,

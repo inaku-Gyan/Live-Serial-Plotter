@@ -1,5 +1,5 @@
 import { describe, expect, test, vi } from "vitest";
-import { OutputPacketBatcher } from "../../src/session/OutputPacketBatcher";
+import { OutputPacketBatcher } from "../../src/pipeline/OutputPacketBatcher";
 import type { OutputPacket } from "../../src/shared/protocol";
 
 describe("OutputPacketBatcher", () => {

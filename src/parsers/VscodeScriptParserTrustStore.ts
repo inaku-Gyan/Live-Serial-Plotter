@@ -1,8 +1,5 @@
 import * as vscode from "vscode";
-import type {
-  ScriptParserTrustRequest,
-  ScriptParserTrustStore,
-} from "../parsers/ScriptParserLoader";
+import type { ScriptParserTrustRequest, ScriptParserTrustStore } from "./ScriptParserLoader";
 
 const trustKeyPrefix = "trustedScriptParser";
 const trustButton = "Run Parser";

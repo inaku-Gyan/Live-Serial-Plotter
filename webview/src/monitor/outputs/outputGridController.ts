@@ -5,7 +5,7 @@ import type {
   OutputLayoutConfig,
   OutputPacket,
 } from "../../../../src/shared/protocol";
-import { createOutputRenderer } from "./factory";
+import { createOutputRenderer } from "./rendererFactory";
 import { applyTileLayout, cssEscape, sortOutputsByLayout } from "./tile/layout";
 import type { OutputGridController, OutputGridControllerOptions, OutputRenderer } from "./types";
 

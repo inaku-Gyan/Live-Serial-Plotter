@@ -7,7 +7,7 @@ import {
   type SerialPortFactory,
   type SerialServiceOptions,
 } from "../serial/SerialService";
-import { OutputPacketBatcher } from "../session/OutputPacketBatcher";
+import { OutputPacketBatcher } from "../pipeline/OutputPacketBatcher";
 import { formatError } from "../shared/formatError";
 import {
   isParserMode,
@@ -17,9 +17,9 @@ import {
 } from "../shared/protocol";
 import { buildWebviewHtml } from "./webviewHtml";
 
-const panelViewType = "liveSerialPlotter.panel";
+const monitorPageViewType = "liveSerialPlotter.monitorPage";
 
-export interface LiveSerialPlotterPanelOptions {
+export interface MonitorPageHostOptions {
   readonly serialPortFactory?: SerialPortFactory;
   readonly profileStore?: ProfileStore;
   readonly layoutStore?: LayoutStore;
@@ -27,9 +27,9 @@ export interface LiveSerialPlotterPanelOptions {
   readonly initialProfileKey?: string;
 }
 
-export class LiveSerialPlotterPanel {
-  private static readonly activePanels = new Set<LiveSerialPlotterPanel>();
-  private static nextPanelId = 1;
+export class MonitorPageHost {
+  private static readonly activePages = new Set<MonitorPageHost>();
+  private static nextPageId = 1;
 
   private readonly disposables: vscode.Disposable[] = [];
   private readonly serialService: SerialService;
@@ -40,25 +40,30 @@ export class LiveSerialPlotterPanel {
   });
   private activeProfileKey: string | undefined;
 
-  static open(extensionUri: vscode.Uri, options: LiveSerialPlotterPanelOptions = {}): void {
-    const title = `Live Serial Plotter #${LiveSerialPlotterPanel.nextPanelId}`;
-    LiveSerialPlotterPanel.nextPanelId += 1;
+  static open(extensionUri: vscode.Uri, options: MonitorPageHostOptions = {}): void {
+    const title = `Live Serial Plotter #${MonitorPageHost.nextPageId}`;
+    MonitorPageHost.nextPageId += 1;
 
-    const panel = vscode.window.createWebviewPanel(panelViewType, title, vscode.ViewColumn.One, {
-      enableScripts: true,
-      retainContextWhenHidden: true,
-      localResourceRoots: [vscode.Uri.joinPath(extensionUri, "dist", "webview")],
-    });
+    const panel = vscode.window.createWebviewPanel(
+      monitorPageViewType,
+      title,
+      vscode.ViewColumn.One,
+      {
+        enableScripts: true,
+        retainContextWhenHidden: true,
+        localResourceRoots: [vscode.Uri.joinPath(extensionUri, "dist", "webview")],
+      },
+    );
 
-    const plotterPanel = new LiveSerialPlotterPanel(panel, extensionUri, title, options);
-    LiveSerialPlotterPanel.activePanels.add(plotterPanel);
+    const host = new MonitorPageHost(panel, extensionUri, title, options);
+    MonitorPageHost.activePages.add(host);
   }
 
   private constructor(
     private readonly panel: vscode.WebviewPanel,
     private readonly extensionUri: vscode.Uri,
     private readonly defaultTitle: string,
-    options: LiveSerialPlotterPanelOptions,
+    options: MonitorPageHostOptions,
   ) {
     this.profileStore = options.profileStore ?? new ProfileStore();
     this.layoutStore = options.layoutStore ?? new LayoutStore();
@@ -259,7 +264,7 @@ export class LiveSerialPlotterPanel {
   }
 
   private dispose(): void {
-    LiveSerialPlotterPanel.activePanels.delete(this);
+    MonitorPageHost.activePages.delete(this);
     this.outputPacketBatcher.dispose();
     this.serialService.dispose();
 

@@ -2,8 +2,8 @@
 import { computed, onBeforeUnmount, onMounted } from "vue";
 import type { ToProfileEditorWebviewMessage } from "../../../src/shared/protocol";
 import { useProfileEditorStore } from "./store";
-import EditorPage from "./components/EditorPage.vue";
-import HomePage from "./components/HomePage.vue";
+import EditorScreen from "./components/EditorScreen.vue";
+import HomeScreen from "./components/HomeScreen.vue";
 import StatusBlock from "./components/StatusBlock.vue";
 
 const store = useProfileEditorStore();
@@ -71,11 +71,11 @@ onBeforeUnmount(() => {
 <template>
   <main v-if="!isReady" class="profile-editor">Loading profiles...</main>
   <main v-else-if="store.state.screen === 'home'" class="profile-home">
-    <HomePage />
+    <HomeScreen />
     <StatusBlock v-if="store.state.statusText.length > 0" :text="store.state.statusText" />
   </main>
   <main v-else class="profile-editor">
-    <EditorPage />
+    <EditorScreen />
     <StatusBlock v-if="store.state.statusText.length > 0" :text="store.state.statusText" />
   </main>
 </template>

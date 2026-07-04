@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import * as vscode from "vscode";
 import { beforeEach, describe, expect, test, vi } from "vitest";
-import { ProfileConfigViewProvider } from "../../src/panel/ProfileConfigViewProvider";
+import { ProfileConfigViewProvider } from "../../src/host/ProfileConfigViewProvider";
 import { defaultProfile } from "../../src/profiles/defaultProfile";
 import {
   createProfileKey,
