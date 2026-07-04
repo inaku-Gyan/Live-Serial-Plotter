@@ -40,20 +40,20 @@ function compareOutputLayoutOrder(
 }
 
 export function applyTileLayout(
-  panel: HTMLElement | null,
+  tile: HTMLElement | null,
   layout: OutputLayoutConfig | undefined,
 ): void {
-  if (panel === null) {
+  if (tile === null) {
     return;
   }
 
-  const panelLayout = layout?.tile;
-  panel.style.order = panelLayout?.order === undefined ? "" : String(panelLayout.order);
-  panel.style.gridColumn =
-    panelLayout?.columnSpan === undefined ? "" : `span ${panelLayout.columnSpan}`;
-  panel.style.minHeight = panelLayout?.minHeight === undefined ? "" : `${panelLayout.minHeight}px`;
-  panel.dataset.collapsed = panelLayout?.collapsed === true ? "true" : "false";
-  panel.dataset.maximized = panelLayout?.maximized === true ? "true" : "false";
+  const tileLayout = layout?.tile;
+  tile.style.order = tileLayout?.order === undefined ? "" : String(tileLayout.order);
+  tile.style.gridColumn =
+    tileLayout?.columnSpan === undefined ? "" : `span ${tileLayout.columnSpan}`;
+  tile.style.minHeight = tileLayout?.minHeight === undefined ? "" : `${tileLayout.minHeight}px`;
+  tile.dataset.collapsed = tileLayout?.collapsed === true ? "true" : "false";
+  tile.dataset.maximized = tileLayout?.maximized === true ? "true" : "false";
 }
 
 export function cssEscape(value: string): string {
