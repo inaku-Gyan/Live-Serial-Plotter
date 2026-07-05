@@ -4,6 +4,7 @@ import path from "node:path";
 import { formatError } from "../shared/formatError";
 import { builtinLayouts, defaultLayout } from "./defaultLayout";
 import { parseJsonc } from "./jsonc";
+import { isPlainObject } from "../shared/tsUtils";
 import {
   type FramePlot2dViewStateConfig,
   type LayoutConfig,
@@ -669,9 +670,6 @@ function getPositiveInteger(value: unknown): number | undefined {
   return typeof value === "number" && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 async function writeLayoutFile(filePath: string, config: LayoutConfig): Promise<void> {
   await writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }

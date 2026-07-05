@@ -8,6 +8,7 @@ import type {
   TerminalFrameOutputConfig,
   TimeSeriesLineOutputConfig,
 } from "../shared/protocol";
+import { isPlainObject as isRecord } from "../shared/tsUtils";
 import { getFieldValue, getNumberField } from "./fieldPath";
 import { TimeAxisResolver } from "./TimeAxisResolver";
 
@@ -221,8 +222,4 @@ function getFrameId(field: string | undefined, record: ParsedRecord): string | n
 
   const value = getFieldValue(record.fields, field);
   return typeof value === "string" || typeof value === "number" ? value : record.seq;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

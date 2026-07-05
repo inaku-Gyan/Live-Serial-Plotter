@@ -1,4 +1,5 @@
 import type { BuiltinParserConfig, Frame, JsonObject, ParserMode } from "../shared/protocol";
+import { isPlainObject } from "../shared/tsUtils";
 
 export interface ParsedLine {
   values: Record<string, number>;
@@ -231,8 +232,4 @@ function getStringOption(options: JsonObject | undefined, key: string): string |
 
 function hasFields(fields: Record<string, unknown>): boolean {
   return Object.keys(fields).length > 0;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

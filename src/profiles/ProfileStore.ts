@@ -4,6 +4,7 @@ import path from "node:path";
 import { formatError } from "../shared/formatError";
 import { builtinProfiles, defaultProfile } from "./defaultProfile";
 import { parseJsonc } from "./jsonc";
+import { isPlainObject } from "../shared/tsUtils";
 import {
   isParserMode,
   type BuiltinParserConfig,
@@ -659,9 +660,6 @@ function isJsonObject(value: unknown): value is JsonObject {
   return isPlainObject(value);
 }
 
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
 async function writeProfileFile(filePath: string, config: ProfileConfig): Promise<void> {
   await writeFile(filePath, `${JSON.stringify(config, null, 2)}\n`, "utf8");
 }

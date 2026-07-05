@@ -1,4 +1,5 @@
 import type { OutputConfig, OutputLayoutConfig } from "../../../../src/shared/protocol";
+import { assertNever } from "../../../../src/shared/tsUtils";
 import { FramePlot2dRenderer } from "./frame-plot/renderer";
 import { applyTileLayout } from "./tile/layout";
 import { TerminalAppendRenderer } from "./terminal/appendRenderer";
@@ -29,9 +30,5 @@ export function createOutputRenderer(
       return new FramePlot2dRenderer(section, output, layout?.viewState);
   }
 
-  return assertNever(output);
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unsupported output kind: ${String(value)}`);
+  return assertNever(output, "Unsupported output kind");
 }

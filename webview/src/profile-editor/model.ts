@@ -9,6 +9,7 @@ import type {
   TimeSeriesConfig,
   TimeSeriesLineOutputConfig,
 } from "../../../src/shared/protocol";
+import { isPlainObject } from "../../../src/shared/tsUtils";
 import { parseBaudRateInput } from "../baudRate";
 
 export interface ProfileEditorPatch {
@@ -508,8 +509,4 @@ function parseNumberOr(value: string, fallback: number): number {
 
 function inputValueToString(value: unknown): string {
   return typeof value === "string" ? value : String(value);
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

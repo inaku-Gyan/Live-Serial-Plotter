@@ -7,6 +7,7 @@ import type {
   ToProfileEditorMessage,
   ToProfileEditorWebviewMessage,
 } from "../../../src/shared/protocol";
+import { assertNever } from "../../../src/shared/tsUtils";
 import type { VsCodeApi } from "../../../src/shared/vscodeApi";
 import {
   applyProfileEditorPatch,
@@ -110,7 +111,7 @@ export function createProfileEditorStore(
         setStatusText(message.message);
         return;
       default:
-        assertNever(message);
+        assertNever(message, "Unhandled host message");
     }
   }
 
@@ -294,8 +295,4 @@ export function useProfileEditorStore(): ProfileEditorStore {
 
 function cloneProfile(profile: ProfileConfig): ProfileConfig {
   return JSON.parse(JSON.stringify(profile));
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unhandled host message: ${JSON.stringify(value)}`);
 }

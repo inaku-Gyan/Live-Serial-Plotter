@@ -96,6 +96,7 @@
 ### TypeScript 工程约束
 
 - TypeScript 编译配置必须开启 `strict: true` 和 `exactOptionalPropertyTypes: true`。
+- 生产代码中跨模块复用的通用 TypeScript 工具（例如穷尽性检查、普通对象守卫和基础字符串规范化）应统一放在 `src/shared/`，避免在 Extension Host、pipeline、serial 和 Webview 中重复定义。
 
 ## 已发现并处理的冲突
 

@@ -6,6 +6,7 @@ import { pathToFileURL } from "node:url";
 import type { LineParser, ParsedRecordInput } from "./parseLine";
 import type { AsyncScriptParserLoader } from "../pipeline/PipelineRunner";
 import type { Frame, JsonObject, ScriptParserConfig } from "../shared/protocol";
+import { isPlainObject as isRecord } from "../shared/tsUtils";
 
 export interface ScriptParserTrustRequest {
   readonly filePath: string;
@@ -142,8 +143,4 @@ function isScriptParserModule(value: unknown): value is ScriptParserModule {
 function isSubpath(filePath: string, directory: string): boolean {
   const relative = path.relative(directory, filePath);
   return relative.length === 0 || (!relative.startsWith("..") && !path.isAbsolute(relative));
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

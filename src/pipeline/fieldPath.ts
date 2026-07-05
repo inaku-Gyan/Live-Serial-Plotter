@@ -1,3 +1,5 @@
+import { isPlainObject as isRecord } from "../shared/tsUtils";
+
 export function getFieldValue(fields: Record<string, unknown>, path: string): unknown {
   if (Object.hasOwn(fields, path)) {
     return fields[path];
@@ -20,8 +22,4 @@ export function getFieldValue(fields: Record<string, unknown>, path: string): un
 export function getNumberField(fields: Record<string, unknown>, path: string): number | null {
   const value = getFieldValue(fields, path);
   return typeof value === "number" && Number.isFinite(value) ? value : null;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

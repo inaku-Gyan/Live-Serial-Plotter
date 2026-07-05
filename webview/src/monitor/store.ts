@@ -14,6 +14,7 @@ import {
   type ToExtensionMessage,
   type ToWebviewMessage,
 } from "../../../src/shared/protocol";
+import { assertNever } from "../../../src/shared/tsUtils";
 import type { VsCodeApi } from "../../../src/shared/vscodeApi";
 import { isBaudRateInputValid, parseBaudRateInput } from "../baudRate";
 import { DomOutputGridController } from "./outputs/outputGridController";
@@ -230,7 +231,7 @@ export function createPageStore(vscode: PageVsCodeApi, options: PageStoreOptions
         showError(message.message);
         return;
       default:
-        assertNever(message);
+        assertNever(message, "Unhandled host message");
     }
   }
 
@@ -377,8 +378,4 @@ export function usePageStore(): PageStore {
   }
 
   return store;
-}
-
-function assertNever(value: never): never {
-  throw new Error(`Unhandled host message: ${JSON.stringify(value)}`);
 }

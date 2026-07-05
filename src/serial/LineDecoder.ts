@@ -1,4 +1,5 @@
 import { StringDecoder } from "node:string_decoder";
+import { stripTrailingCarriageReturn } from "../shared/tsUtils";
 
 export class LineDecoder {
   private readonly decoder = new StringDecoder("utf8");
@@ -30,8 +31,4 @@ export class LineDecoder {
     this.bufferedText = parts.pop() ?? "";
     return parts.map(stripTrailingCarriageReturn);
   }
-}
-
-function stripTrailingCarriageReturn(line: string): string {
-  return line.endsWith("\r") ? line.slice(0, -1) : line;
 }

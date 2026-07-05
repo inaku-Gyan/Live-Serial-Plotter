@@ -1,10 +1,6 @@
 import type { TimeSeriesLineOutputConfig } from "../../../../../src/shared/protocol";
+import type { UnitGroup } from "../types";
 import { defaultValueUnit, seriesColors } from "./constants";
-
-export interface UnitGroup {
-  unit: string;
-  channelNames: string[];
-}
 
 export function pickConfiguredValues(
   values: Record<string, number>,

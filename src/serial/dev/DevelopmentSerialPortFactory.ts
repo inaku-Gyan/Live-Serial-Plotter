@@ -12,6 +12,7 @@ import {
   type ScriptedSerialPortOptions,
 } from "./ScriptedSerialPort";
 import type { ConnectionSettings, SerialPortSummary } from "../../shared/protocol";
+import { isPlainObject } from "../../shared/tsUtils";
 
 const devSerialDirectory = "live-serial-plotter-dev-serial";
 const e2eRegistryFile = "e2e-ports.json";
@@ -209,10 +210,6 @@ function resolveGeneratorPath(
   }
 
   return path.resolve(extensionRoot, generator);
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function isConfigFile(value: unknown): value is ConfigFile {

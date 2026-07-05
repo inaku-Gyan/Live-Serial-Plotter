@@ -1,5 +1,6 @@
 import { StringDecoder } from "node:string_decoder";
 import type { Frame, LineFramingConfig, TextCodecConfig } from "../shared/protocol";
+import { stripTrailingCarriageReturn } from "../shared/tsUtils";
 
 const defaultMaxFrameBytes = 65_536;
 
@@ -190,8 +191,4 @@ function findAutoDelimiter(text: string): DelimiterMatch | null {
   }
 
   return null;
-}
-
-function stripTrailingCarriageReturn(line: string): string {
-  return line.endsWith("\r") ? line.slice(0, -1) : line;
 }
