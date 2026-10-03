@@ -1,3 +1,10 @@
+Status: historical audit / not current source
+
+本文档保留 Wayfinder #14 的历史审计证据。文中旧路径、旧术语和
+`historical/superseded` 判定只用于说明迁移依据，不是当前事实、Agent 规则或开放规划的
+来源；当前内容以事实文档、`AGENTS.md`、`CONTEXT.md`、ADR 和 GitHub Issues
+为准。
+
 # Wayfinder #14：文档与代码审计
 
 > 这是一份为 [Wayfinder 地图 #13](https://github.com/inaku-Gyan/Live-Serial-Plotter/issues/13) 和研究 ticket [#14](https://github.com/inaku-Gyan/Live-Serial-Plotter/issues/14) 生成的审计记录。结论以当前 `refactor/ui` 工作树、源码、测试和生成 schema 为准；后续归档矩阵 ticket 可以决定本文件是否保留。

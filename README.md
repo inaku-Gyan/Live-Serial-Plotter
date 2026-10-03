@@ -11,10 +11,17 @@ Live Serial Plotter is a VS Code desktop extension for monitoring serial ports, 
 - Load JSONC profiles for text codec, framing, parser options, output routing, and styling.
 - Edit basic profile and pipeline settings from the VS Code sidebar.
 
-## Contributing
+## Documentation
 
-Development setup, common commands, debugging, testing, and release notes are
-covered in [CONTRIBUTING.md](CONTRIBUTING.md).
+Use these stable documents as the repository map:
 
-Profile and pipeline configuration is covered in
-[docs/profiles-and-pipeline.zh-CN.md](docs/profiles-and-pipeline.zh-CN.md).
+- [AGENTS.md](AGENTS.md) — repository workflow, code standards, and release gates.
+- [CONTEXT.md](CONTEXT.md) — domain vocabulary and runtime ownership boundaries.
+- [Architecture](docs/architecture.zh-CN.md) — current runtime structure and data flow.
+- [Profile and pipeline](docs/profiles-and-pipeline.zh-CN.md) — configuration and parsing behavior.
+- [Testing](docs/testing.zh-CN.md) — unit, extension, simulated serial, and E2E checks.
+- [Release](docs/release.zh-CN.md) — versioning and publishing workflow.
+- [Agent issue tracker](docs/agents/issue-tracker.md) — GitHub Issue operations.
+- [Agent triage labels](docs/agents/triage-labels.md) — category and state labels.
+- [Agent domain rules](docs/agents/domain.md) — source-of-truth layers and terminology pointers.
+- [Architecture decisions](docs/adr/) — decisions that are costly to reverse.

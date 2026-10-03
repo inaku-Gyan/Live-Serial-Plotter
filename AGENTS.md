@@ -34,7 +34,7 @@ Live Serial Plotter 是一个 VS Code 桌面扩展，用于串口监控、串口
 
 ## 代码规范
 
-- 需求记录优先。用户提出新的产品或工程需求时，先更新 `docs/requirements.zh-CN.md`，并检查新需求是否与该文档、`AGENTS.md`、现有实现或已提交计划冲突；如有冲突，先明确告知用户冲突点、影响范围和建议取舍，再继续实现。
+- Issue 记录优先。用户提出新的产品或工程需求时，先建立或更新 GitHub Issue，并检查新需求是否与 `AGENTS.md`、`CONTEXT.md`、ADR、现有事实文档或当前实现冲突；如有冲突，先明确告知用户冲突点、影响范围和建议取舍，再继续实现。已完成的行为写入事实文档，开放规划保留在 Issues，不回写已迁移的规划文件。
 - 优先保持模块化。避免把 UI 状态、DOM 事件、VS Code 消息、串口数据处理和图表更新继续堆在同一个大文件里；新增功能时按职责拆分，例如 Webview bridge、连接控件、日志面板、uPlot 图表、图例和持久化状态。
 - 协议类型优先。Extension Host 和 Webview 之间新增消息时，先更新 `src/shared/protocol.ts` 的 discriminated union，再同步调整两端处理逻辑；不要在消息链路中使用 `any` 或未校验的自由对象。
 - 保持串口、解析、缓冲和 UI 解耦。串口读取、行解码、文本解析、输出包批处理和图表展示应各自独立，核心逻辑要能脱离 VS Code Webview 做单元测试。

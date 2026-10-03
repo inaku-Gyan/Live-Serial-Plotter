@@ -1,6 +1,6 @@
 # 架构总览
 
-本文档描述 Live Serial Plotter 的当前运行时结构、数据流水线，以及四种输出类型（output kind）之间的关系。它是**当前结构的权威说明**；`docs/ui-refactor-*` 与 `docs/ui-architecture-roadmap.zh-CN.md` 分别是历史施工记录与长期路线图，二者引用的旧路径不代表现状。
+本文档描述 Live Serial Plotter 的当前运行时结构、数据流水线，以及四种输出类型（output kind）之间的关系。它是**当前结构的权威说明**。迁移过程的历史审计见 [`docs/research/wayfinder-14-document-audit.md`](research/wayfinder-14-document-audit.md)，其中的旧路径和旧术语只用于历史证据。
 
 ## 1. 进程与模块结构
 
@@ -141,5 +141,4 @@ flowchart TD
 
 - `AGENTS.md` — 目录职责与代码规范（当前结构权威）。
 - `docs/profiles-and-pipeline.zh-CN.md` — Profile 配置与解析管线细节。
-- `docs/ui-architecture-roadmap.zh-CN.md` — UI 长期路线图（前瞻，非现状）。
-- `docs/ui-refactor-plan.zh-CN.md` / `docs/ui-refactor-rename-table.zh-CN.md` — 已完成重构的历史施工记录。
+- `docs/research/wayfinder-14-document-audit.md` — 文档迁移的历史审计（不是当前来源）。
