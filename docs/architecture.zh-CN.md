@@ -144,7 +144,7 @@ flowchart TD
 connect 请求会先完整结束上一会话，再建立下一会话；过渡阶段会禁用监视页的重复操作。
 
 连接失败会保留稳定的错误类别：`port-not-found`、`permission-denied`、
-`port-busy`、`native-binding` 或 `unknown`。错误消息同时带有可执行的恢复方向，
+`port-busy`、`native-binding`、`device-disconnected` 或 `unknown`。错误消息同时带有可执行的恢复方向，
 例如刷新端口、重试或检查权限。串口意外 close 会进入 `disconnected`，释放 pipeline
 和串口监听器，保留 Monitor Page 的输出网格与已有日志，并提示刷新端口；Host 会自动
 请求最新端口列表，用户可在刷新后重新连接。

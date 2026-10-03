@@ -80,7 +80,7 @@ export class DevelopmentSerialPortFactory implements SerialPortFactory {
     return [...scriptedPorts, ...e2ePorts, ...realPorts];
   }
 
-  create(settings: ConnectionSettings): SerialPortLike {
+  create(settings: ConnectionSettings): SerialPortLike | Promise<SerialPortLike> {
     const scriptedPort = this.loadScriptedPortDefinitions().find(
       (port) => port.path === settings.path,
     );

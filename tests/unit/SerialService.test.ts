@@ -2,6 +2,7 @@ import { EventEmitter } from "node:events";
 import { beforeEach, describe, expect, test, vi } from "vitest";
 import { SerialPortMock } from "serialport";
 import {
+  NodeSerialPortFactory,
   SerialService,
   type SerialConnectionError,
   type SerialPortFactory,
@@ -58,6 +59,7 @@ class FakeSerialPort extends EventEmitter implements SerialPortLike {
   readonly writes: string[] = [];
   closeCalls = 0;
   private openState = false;
+  private writeError: Error | undefined;
 
   constructor(private readonly openError?: Error) {
     super();
@@ -85,7 +87,11 @@ class FakeSerialPort extends EventEmitter implements SerialPortLike {
 
   write(data: string | Buffer, callback: (error: Error | null | undefined) => void): void {
     this.writes.push(data.toString());
-    callback(null);
+    callback(this.writeError);
+  }
+
+  failWritesWith(error: Error): void {
+    this.writeError = error;
   }
 }
 
@@ -221,6 +227,12 @@ describe("SerialService", () => {
       kind: "native-binding",
       recovery: "retry",
     },
+    {
+      code: undefined,
+      message: "No native build was found for node=22.0.0 platform=linux arch=x64",
+      kind: "native-binding",
+      recovery: "retry",
+    },
   ])("classifies $code connection failures", async ({ code, message, kind, recovery }) => {
     const error = Object.assign(new Error(message), { code });
     const service = new SerialService(
@@ -234,6 +246,18 @@ describe("SerialService", () => {
       kind,
       path: "/dev/TEST",
       recovery,
+    });
+  });
+
+  test("classifies native binding failures while loading the real serial factory", async () => {
+    const factory = new NodeSerialPortFactory(async () => {
+      throw new Error("No native build was found for node=22.0.0 platform=linux arch=x64");
+    });
+    const service = new SerialService({}, factory);
+
+    await expect(service.listPorts()).rejects.toMatchObject({
+      kind: "native-binding",
+      recovery: "retry",
     });
   });
 
@@ -303,6 +327,38 @@ describe("SerialService", () => {
 
     expect(packets).toEqual([]);
     await expect(service.send("ping")).rejects.toThrow("No serial port is connected.");
+  });
+
+  test("still reports device removal after an earlier port error", async () => {
+    const port = new FakeSerialPort();
+    const errors: SerialConnectionError[] = [];
+    const service = new SerialService(
+      { onError: (error) => errors.push(error) },
+      new SequenceSerialPortFactory([port]),
+    );
+
+    await service.connect({ path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" });
+    port.emit("error", new Error("read failed"));
+    port.emit("close");
+
+    expect(errors.map((error) => error.kind)).toEqual(["unknown", "device-disconnected"]);
+    await service.disconnect();
+  });
+
+  test("classifies write failures after a device disappears", async () => {
+    const port = new FakeSerialPort();
+    const service = new SerialService({}, new SequenceSerialPortFactory([port]));
+
+    await service.connect({ path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" });
+    port.failWritesWith(Object.assign(new Error("device removed"), { code: "ENODEV" }));
+
+    await expect(service.send("ping")).rejects.toMatchObject({
+      kind: "device-disconnected",
+      path: "/dev/ROBOT",
+      recovery: "refresh-ports",
+    });
+
+    await service.disconnect();
   });
 
   test("applies text codec send line endings", async () => {

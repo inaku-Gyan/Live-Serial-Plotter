@@ -1,5 +1,5 @@
 import type { EventEmitter } from "node:events";
-import { SerialPort } from "serialport";
+import type { SerialPort } from "serialport";
 import {
   PipelineRunner,
   type AsyncScriptParserLoader,
@@ -20,6 +20,9 @@ import type {
   SerialPortSummary,
 } from "../shared/protocol";
 
+type SerialPortModule = { SerialPort: typeof SerialPort };
+type SerialPortModuleLoader = () => Promise<SerialPortModule>;
+
 export interface SerialPortLike extends EventEmitter {
   readonly isOpen: boolean;
   open(callback: (error: Error | null | undefined) => void): void;
@@ -29,7 +32,7 @@ export interface SerialPortLike extends EventEmitter {
 
 export interface SerialPortFactory {
   list(): Promise<SerialPortSummary[]>;
-  create(settings: ConnectionSettings): SerialPortLike;
+  create(settings: ConnectionSettings): SerialPortLike | Promise<SerialPortLike>;
 }
 
 export interface SerialServiceEvents {
@@ -56,7 +59,10 @@ export class SerialConnectionError extends Error {
 }
 
 export class NodeSerialPortFactory implements SerialPortFactory {
+  constructor(private readonly loadModule: SerialPortModuleLoader = loadSerialPortModule) {}
+
   async list(): Promise<SerialPortSummary[]> {
+    const { SerialPort } = await this.loadModule();
     const ports = await SerialPort.list();
 
     return ports.map((port) => ({
@@ -68,7 +74,9 @@ export class NodeSerialPortFactory implements SerialPortFactory {
     }));
   }
 
-  create(settings: ConnectionSettings): SerialPortLike {
+  async create(settings: ConnectionSettings): Promise<SerialPortLike> {
+    const { SerialPort } = await this.loadModule();
+
     return new SerialPort({
       path: settings.path,
       baudRate: settings.baudRate,
@@ -86,7 +94,7 @@ export class SerialService {
   private disconnecting = false;
   private connectionPhase: ConnectionPhase = "disconnected";
   private operationQueue: Promise<void> = Promise.resolve();
-  private portErrorNotified = false;
+  private portErrorKind: ConnectionErrorKind | undefined;
 
   constructor(
     private readonly events: SerialServiceEvents = {},
@@ -129,13 +137,13 @@ export class SerialService {
       this.pipelineRunner = await this.createPipelineRunner(settings);
 
       try {
-        port = this.factory.create(settings);
+        port = await this.factory.create(settings);
       } catch (error) {
         throw classifySerialError(error, settings.path);
       }
 
       this.port = port;
-      this.portErrorNotified = false;
+      this.portErrorKind = undefined;
       port.on("data", this.handleData);
       port.on("error", this.handlePortError);
       port.on("close", this.handleClose);
@@ -220,12 +228,13 @@ export class SerialService {
     this.port = undefined;
     this.currentSettings = undefined;
     this.disconnecting = false;
-    this.portErrorNotified = false;
+    this.portErrorKind = undefined;
     this.setConnectionState({ phase: "disconnected" });
   }
 
   async send(text: string): Promise<void> {
     const port = this.port;
+    const path = this.currentSettings?.path;
 
     if (port === undefined || !port.isOpen) {
       throw new Error("No serial port is connected.");
@@ -234,7 +243,7 @@ export class SerialService {
     await new Promise<void>((resolve, reject) => {
       port.write(this.encodeTextForSend(text), (error) => {
         if (error) {
-          reject(error);
+          reject(classifySerialError(error, path, true));
           return;
         }
 
@@ -288,7 +297,7 @@ export class SerialService {
 
   private readonly handlePortError = (error: Error): void => {
     const classified = classifySerialError(error, this.currentSettings?.path, true);
-    this.portErrorNotified = true;
+    this.portErrorKind = classified.kind;
     this.events.onError?.(classified);
   };
 
@@ -298,7 +307,7 @@ export class SerialService {
     }
 
     const port = this.port;
-    const hadPortError = this.portErrorNotified;
+    const hadDeviceDisconnectError = this.portErrorKind === "device-disconnected";
 
     if (port !== undefined) {
       this.detachPortListeners(port);
@@ -311,10 +320,10 @@ export class SerialService {
     this.pipelineRunner?.dispose();
     this.pipelineRunner = undefined;
     this.disconnecting = false;
-    this.portErrorNotified = false;
+    this.portErrorKind = undefined;
     this.setConnectionState({ phase: "disconnected" });
 
-    if (!hadPortError) {
+    if (!hadDeviceDisconnectError) {
       this.events.onError?.(
         new SerialConnectionError(
           "device-disconnected",
@@ -430,7 +439,7 @@ export class SerialService {
     this.pipelineRunner?.dispose();
     this.pipelineRunner = undefined;
     this.disconnecting = false;
-    this.portErrorNotified = false;
+    this.portErrorKind = undefined;
   }
 
   private enqueue(operation: () => Promise<void>): Promise<void> {
@@ -555,8 +564,17 @@ function isNativeBindingError(code: string | undefined, message: string): boolea
     code === "ERR_DLOPEN_FAILED" ||
     code === "MODULE_NOT_FOUND" ||
     code === "ERR_MODULE_NOT_FOUND" ||
-    /native binding|bindings file|dlopen|node-gyp|compiled against/i.test(message)
+    /native binding|bindings file|dlopen|node-gyp|compiled against|no native build was found/i.test(
+      message,
+    )
   );
+}
+
+let serialPortModulePromise: Promise<SerialPortModule> | undefined;
+
+function loadSerialPortModule(): Promise<SerialPortModule> {
+  serialPortModulePromise ??= import("serialport") as Promise<SerialPortModule>;
+  return serialPortModulePromise;
 }
 
 function isPortNotFoundError(code: string | undefined, message: string): boolean {
