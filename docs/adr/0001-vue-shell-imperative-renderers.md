@@ -8,4 +8,3 @@ keeps ordinary UI state easy to compose without making the high-frequency path
 pay for reactive tree updates; a fully reactive chart state and a fully
 hand-built UI were rejected because they make one of the two workloads harder to
 control.
-

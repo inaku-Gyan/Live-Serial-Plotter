@@ -8,4 +8,3 @@ explicit Save Layout or Save As writes overrides back to a preset. Switching
 profiles loads the new default preset and drops unsaved overrides. This keeps
 reusable device semantics independent from per-window arrangement and prevents
 live data or transient interaction state from becoming configuration.
-

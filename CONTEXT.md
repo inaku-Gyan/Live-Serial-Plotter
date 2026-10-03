@@ -93,4 +93,3 @@ typed shared message contract.
 The typed contract for messages and data crossing the Extension Host/Webview
 boundary. It is the source of truth for the shapes of profiles, layouts, output
 packets, and commands.
-
