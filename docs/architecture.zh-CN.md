@@ -81,12 +81,12 @@ flowchart TD
 
 一份 Profile 可配置多个 output，每个 output 有一个 `kind`。`kind` 在三处严格对齐：**配置 `OutputConfig` → 运行时包 `OutputPacket` → 渲染器 `OutputRenderer`**。
 
-| kind | 配置类型 | 运行时 Packet | Renderer | 干什么 |
-|------|---------|--------------|----------|--------|
-| `terminalAppend` | `TerminalAppendOutputConfig` | `terminalAppend`（追加 `lines[]`） | `terminal/appendRenderer` | 终端式日志，逐行**追加**，可自动滚动，`maxLines` 上限，按 level 着色 |
-| `terminalFrame` | `TerminalFrameOutputConfig` | `terminalFrame`（按 `frameId` 的整块 `text`） | `terminal/frameRenderer` | 按 frameId **整帧替换**的终端块（同一帧刷新覆盖，非追加） |
-| `timeSeriesLine` | `TimeSeriesLineOutputConfig` | `timeSeriesAppend`（追加 `samples[]`） | `time-series/renderer`（uPlot） | 数值多通道**实时折线图**，滚动窗口（points/duration），跟随/缩放 viewState |
-| `framePlot2d` | `FramePlot2dOutputConfig` | `framePlot2d`（按 frameId 的 `layers[]` 点集） | `frame-plot/renderer`（canvas） | 按帧渲染的 **2D 散点/点云**（每帧一组 layers，可带 bounds） |
+| kind             | 配置类型                     | 运行时 Packet                                  | Renderer                        | 干什么                                                                     |
+| ---------------- | ---------------------------- | ---------------------------------------------- | ------------------------------- | -------------------------------------------------------------------------- |
+| `terminalAppend` | `TerminalAppendOutputConfig` | `terminalAppend`（追加 `lines[]`）             | `terminal/appendRenderer`       | 终端式日志，逐行**追加**，可自动滚动，`maxLines` 上限，按 level 着色       |
+| `terminalFrame`  | `TerminalFrameOutputConfig`  | `terminalFrame`（按 `frameId` 的整块 `text`）  | `terminal/frameRenderer`        | 按 frameId **整帧替换**的终端块（同一帧刷新覆盖，非追加）                  |
+| `timeSeriesLine` | `TimeSeriesLineOutputConfig` | `timeSeriesAppend`（追加 `samples[]`）         | `time-series/renderer`（uPlot） | 数值多通道**实时折线图**，滚动窗口（points/duration），跟随/缩放 viewState |
+| `framePlot2d`    | `FramePlot2dOutputConfig`    | `framePlot2d`（按 frameId 的 `layers[]` 点集） | `frame-plot/renderer`（canvas） | 按帧渲染的 **2D 散点/点云**（每帧一组 layers，可带 bounds）                |
 
 > ⚠️ 一处**故意的不对称**：`timeSeriesLine` 的配置 kind 与它的 packet kind（`timeSeriesAppend`）**不同名**——配置描述“这是一张折线图”，包描述“这批是追加的样本”。其余三种配置 kind 与 packet kind 同名。
 
