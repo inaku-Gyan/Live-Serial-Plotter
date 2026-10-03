@@ -45,6 +45,35 @@ describe("parseLine", () => {
     expect(parseLine("1,2", "auto")).toEqual({ values: { channel1: 1, channel2: 2 } });
   });
 
+  test("auto mode ignores empty lines", () => {
+    expect(parseLine(" \t", "auto")).toEqual({ values: {} });
+  });
+
+  test("auto mode keeps numeric fields from nonnumeric key-value input", () => {
+    expect(parseLine("temp=23.5 label=ready humidity=unknown", "auto")).toEqual({
+      values: { temp: 23.5 },
+    });
+  });
+
+  test("auto mode handles a stream that mixes JSON, key-value, and CSV frames", () => {
+    const parser = new BuiltinLineParser({ kind: "builtin", mode: "auto" });
+
+    expect(parser.parseFrame({ seq: 1, receivedAt: 100, raw: '{"temp":23}' })).toEqual([
+      { fields: { temp: 23 } },
+    ]);
+    expect(parser.parseFrame({ seq: 2, receivedAt: 110, raw: "rpm=1200" })).toEqual([
+      { fields: { rpm: 1200 } },
+    ]);
+    expect(parser.parseFrame({ seq: 3, receivedAt: 120, raw: "1,2" })).toEqual([
+      { fields: { channel1: 1, channel2: 2 } },
+    ]);
+  });
+
+  test("auto mode ignores invalid JSON without throwing", () => {
+    expect(() => parseLine('{"temp":', "auto")).not.toThrow();
+    expect(parseLine('{"temp":', "auto")).toEqual({ values: {} });
+  });
+
   test("malformed line keeps parser result empty instead of throwing", () => {
     expect(() => parseLine("plain text", "auto")).not.toThrow();
     expect(parseLine("plain text", "auto")).toEqual({ values: {} });

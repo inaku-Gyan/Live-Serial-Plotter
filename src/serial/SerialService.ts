@@ -107,6 +107,8 @@ export class SerialService {
         });
       });
     } catch (error) {
+      this.pipelineRunner?.dispose();
+      this.pipelineRunner = undefined;
       this.detachPortListeners(port);
       this.port = undefined;
       this.currentSettings = undefined;
@@ -224,10 +226,17 @@ export class SerialService {
       return;
     }
 
+    const port = this.port;
+
+    if (port !== undefined) {
+      this.detachPortListeners(port);
+    }
+
     this.port = undefined;
     this.currentSettings = undefined;
     this.pipelineRunner?.dispose();
     this.pipelineRunner = undefined;
+    this.disconnecting = false;
     this.events.onConnectionState?.({ connected: false });
   };
 

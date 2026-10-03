@@ -1,14 +1,16 @@
 import { EventEmitter } from "node:events";
-import { describe, expect, test, beforeEach } from "vitest";
+import { beforeEach, describe, expect, test, vi } from "vitest";
 import { SerialPortMock } from "serialport";
 import {
   SerialService,
   type SerialPortFactory,
   type SerialPortLike,
 } from "../../src/serial/SerialService";
+import type { AsyncScriptParserLoader } from "../../src/pipeline/PipelineRunner";
 import { defaultProfile } from "../../src/profiles/defaultProfile";
 import type {
   ConnectionSettings,
+  ConnectionState,
   OutputPacket,
   SerialPortSummary,
 } from "../../src/shared/protocol";
@@ -53,6 +55,7 @@ class MockSerialPortFactory implements SerialPortFactory {
 
 class FakeSerialPort extends EventEmitter implements SerialPortLike {
   readonly writes: string[] = [];
+  closeCalls = 0;
   private openState = false;
 
   constructor(private readonly openError?: Error) {
@@ -74,6 +77,7 @@ class FakeSerialPort extends EventEmitter implements SerialPortLike {
   }
 
   close(callback: (error: Error | null | undefined) => void): void {
+    this.closeCalls += 1;
     this.openState = false;
     callback(null);
   }
@@ -159,6 +163,63 @@ describe("SerialService", () => {
     await service.disconnect();
   });
 
+  test("emits lifecycle states and detaches listeners on disconnect", async () => {
+    const port = new FakeSerialPort();
+    const states: ConnectionState[] = [];
+    const service = new SerialService(
+      { onConnectionState: (state) => states.push(state) },
+      new SequenceSerialPortFactory([port]),
+    );
+
+    await service.connect({ path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" });
+
+    expect(states).toEqual([{ connected: true, path: "/dev/ROBOT", baudRate: 115200 }]);
+    expect(port.listenerCount("data")).toBe(1);
+    expect(port.listenerCount("error")).toBe(1);
+    expect(port.listenerCount("close")).toBe(1);
+
+    await service.disconnect();
+
+    expect(port.closeCalls).toBe(1);
+    expect(states).toEqual([
+      { connected: true, path: "/dev/ROBOT", baudRate: 115200 },
+      { connected: false },
+    ]);
+    expect(port.listenerCount("data")).toBe(0);
+    expect(port.listenerCount("error")).toBe(0);
+    expect(port.listenerCount("close")).toBe(0);
+  });
+
+  test("cleans up after an unexpected port close", async () => {
+    const port = new FakeSerialPort();
+    const states: ConnectionState[] = [];
+    const packets: OutputPacket[] = [];
+    const service = new SerialService(
+      {
+        onConnectionState: (state) => states.push(state),
+        onOutputPacket: (packet) => packets.push(packet),
+      },
+      new SequenceSerialPortFactory([port]),
+    );
+
+    await service.connect({ path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" });
+    port.emit("close");
+
+    expect(states).toEqual([
+      { connected: true, path: "/dev/ROBOT", baudRate: 115200 },
+      { connected: false },
+    ]);
+    expect(port.listenerCount("data")).toBe(0);
+    expect(port.listenerCount("error")).toBe(0);
+    expect(port.listenerCount("close")).toBe(0);
+
+    port.emit("data", Buffer.from("after-close\n"));
+    await waitForMicrotask();
+
+    expect(packets).toEqual([]);
+    await expect(service.send("ping")).rejects.toThrow("No serial port is connected.");
+  });
+
   test("applies text codec send line endings", async () => {
     const factory = new MockSerialPortFactory();
     const service = new SerialService({}, factory);
@@ -230,6 +291,32 @@ describe("SerialService", () => {
     expect(retryPort.writes).toEqual(["retry-ping"]);
 
     await service.disconnect();
+  });
+
+  test("disposes the pipeline when opening a port fails", async () => {
+    const parser = {
+      parseFrame: () => [],
+      reset: vi.fn<() => void>(),
+      dispose: vi.fn<() => void>(),
+    };
+    const scriptParserLoader: AsyncScriptParserLoader = {
+      load: async () => parser,
+    };
+    const service = new SerialService(
+      {},
+      new SequenceSerialPortFactory([new FakeSerialPort(new Error("open failed"))]),
+      { scriptParserLoader },
+    );
+    service.setProfile({
+      ...defaultProfile,
+      parser: { kind: "script", path: "parser.mjs" },
+    });
+
+    await expect(service.connect({ path: "/dev/FAIL", baudRate: 115200 })).rejects.toThrow(
+      "open failed",
+    );
+
+    expect(parser.dispose).toHaveBeenCalledOnce();
   });
 });
 
