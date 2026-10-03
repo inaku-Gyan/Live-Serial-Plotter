@@ -8,6 +8,9 @@ import {
 import { defaultProfile } from "../profiles/defaultProfile";
 import { formatError } from "../shared/formatError";
 import type {
+  ConnectionErrorKind,
+  ConnectionErrorRecovery,
+  ConnectionPhase,
   ConnectionSettings,
   ConnectionState,
   LineEnding,
@@ -32,11 +35,24 @@ export interface SerialPortFactory {
 export interface SerialServiceEvents {
   onConnectionState?(state: ConnectionState): void;
   onOutputPacket?(packet: OutputPacket): void;
-  onError?(message: string): void;
+  onError?(error: SerialConnectionError): void;
 }
 
 export interface SerialServiceOptions {
   readonly scriptParserLoader?: AsyncScriptParserLoader;
+}
+
+export class SerialConnectionError extends Error {
+  readonly name = "SerialConnectionError";
+
+  constructor(
+    readonly kind: ConnectionErrorKind,
+    message: string,
+    readonly path?: string,
+    readonly recovery: ConnectionErrorRecovery = "retry",
+  ) {
+    super(message);
+  }
 }
 
 export class NodeSerialPortFactory implements SerialPortFactory {
@@ -68,6 +84,9 @@ export class SerialService {
   private pipelineRunner: PipelineRunner | undefined;
   private currentSettings: ConnectionSettings | undefined;
   private disconnecting = false;
+  private connectionPhase: ConnectionPhase = "disconnected";
+  private operationQueue: Promise<void> = Promise.resolve();
+  private portErrorNotified = false;
 
   constructor(
     private readonly events: SerialServiceEvents = {},
@@ -76,83 +95,133 @@ export class SerialService {
   ) {}
 
   async listPorts(): Promise<SerialPortSummary[]> {
-    return this.factory.list();
+    try {
+      return await this.factory.list();
+    } catch (error) {
+      throw classifySerialError(error);
+    }
   }
 
   async connect(settings: ConnectionSettings): Promise<void> {
-    await this.disconnect();
+    return this.enqueue(() => this.connectInternal(settings));
+  }
+
+  async disconnect(): Promise<void> {
+    return this.enqueue(() => this.disconnectInternal());
+  }
+
+  private async connectInternal(settings: ConnectionSettings): Promise<void> {
+    await this.disconnectInternal();
 
     this.parserMode = settings.parserMode ?? "auto";
     this.currentSettings = settings;
     this.pipelineRunner?.dispose();
-    this.pipelineRunner = await this.createPipelineRunner(settings);
-    this.disconnecting = false;
+    this.pipelineRunner = undefined;
+    this.setConnectionState({
+      phase: "connecting",
+      path: settings.path,
+      baudRate: settings.baudRate,
+    });
 
-    const port = this.factory.create(settings);
-    this.port = port;
-
-    port.on("data", this.handleData);
-    port.on("error", this.handlePortError);
-    port.on("close", this.handleClose);
+    let port: SerialPortLike | undefined;
 
     try {
+      this.pipelineRunner = await this.createPipelineRunner(settings);
+
+      try {
+        port = this.factory.create(settings);
+      } catch (error) {
+        throw classifySerialError(error, settings.path);
+      }
+
+      this.port = port;
+      this.portErrorNotified = false;
+      port.on("data", this.handleData);
+      port.on("error", this.handlePortError);
+      port.on("close", this.handleClose);
+
       await new Promise<void>((resolve, reject) => {
-        port.open((error) => {
+        port?.open((error) => {
           if (error) {
-            reject(error);
+            reject(classifySerialError(error, settings.path));
             return;
           }
 
           resolve();
         });
       });
+
+      if (this.port !== port) {
+        throw new SerialConnectionError(
+          "device-disconnected",
+          createConnectionErrorMessage(
+            "device-disconnected",
+            "The device disconnected while opening.",
+            settings.path,
+          ),
+          settings.path,
+          "refresh-ports",
+        );
+      }
     } catch (error) {
-      this.pipelineRunner?.dispose();
-      this.pipelineRunner = undefined;
-      this.detachPortListeners(port);
-      this.port = undefined;
-      this.currentSettings = undefined;
-      this.disconnecting = false;
-      throw error;
+      await this.cleanupFailedConnection(port);
+      this.setConnectionState({ phase: "disconnected" });
+      throw toConnectionError(error, settings.path);
     }
 
-    this.events.onConnectionState?.({
-      connected: true,
+    this.setConnectionState({
+      phase: "connected",
       path: settings.path,
       baudRate: settings.baudRate,
     });
   }
 
-  async disconnect(): Promise<void> {
+  private async disconnectInternal(): Promise<void> {
     const port = this.port;
 
     if (port === undefined) {
+      this.pipelineRunner?.dispose();
+      this.pipelineRunner = undefined;
+      this.currentSettings = undefined;
+      this.disconnecting = false;
+      this.setConnectionState({ phase: "disconnected" });
       return;
     }
 
     this.disconnecting = true;
+    const settings = this.currentSettings;
+    this.setConnectionState(createConnectionState("disconnecting", settings));
     this.pipelineRunner?.flush();
     this.pipelineRunner?.dispose();
     this.pipelineRunner = undefined;
     this.detachPortListeners(port);
 
-    if (port.isOpen) {
-      await new Promise<void>((resolve, reject) => {
-        port.close((error) => {
-          if (error) {
-            reject(error);
-            return;
-          }
+    try {
+      if (port.isOpen) {
+        await new Promise<void>((resolve, reject) => {
+          port.close((error) => {
+            if (error) {
+              reject(classifySerialError(error, settings?.path));
+              return;
+            }
 
-          resolve();
+            resolve();
+          });
         });
-      });
+      }
+    } catch (error) {
+      this.port = undefined;
+      this.currentSettings = undefined;
+      this.disconnecting = false;
+      this.setConnectionState({ phase: "disconnected" });
+      throw toConnectionError(error, settings?.path);
     }
 
     this.port = undefined;
     this.currentSettings = undefined;
     this.disconnecting = false;
-    this.events.onConnectionState?.({ connected: false });
+    this.portErrorNotified = false;
+    this.setConnectionState({ phase: "disconnected" });
   }
 
   async send(text: string): Promise<void> {
@@ -209,7 +278,7 @@ export class SerialService {
 
   dispose(): void {
     void this.disconnect().catch((error: unknown) => {
-      this.events.onError?.(formatError(error));
+      this.events.onError?.(toConnectionError(error, this.currentSettings?.path));
     });
   }
 
@@ -218,7 +287,9 @@ export class SerialService {
   };
 
   private readonly handlePortError = (error: Error): void => {
-    this.events.onError?.(error.message);
+    const classified = classifySerialError(error, this.currentSettings?.path, true);
+    this.portErrorNotified = true;
+    this.events.onError?.(classified);
   };
 
   private readonly handleClose = (): void => {
@@ -227,17 +298,36 @@ export class SerialService {
     }
 
     const port = this.port;
+    const hadPortError = this.portErrorNotified;
 
     if (port !== undefined) {
       this.detachPortListeners(port);
     }
 
     this.port = undefined;
+    const path = this.currentSettings?.path;
     this.currentSettings = undefined;
+    this.pipelineRunner?.flush();
     this.pipelineRunner?.dispose();
     this.pipelineRunner = undefined;
     this.disconnecting = false;
-    this.events.onConnectionState?.({ connected: false });
+    this.portErrorNotified = false;
+    this.setConnectionState({ phase: "disconnected" });
+
+    if (!hadPortError) {
+      this.events.onError?.(
+        new SerialConnectionError(
+          "device-disconnected",
+          createConnectionErrorMessage(
+            "device-disconnected",
+            "The device was unplugged or stopped responding.",
+            path,
+          ),
+          path,
+          "refresh-ports",
+        ),
+      );
+    }
   };
 
   private detachPortListeners(port: SerialPortLike): void {
@@ -254,7 +344,10 @@ export class SerialService {
       parser: profile.parser,
       outputs: profile.outputs,
       onPacket: (packet) => this.handleOutputPacket(packet),
-      onError: (message) => this.events.onError?.(message),
+      onError: (message) =>
+        this.events.onError?.(
+          new SerialConnectionError("unknown", message, this.currentSettings?.path, "retry"),
+        ),
     };
     const options: PipelineRunnerOptions =
       this.options.scriptParserLoader === undefined
@@ -268,16 +361,24 @@ export class SerialService {
   }
 
   private async recreatePipelineRunner(): Promise<void> {
-    if (this.currentSettings === undefined) {
-      this.pipelineRunner = undefined;
+    const settings = this.currentSettings;
+
+    if (settings === undefined || this.connectionPhase !== "connected") {
       return;
     }
 
     try {
-      this.pipelineRunner = await this.createPipelineRunner(this.currentSettings);
+      const runner = await this.createPipelineRunner(settings);
+
+      if (this.currentSettings !== settings || this.port === undefined) {
+        runner.dispose();
+        return;
+      }
+
+      this.pipelineRunner = runner;
     } catch (error) {
       this.pipelineRunner = undefined;
-      this.events.onError?.(formatError(error));
+      this.events.onError?.(toConnectionError(error, settings.path));
     }
   }
 
@@ -303,6 +404,189 @@ export class SerialService {
   private handleOutputPacket(packet: OutputPacket): void {
     this.events.onOutputPacket?.(packet);
   }
+
+  private setConnectionState(state: ConnectionState): void {
+    if (this.connectionPhase === state.phase) {
+      return;
+    }
+
+    this.connectionPhase = state.phase;
+    this.events.onConnectionState?.(state);
+  }
+
+  private async cleanupFailedConnection(port: SerialPortLike | undefined): Promise<void> {
+    if (port !== undefined) {
+      this.detachPortListeners(port);
+
+      if (port.isOpen) {
+        await new Promise<void>((resolve) => {
+          port.close(() => resolve());
+        });
+      }
+    }
+
+    this.port = undefined;
+    this.currentSettings = undefined;
+    this.pipelineRunner?.dispose();
+    this.pipelineRunner = undefined;
+    this.disconnecting = false;
+    this.portErrorNotified = false;
+  }
+
+  private enqueue(operation: () => Promise<void>): Promise<void> {
+    const next = this.operationQueue.then(operation, operation);
+    this.operationQueue = next.then(
+      () => undefined,
+      () => undefined,
+    );
+    return next;
+  }
+}
+
+function createConnectionState(
+  phase: ConnectionPhase,
+  settings: ConnectionSettings | undefined,
+): ConnectionState {
+  if (settings === undefined) {
+    return { phase };
+  }
+
+  return {
+    phase,
+    path: settings.path,
+    baudRate: settings.baudRate,
+  };
+}
+
+function toConnectionError(error: unknown, path: string | undefined): SerialConnectionError {
+  if (error instanceof SerialConnectionError) {
+    return error;
+  }
+
+  return new SerialConnectionError("unknown", formatError(error), path, "retry");
+}
+
+function classifySerialError(
+  error: unknown,
+  path?: string,
+  runtime = false,
+): SerialConnectionError {
+  if (error instanceof SerialConnectionError) {
+    return error;
+  }
+
+  const message = formatError(error);
+  const code = getErrorCode(error);
+  let kind: ConnectionErrorKind = "unknown";
+
+  if (runtime && isDeviceDisconnectedError(code, message)) {
+    kind = "device-disconnected";
+  } else if (isNativeBindingError(code, message)) {
+    kind = "native-binding";
+  } else if (isPortNotFoundError(code, message)) {
+    kind = "port-not-found";
+  } else if (isPermissionError(code, message)) {
+    kind = "permission-denied";
+  } else if (isBusyError(code, message)) {
+    kind = "port-busy";
+  }
+
+  return new SerialConnectionError(
+    kind,
+    createConnectionErrorMessage(kind, message, path),
+    path,
+    getRecovery(kind),
+  );
+}
+
+function createConnectionErrorMessage(
+  kind: ConnectionErrorKind,
+  message: string,
+  path: string | undefined,
+): string {
+  if (kind === "unknown") {
+    return message;
+  }
+
+  const target = path === undefined ? "" : ` (${path})`;
+
+  if (kind === "port-not-found") {
+    return `Port not found${target}: ${message}`;
+  }
+
+  if (kind === "permission-denied") {
+    return `Permission denied${target}: ${message}`;
+  }
+
+  if (kind === "port-busy") {
+    return `Port is busy${target}: ${message}`;
+  }
+
+  if (kind === "native-binding") {
+    return `Serial native binding is unavailable: ${message}`;
+  }
+
+  return `Serial device disconnected${target}. Refresh ports and reconnect. ${message}`;
+}
+
+function getRecovery(kind: ConnectionErrorKind): ConnectionErrorRecovery {
+  if (kind === "port-not-found" || kind === "device-disconnected") {
+    return "refresh-ports";
+  }
+
+  if (kind === "permission-denied") {
+    return "check-permissions";
+  }
+
+  return "retry";
+}
+
+function getErrorCode(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return undefined;
+  }
+
+  const code = error.code;
+  return typeof code === "string" ? code : undefined;
+}
+
+function isNativeBindingError(code: string | undefined, message: string): boolean {
+  return (
+    code === "ERR_DLOPEN_FAILED" ||
+    code === "MODULE_NOT_FOUND" ||
+    code === "ERR_MODULE_NOT_FOUND" ||
+    /native binding|bindings file|dlopen|node-gyp|compiled against/i.test(message)
+  );
+}
+
+function isPortNotFoundError(code: string | undefined, message: string): boolean {
+  return (
+    code === "ENOENT" ||
+    /no such file|port(?:\s+path)?\s+not found|cannot find (?:the )?(?:serial )?(?:port|device)/i.test(
+      message,
+    )
+  );
+}
+
+function isPermissionError(code: string | undefined, message: string): boolean {
+  return (
+    code === "EACCES" ||
+    code === "EPERM" ||
+    /permission denied|access denied|operation not permitted/i.test(message)
+  );
+}
+
+function isBusyError(code: string | undefined, message: string): boolean {
+  return code === "EBUSY" || /resource busy|port is already open|already open/i.test(message);
+}
+
+function isDeviceDisconnectedError(code: string | undefined, message: string): boolean {
+  return (
+    code === "ENODEV" ||
+    code === "EIO" ||
+    code === "EBADF" ||
+    /device (?:was )?(?:disconnected|removed)|no such device|device is not present/i.test(message)
+  );
 }
 
 function getLineEndingText(lineEnding: LineEnding): string {

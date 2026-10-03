@@ -78,7 +78,7 @@ describe("MonitorPageHost", () => {
 
     expect(getPostedMessages(panel)).toContainEqual({
       type: "connectionState",
-      state: { connected: true, path: "/dev/ROBOT", baudRate: 115200 },
+      state: { phase: "connected", path: "/dev/ROBOT", baudRate: 115200 },
     });
     expect(panel.title).toBe("Live Serial Plotter: /dev/ROBOT");
 
@@ -106,7 +106,12 @@ describe("MonitorPageHost", () => {
 
     port.emit("error", new Error("read failed"));
     await waitForAsyncWork();
-    expect(getPostedMessages(panel)).toContainEqual({ type: "error", message: "read failed" });
+    expect(getPostedMessages(panel)).toContainEqual({
+      type: "error",
+      message: "read failed",
+      kind: "unknown",
+      recovery: "retry",
+    });
 
     panel.webview.postMessage.mockClear();
     dispatch({ type: "disconnect" });
@@ -114,7 +119,7 @@ describe("MonitorPageHost", () => {
 
     expect(getPostedMessages(panel)).toContainEqual({
       type: "connectionState",
-      state: { connected: false },
+      state: { phase: "disconnected" },
     });
     expect(panel.title).toBe(defaultTitle);
     expect(port.listenerCount("data")).toBe(0);
@@ -126,7 +131,9 @@ describe("MonitorPageHost", () => {
   });
 
   test("reports failed connections and removes failed port listeners", async () => {
-    const port = new HostTestSerialPort(new Error("open failed"));
+    const port = new HostTestSerialPort(
+      Object.assign(new Error("no such file"), { code: "ENOENT" }),
+    );
     const factory = new HostTestSerialPortFactory(port, []);
 
     MonitorPageHost.open(extensionUri, { serialPortFactory: factory });
@@ -142,11 +149,77 @@ describe("MonitorPageHost", () => {
     });
     await waitForAsyncWork();
 
-    expect(getPostedMessages(panel)).toContainEqual({ type: "error", message: "open failed" });
+    expect(getPostedMessages(panel)).toContainEqual({
+      type: "error",
+      message: "Port not found (/dev/FAIL): no such file",
+      kind: "port-not-found",
+      recovery: "refresh-ports",
+    });
     expect(panel.title).toMatch(/^Live Serial Plotter #\d+$/);
     expect(port.listenerCount("data")).toBe(0);
     expect(port.listenerCount("error")).toBe(0);
     expect(port.listenerCount("close")).toBe(0);
+
+    getDisposeHandler(panel)();
+    await waitForAsyncWork();
+  });
+
+  test("refreshes ports after an unexpected device close and allows reconnecting", async () => {
+    const port = new HostTestSerialPort();
+    const factory = new HostTestSerialPortFactory(port, [{ path: "/dev/ROBOT" }]);
+
+    MonitorPageHost.open(extensionUri, { serialPortFactory: factory });
+
+    const panel = getCreatedPanel();
+    const dispatch = getMessageHandler(panel);
+    await waitForAsyncWork();
+    panel.webview.postMessage.mockClear();
+
+    dispatch({
+      type: "connect",
+      settings: { path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" },
+    });
+    await waitForAsyncWork();
+    panel.webview.postMessage.mockClear();
+
+    port.emitData("before-unplug\npartial");
+    port.emitClose();
+    await waitForAsyncWork(75);
+
+    expect(getPostedMessages(panel)).toContainEqual(
+      expect.objectContaining({
+        type: "outputPacket",
+        packet: expect.objectContaining({
+          kind: "terminalAppend",
+          lines: [{ text: "before-unplug" }, { text: "partial" }],
+        }),
+      }),
+    );
+    expect(getPostedMessages(panel)).toContainEqual({
+      type: "error",
+      message: expect.stringContaining("Serial device disconnected"),
+      kind: "device-disconnected",
+      recovery: "refresh-ports",
+    });
+    expect(getPostedMessages(panel)).toContainEqual({
+      type: "ports",
+      ports: [{ path: "/dev/ROBOT" }],
+    });
+    expect(panel.title).toMatch(/^Live Serial Plotter #\d+$/);
+    expect(port.listenerCount("data")).toBe(0);
+
+    panel.webview.postMessage.mockClear();
+    dispatch({
+      type: "connect",
+      settings: { path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" },
+    });
+    await waitForAsyncWork();
+
+    expect(getPostedMessages(panel)).toContainEqual({
+      type: "connectionState",
+      state: { phase: "connected", path: "/dev/ROBOT", baudRate: 115200 },
+    });
+    expect(port.listenerCount("data")).toBe(1);
 
     getDisposeHandler(panel)();
     await waitForAsyncWork();
@@ -185,6 +258,11 @@ class HostTestSerialPort extends EventEmitter implements SerialPortLike {
 
   emitData(data: string): void {
     this.emit("data", Buffer.from(data));
+  }
+
+  emitClose(): void {
+    this.openState = false;
+    this.emit("close");
   }
 }
 

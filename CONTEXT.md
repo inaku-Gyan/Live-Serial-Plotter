@@ -40,6 +40,17 @@ controls, active profile and layout references, and page-level notifications.
 It delegates high-frequency output work to the output grid boundary.
 _Avoid_: a global monitor store shared by pages.
 
+**Connection Phase**:
+The lifecycle of one Monitor Page serial session: `disconnected`, `connecting`,
+`connected`, or `disconnecting`. Host operations are serialized so the page
+cannot start a second session during a transition.
+
+**Connection Error Kind**:
+The stable category attached to a serial failure: port not found, permission
+denied, port busy, native binding unavailable, device disconnected, or unknown.
+The category carries a recovery direction for the page, such as refreshing
+ports, retrying, or checking permissions.
+
 ## Configuration and session concepts
 
 **Profile**:

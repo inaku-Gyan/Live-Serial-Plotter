@@ -3,6 +3,7 @@ import { defaultLayout } from "../../../src/profiles/defaultLayout";
 import { defaultProfile } from "../../../src/profiles/defaultProfile";
 import {
   isParserMode,
+  type ConnectionPhase,
   type ConnectionSettings,
   type LayoutConfig,
   type LayoutSaveTarget,
@@ -51,7 +52,7 @@ interface PageState {
   baudRate: number;
   baudRateInput: string;
   parserMode: ParserMode;
-  connected: boolean;
+  connectionPhase: ConnectionPhase;
   errorMessage: string;
   errorVisible: boolean;
 }
@@ -84,7 +85,7 @@ export function createPageStore(vscode: PageVsCodeApi, options: PageStoreOptions
     baudRate: initialBaudRate,
     baudRateInput: String(initialBaudRate),
     parserMode: persistedState?.parserMode ?? defaultParserMode,
-    connected: false,
+    connectionPhase: "disconnected",
     errorMessage: "",
     errorVisible: false,
   });
@@ -92,17 +93,40 @@ export function createPageStore(vscode: PageVsCodeApi, options: PageStoreOptions
   let userChangedBaudRate = persistedState?.baudRate !== undefined;
 
   const baudRateValid = computed(() => isBaudRateInputValid(state.baudRateInput));
-  const connectionStatusText = computed(() =>
-    state.connected ? `Connected to ${state.selectedPath}` : "Disconnected",
+  const connected = computed(() => state.connectionPhase === "connected");
+  const connectionBusy = computed(
+    () => state.connectionPhase === "connecting" || state.connectionPhase === "disconnecting",
   );
-  const portSelectDisabled = computed(() => state.connected || state.ports.length === 0);
+  const connectionStatusText = computed(() => {
+    const path = state.selectedPath.length === 0 ? "serial port" : state.selectedPath;
+
+    if (state.connectionPhase === "connecting") {
+      return `Connecting to ${path}`;
+    }
+
+    if (state.connectionPhase === "connected") {
+      return `Connected to ${path}`;
+    }
+
+    if (state.connectionPhase === "disconnecting") {
+      return `Disconnecting from ${path}`;
+    }
+
+    return "Disconnected";
+  });
+  const portSelectDisabled = computed(
+    () => state.connectionPhase !== "disconnected" || state.ports.length === 0,
+  );
   const parserModeSelectDisabled = computed(
-    () => state.connected || state.activeProfile.parser.kind === "script",
+    () => state.connectionPhase !== "disconnected" || state.activeProfile.parser.kind === "script",
   );
   const connectDisabled = computed(
-    () => !state.connected && (state.selectedPath.length === 0 || !baudRateValid.value),
+    () =>
+      state.connectionPhase !== "disconnected" ||
+      state.selectedPath.length === 0 ||
+      !baudRateValid.value,
   );
-  const sendDisabled = computed(() => !state.connected);
+  const sendDisabled = computed(() => !connected.value);
 
   function mountOutputGrid(root: HTMLElement): void {
     outputGrid?.dispose();
@@ -153,8 +177,12 @@ export function createPageStore(vscode: PageVsCodeApi, options: PageStoreOptions
   }
 
   function toggleConnection(): void {
-    if (state.connected) {
+    if (connected.value) {
       postMessage({ type: "disconnect" });
+      return;
+    }
+
+    if (state.connectionPhase !== "disconnected") {
       return;
     }
 
@@ -181,7 +209,7 @@ export function createPageStore(vscode: PageVsCodeApi, options: PageStoreOptions
   }
 
   function sendText(text: string): boolean {
-    if (text.length === 0 || !state.connected) {
+    if (text.length === 0 || !connected.value) {
       return false;
     }
 
@@ -222,7 +250,7 @@ export function createPageStore(vscode: PageVsCodeApi, options: PageStoreOptions
         outputGrid?.renderOutputs(state.activeProfile.outputs, state.activeLayout);
         return;
       case "connectionState":
-        state.connected = message.state.connected;
+        state.connectionPhase = message.state.phase;
         return;
       case "outputPacket":
         outputGrid?.appendPacket(message.packet);
@@ -343,6 +371,8 @@ export function createPageStore(vscode: PageVsCodeApi, options: PageStoreOptions
     state,
     baudRateValid,
     connectionStatusText,
+    connected,
+    connectionBusy,
     portSelectDisabled,
     parserModeSelectDisabled,
     connectDisabled,

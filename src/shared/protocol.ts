@@ -22,8 +22,30 @@ export interface ConnectionSettings {
   parserMode?: ParserMode;
 }
 
+export const connectionPhases = [
+  "disconnected",
+  "connecting",
+  "connected",
+  "disconnecting",
+] as const;
+
+export type ConnectionPhase = (typeof connectionPhases)[number];
+
+export const connectionErrorKinds = [
+  "port-not-found",
+  "permission-denied",
+  "port-busy",
+  "native-binding",
+  "device-disconnected",
+  "unknown",
+] as const;
+
+export type ConnectionErrorKind = (typeof connectionErrorKinds)[number];
+
+export type ConnectionErrorRecovery = "refresh-ports" | "retry" | "check-permissions";
+
 export interface ConnectionState {
-  connected: boolean;
+  phase: ConnectionPhase;
   path?: string;
   baudRate?: number;
 }
@@ -789,7 +811,12 @@ export type ToWebviewMessage =
   | { type: "layoutSavedAs"; layout: LayoutConfig; layoutKey: string; profile: ProfileConfig }
   | { type: "outputPacket"; packet: OutputPacket }
   | { type: "connectionState"; state: ConnectionState }
-  | { type: "error"; message: string };
+  | {
+      type: "error";
+      message: string;
+      kind?: ConnectionErrorKind;
+      recovery?: ConnectionErrorRecovery;
+    };
 
 export type ToProfileEditorMessage =
   | { type: "requestProfileEditorState"; profileKey?: string }

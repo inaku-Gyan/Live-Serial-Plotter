@@ -4,6 +4,7 @@ import { LayoutStore } from "../profiles/LayoutStore";
 import { ProfileStore } from "../profiles/ProfileStore";
 import {
   SerialService,
+  SerialConnectionError,
   type SerialPortFactory,
   type SerialServiceOptions,
 } from "../serial/SerialService";
@@ -80,7 +81,7 @@ export class MonitorPageHost {
           this.postMessage({ type: "connectionState", state });
         },
         onOutputPacket: (packet) => this.outputPacketBatcher.add(packet),
-        onError: (message) => this.postError(message),
+        onError: (error) => this.handleSerialError(error),
       },
       options.serialPortFactory,
       serialServiceOptions,
@@ -103,7 +104,7 @@ export class MonitorPageHost {
   private async handleMessage(message: ToExtensionMessage): Promise<void> {
     try {
       if (message.type === "requestPorts") {
-        await this.postPorts();
+        this.postPorts();
         return;
       }
 
@@ -165,17 +166,49 @@ export class MonitorPageHost {
         return;
       }
     } catch (error) {
-      this.postError(formatError(error));
+      this.postErrorFromUnknown(error);
     }
   }
 
-  private async postPorts(): Promise<void> {
-    const ports = await this.serialService.listPorts();
-    this.postMessage({ type: "ports", ports });
+  private postPorts(): void {
+    void this.serialService.listPorts().then(
+      (ports) => this.postMessage({ type: "ports", ports }),
+      (error: unknown) => this.postErrorFromUnknown(error),
+    );
   }
 
-  private postError(message: string): void {
-    this.postMessage({ type: "error", message });
+  private handleSerialError(error: SerialConnectionError): void {
+    this.postError(error.message, error);
+
+    if (error.kind === "device-disconnected") {
+      this.postPorts();
+    }
+  }
+
+  private postErrorFromUnknown(error: unknown): void {
+    if (error instanceof SerialConnectionError) {
+      this.postError(error.message, error);
+      return;
+    }
+
+    this.postError(formatError(error));
+  }
+
+  private postError(
+    message: string,
+    details?: Pick<SerialConnectionError, "kind" | "recovery">,
+  ): void {
+    const errorMessage: Parameters<vscode.Webview["postMessage"]>[0] = {
+      type: "error",
+      message,
+    };
+
+    if (details !== undefined) {
+      errorMessage.kind = details.kind;
+      errorMessage.recovery = details.recovery;
+    }
+
+    this.postMessage(errorMessage);
   }
 
   private async postProfiles(activeProfileKey: string | undefined): Promise<void> {
@@ -246,10 +279,27 @@ export class MonitorPageHost {
   }
 
   private updatePanelTitle(state: ConnectionState): void {
-    this.panel.title =
-      state.connected && state.path !== undefined
-        ? `Live Serial Plotter: ${state.path}`
-        : this.defaultTitle;
+    if (state.path === undefined) {
+      this.panel.title = this.defaultTitle;
+      return;
+    }
+
+    if (state.phase === "connected") {
+      this.panel.title = `Live Serial Plotter: ${state.path}`;
+      return;
+    }
+
+    if (state.phase === "connecting") {
+      this.panel.title = `Live Serial Plotter: Connecting to ${state.path}`;
+      return;
+    }
+
+    if (state.phase === "disconnecting") {
+      this.panel.title = `Live Serial Plotter: Disconnecting from ${state.path}`;
+      return;
+    }
+
+    this.panel.title = this.defaultTitle;
   }
 
   private getHtml(): string {

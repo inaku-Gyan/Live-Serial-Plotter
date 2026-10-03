@@ -137,6 +137,18 @@ flowchart TD
 - **controller 管路由与快照**：`DomOutputGridController` 负责 packet 路由（`appendPacket`）、布局采集（`captureLayout`）与视图状态重置，是 `OutputGridController` 端口的生产实现。
 - 命名边界：`OutputGrid` **不叫 Workspace**，以避免与 `vscode.workspace` 撞名。
 
+## 5. 串口会话生命周期
+
+`SerialService` 通过共享协议发布四个连接阶段：`disconnected`、`connecting`、
+`connected` 和 `disconnecting`。连接与断开操作进入同一个串行队列，因此连续的
+connect 请求会先完整结束上一会话，再建立下一会话；过渡阶段会禁用监视页的重复操作。
+
+连接失败会保留稳定的错误类别：`port-not-found`、`permission-denied`、
+`port-busy`、`native-binding` 或 `unknown`。错误消息同时带有可执行的恢复方向，
+例如刷新端口、重试或检查权限。串口意外 close 会进入 `disconnected`，释放 pipeline
+和串口监听器，保留 Monitor Page 的输出网格与已有日志，并提示刷新端口；Host 会自动
+请求最新端口列表，用户可在刷新后重新连接。
+
 ## 相关文档
 
 - `AGENTS.md` — 目录职责与代码规范（当前结构权威）。

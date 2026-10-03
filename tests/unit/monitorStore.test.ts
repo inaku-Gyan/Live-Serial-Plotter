@@ -137,7 +137,7 @@ describe("monitor store", () => {
 
     store.handleHostMessage({
       type: "connectionState",
-      state: { connected: true, path: "/dev/ttyUSB0", baudRate: 115_200 },
+      state: { phase: "connected", path: "/dev/ttyUSB0", baudRate: 115_200 },
     });
     expect(store.portSelectDisabled.value).toBe(true);
     expect(store.sendText("ping")).toBe(true);
@@ -145,6 +145,40 @@ describe("monitor store", () => {
 
     expect(vscode.messages).toContainEqual({ type: "send", text: "ping" });
     expect(vscode.messages).toContainEqual({ type: "disconnect" });
+  });
+
+  test("keeps controls consistent across connection lifecycle phases", () => {
+    const vscode = createVscodeApi();
+    const { store } = createStore(vscode.api);
+
+    store.handleHostMessage({
+      type: "ports",
+      ports: [{ path: "/dev/ttyUSB0" }],
+    });
+    vscode.messages.length = 0;
+
+    store.handleHostMessage({
+      type: "connectionState",
+      state: { phase: "connecting", path: "/dev/ttyUSB0", baudRate: 115_200 },
+    });
+
+    expect(store.connectionStatusText.value).toBe("Connecting to /dev/ttyUSB0");
+    expect(store.connectDisabled.value).toBe(true);
+    expect(store.portSelectDisabled.value).toBe(true);
+    expect(store.sendDisabled.value).toBe(true);
+    store.toggleConnection();
+    expect(vscode.messages).toEqual([]);
+
+    store.handleHostMessage({
+      type: "connectionState",
+      state: { phase: "disconnecting", path: "/dev/ttyUSB0", baudRate: 115_200 },
+    });
+    expect(store.connectionStatusText.value).toBe("Disconnecting from /dev/ttyUSB0");
+
+    store.handleHostMessage({ type: "connectionState", state: { phase: "disconnected" } });
+    expect(store.connectionStatusText.value).toBe("Disconnected");
+    expect(store.connectDisabled.value).toBe(false);
+    expect(store.portSelectDisabled.value).toBe(false);
   });
 
   test("forwards output packets directly to the imperative adapter", () => {

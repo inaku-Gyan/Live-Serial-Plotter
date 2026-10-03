@@ -115,7 +115,7 @@ describe("MonitorPage", () => {
 
     dispatchHostMessage({
       type: "connectionState",
-      state: { connected: true, path: "/dev/ttyUSB0", baudRate: 115_200 },
+      state: { phase: "connected", path: "/dev/ttyUSB0", baudRate: 115_200 },
     });
     await nextTick();
 
@@ -134,6 +134,34 @@ describe("MonitorPage", () => {
     expect(
       wrapper.find<HTMLInputElement>(".send-row input").attributes("disabled"),
     ).toBeUndefined();
+  });
+
+  test("renders connecting and disconnecting states without allowing duplicate actions", async () => {
+    const { wrapper, vscode } = mountMonitor();
+    dispatchHostMessage({
+      type: "ports",
+      ports: [{ path: "/dev/ttyUSB0" }],
+    });
+    dispatchHostMessage({
+      type: "connectionState",
+      state: { phase: "connecting", path: "/dev/ttyUSB0", baudRate: 115_200 },
+    });
+    await nextTick();
+
+    expect(wrapper.find(".status").text()).toBe("Connecting to /dev/ttyUSB0");
+    expect(wrapper.find(".status").classes()).not.toContain("status-connected");
+    const workingButton = wrapper.findAll("button").find((button) => button.text() === "Working…");
+    expect(workingButton?.attributes("disabled")).toBeDefined();
+
+    await workingButton?.trigger("click");
+    expect(vscode.messages).not.toContainEqual({ type: "disconnect" });
+
+    dispatchHostMessage({
+      type: "connectionState",
+      state: { phase: "disconnecting", path: "/dev/ttyUSB0", baudRate: 115_200 },
+    });
+    await nextTick();
+    expect(wrapper.find(".status").text()).toBe("Disconnecting from /dev/ttyUSB0");
   });
 
   test("script profiles disable parser mode select", async () => {
@@ -168,7 +196,7 @@ describe("MonitorPage", () => {
     const { wrapper, vscode } = mountMonitor();
     dispatchHostMessage({
       type: "connectionState",
-      state: { connected: true, path: "/dev/ttyUSB0", baudRate: 115_200 },
+      state: { phase: "connected", path: "/dev/ttyUSB0", baudRate: 115_200 },
     });
     await nextTick();
 

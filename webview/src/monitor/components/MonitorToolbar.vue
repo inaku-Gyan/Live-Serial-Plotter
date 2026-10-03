@@ -7,6 +7,8 @@ const store = usePageStore();
 const {
   state,
   baudRateValid,
+  connected,
+  connectionBusy,
   connectionStatusText,
   portSelectDisabled,
   parserModeSelectDisabled,
@@ -73,7 +75,7 @@ function formatParserMode(parserMode: ParserMode): string {
       <span>Profile</span>
       <select
         :value="state.profileKey"
-        :disabled="state.connected"
+        :disabled="connectionBusy || connected"
         @change="handleProfileChange($event)"
       >
         <option v-for="profile in state.profiles" :key="profile.key" :value="profile.key">
@@ -107,7 +109,7 @@ function formatParserMode(parserMode: ParserMode): string {
         inputmode="numeric"
         list="baudRatePresets"
         autocomplete="off"
-        :disabled="state.connected"
+        :disabled="connectionBusy || connected"
         :aria-invalid="baudRateValid ? 'false' : 'true'"
         @input="handleBaudInput($event)"
         @change="handleBaudInput($event)"
@@ -130,14 +132,14 @@ function formatParserMode(parserMode: ParserMode): string {
     </label>
     <button
       class="button"
-      :class="state.connected ? 'button-secondary' : 'button-primary'"
+      :class="connected ? 'button-secondary' : 'button-primary'"
       type="button"
       :disabled="connectDisabled"
       @click="store.toggleConnection()"
     >
-      {{ state.connected ? "Disconnect" : "Connect" }}
+      {{ connected ? "Disconnect" : connectionBusy ? "Working…" : "Connect" }}
     </button>
-    <span class="status" :class="{ 'status-connected': state.connected }" aria-live="polite">
+    <span class="status" :class="{ 'status-connected': connected }" aria-live="polite">
       {{ connectionStatusText }}
     </span>
   </header>

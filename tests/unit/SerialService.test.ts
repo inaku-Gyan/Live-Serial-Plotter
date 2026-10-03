@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest";
 import { SerialPortMock } from "serialport";
 import {
   SerialService,
+  type SerialConnectionError,
   type SerialPortFactory,
   type SerialPortLike,
 } from "../../src/serial/SerialService";
@@ -173,7 +174,10 @@ describe("SerialService", () => {
 
     await service.connect({ path: "/dev/ROBOT", baudRate: 115200, parserMode: "raw" });
 
-    expect(states).toEqual([{ connected: true, path: "/dev/ROBOT", baudRate: 115200 }]);
+    expect(states).toEqual([
+      { phase: "connecting", path: "/dev/ROBOT", baudRate: 115200 },
+      { phase: "connected", path: "/dev/ROBOT", baudRate: 115200 },
+    ]);
     expect(port.listenerCount("data")).toBe(1);
     expect(port.listenerCount("error")).toBe(1);
     expect(port.listenerCount("close")).toBe(1);
@@ -182,22 +186,95 @@ describe("SerialService", () => {
 
     expect(port.closeCalls).toBe(1);
     expect(states).toEqual([
-      { connected: true, path: "/dev/ROBOT", baudRate: 115200 },
-      { connected: false },
+      { phase: "connecting", path: "/dev/ROBOT", baudRate: 115200 },
+      { phase: "connected", path: "/dev/ROBOT", baudRate: 115200 },
+      { phase: "disconnecting", path: "/dev/ROBOT", baudRate: 115200 },
+      { phase: "disconnected" },
     ]);
     expect(port.listenerCount("data")).toBe(0);
     expect(port.listenerCount("error")).toBe(0);
     expect(port.listenerCount("close")).toBe(0);
   });
 
+  test.each([
+    {
+      code: "ENOENT",
+      message: "no such file or directory",
+      kind: "port-not-found",
+      recovery: "refresh-ports",
+    },
+    {
+      code: "EACCES",
+      message: "permission denied",
+      kind: "permission-denied",
+      recovery: "check-permissions",
+    },
+    {
+      code: "EBUSY",
+      message: "resource busy",
+      kind: "port-busy",
+      recovery: "retry",
+    },
+    {
+      code: "ERR_DLOPEN_FAILED",
+      message: "native binding failed to load",
+      kind: "native-binding",
+      recovery: "retry",
+    },
+  ])("classifies $code connection failures", async ({ code, message, kind, recovery }) => {
+    const error = Object.assign(new Error(message), { code });
+    const service = new SerialService(
+      {},
+      new SequenceSerialPortFactory([new FakeSerialPort(error)]),
+    );
+
+    await expect(
+      service.connect({ path: "/dev/TEST", baudRate: 115200, parserMode: "raw" }),
+    ).rejects.toMatchObject({
+      kind,
+      path: "/dev/TEST",
+      recovery,
+    });
+  });
+
+  test("serializes repeated connect operations into one active session", async () => {
+    const firstPort = new FakeSerialPort();
+    const secondPort = new FakeSerialPort();
+    const states: ConnectionState[] = [];
+    const service = new SerialService(
+      { onConnectionState: (state) => states.push(state) },
+      new SequenceSerialPortFactory([firstPort, secondPort]),
+    );
+
+    await Promise.all([
+      service.connect({ path: "/dev/FIRST", baudRate: 115200, parserMode: "raw" }),
+      service.connect({ path: "/dev/SECOND", baudRate: 9600, parserMode: "raw" }),
+    ]);
+
+    expect(states).toEqual([
+      { phase: "connecting", path: "/dev/FIRST", baudRate: 115200 },
+      { phase: "connected", path: "/dev/FIRST", baudRate: 115200 },
+      { phase: "disconnecting", path: "/dev/FIRST", baudRate: 115200 },
+      { phase: "disconnected" },
+      { phase: "connecting", path: "/dev/SECOND", baudRate: 9600 },
+      { phase: "connected", path: "/dev/SECOND", baudRate: 9600 },
+    ]);
+    expect(firstPort.listenerCount("data")).toBe(0);
+    expect(secondPort.listenerCount("data")).toBe(1);
+
+    await service.disconnect();
+  });
+
   test("cleans up after an unexpected port close", async () => {
     const port = new FakeSerialPort();
     const states: ConnectionState[] = [];
     const packets: OutputPacket[] = [];
+    const errors: SerialConnectionError[] = [];
     const service = new SerialService(
       {
         onConnectionState: (state) => states.push(state),
         onOutputPacket: (packet) => packets.push(packet),
+        onError: (error) => errors.push(error),
       },
       new SequenceSerialPortFactory([port]),
     );
@@ -206,8 +283,16 @@ describe("SerialService", () => {
     port.emit("close");
 
     expect(states).toEqual([
-      { connected: true, path: "/dev/ROBOT", baudRate: 115200 },
-      { connected: false },
+      { phase: "connecting", path: "/dev/ROBOT", baudRate: 115200 },
+      { phase: "connected", path: "/dev/ROBOT", baudRate: 115200 },
+      { phase: "disconnected" },
+    ]);
+    expect(errors).toEqual([
+      expect.objectContaining({
+        kind: "device-disconnected",
+        path: "/dev/ROBOT",
+        recovery: "refresh-ports",
+      }),
     ]);
     expect(port.listenerCount("data")).toBe(0);
     expect(port.listenerCount("error")).toBe(0);
